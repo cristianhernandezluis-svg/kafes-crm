@@ -13,20 +13,36 @@ export async function PATCH(
     const { id } = await context.params;
     const body = await request.json();
 
-    const { etapa, asesor, ciudad } = body;
+    console.log("ID RECIBIDO:", id);
+    console.log("BODY RECIBIDO:", body);
 
     const result = await pool.query(
       `
       UPDATE clientes
       SET
-        etapa = COALESCE($1, etapa),
+        etapa = $1,
         asesor = COALESCE($2, asesor),
-        ciudad = COALESCE($3, ciudad)
-      WHERE id = $4
+        ciudad = COALESCE($3, ciudad),
+        observacion = $4,
+        proximo_seguimiento = $5,
+        ultima_gestion = $6,
+        cantidad_seguimientos = $7
+      WHERE id = $8
       RETURNING *
       `,
-      [etapa, asesor, ciudad, id]
+      [
+        body.etapa || "Seguimiento",
+        body.asesor ?? null,
+        body.ciudad ?? null,
+        body.observacion ?? "",
+        body.proximo_seguimiento ?? null,
+        body.ultima_gestion ?? new Date().toISOString(),
+        body.cantidad_seguimientos ?? 0,
+        id,
+      ]
     );
+
+    console.log("CLIENTE ACTUALIZADO:", result.rows[0]);
 
     return NextResponse.json({
       success: true,
@@ -36,7 +52,10 @@ export async function PATCH(
     console.error("Error actualizando cliente:", error);
 
     return NextResponse.json(
-      { success: false, error: "Error actualizando cliente" },
+      {
+        success: false,
+        error: "Error actualizando cliente",
+      },
       { status: 500 }
     );
   }
