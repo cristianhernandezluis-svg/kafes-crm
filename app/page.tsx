@@ -19,6 +19,10 @@ type Cliente = {
   ciudad: string | null;
   etapa: string;
   asesor: string | null;
+  observacion?: string | null;
+  proximo_seguimiento?: string | null;
+  ultima_gestion?: string | null;
+  cantidad_seguimientos?: number;
   created_at: string;
 };
 
@@ -42,6 +46,11 @@ export default function Home() {
   const [mensajeNuevo, setMensajeNuevo] = useState("");
   const [enviando, setEnviando] = useState(false);
 
+  const [clienteSeguimiento, setClienteSeguimiento] =
+    useState<Cliente | null>(null);
+  const [fechaSeguimiento, setFechaSeguimiento] = useState("");
+  const [observacionSeguimiento, setObservacionSeguimiento] = useState("");
+
   const [form, setForm] = useState({
     nombre: "",
     telefono: "",
@@ -49,6 +58,13 @@ export default function Home() {
     etapa: "Nuevo",
     asesor: "",
   });
+
+  const seguimientosPendientes = clientes.filter(
+    (c) =>
+      c.proximo_seguimiento &&
+      new Date(c.proximo_seguimiento) <= new Date() &&
+      !["Pagó Adelanto", "Enviado", "Entregado"].includes(c.etapa)
+  );
 
   const cargarClientes = async () => {
     try {
@@ -156,6 +172,44 @@ export default function Home() {
     }
   };
 
+  const guardarSeguimiento = async () => {
+    if (!clienteSeguimiento || !fechaSeguimiento) {
+      alert("Selecciona fecha y hora");
+      return;
+    }
+
+    const nuevaCantidad = (clienteSeguimiento.cantidad_seguimientos || 0) + 1;
+
+    try {
+      const res = await fetch(`/api/clientes/${clienteSeguimiento.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proximo_seguimiento: fechaSeguimiento,
+          observacion: observacionSeguimiento,
+          ultima_gestion: new Date().toISOString(),
+          cantidad_seguimientos: nuevaCantidad,
+          etapa: "Seguimiento",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert("No se pudo guardar el seguimiento");
+        return;
+      }
+
+      setClienteSeguimiento(null);
+      setFechaSeguimiento("");
+      setObservacionSeguimiento("");
+      cargarClientes();
+    } catch (error) {
+      console.error("Error guardando seguimiento:", error);
+      alert("Error guardando seguimiento");
+    }
+  };
+
   const enviarMensaje = async () => {
     if (!clienteActivo || !mensajeNuevo.trim()) return;
 
@@ -177,7 +231,6 @@ export default function Home() {
       const data = await res.json();
 
       if (!data.success) {
-        console.error("Error WhatsApp:", data);
         alert("No se pudo enviar el mensaje");
         return;
       }
@@ -218,6 +271,7 @@ export default function Home() {
         <div className="mt-10 bg-zinc-900 p-4 rounded-xl">
           <p className="text-sm text-gray-400">Resumen hoy</p>
           <p className="mt-2">Clientes: {clientes.length}</p>
+          <p>Seguimientos: {seguimientosPendientes.length}</p>
           <p>
             Adelantos:{" "}
             {clientes.filter((c) => c.etapa === "Pagó Adelanto").length}
@@ -250,6 +304,17 @@ export default function Home() {
           </div>
         </div>
 
+        {seguimientosPendientes.length > 0 && (
+          <div className="mt-6 bg-orange-100 border border-orange-300 rounded-xl p-4">
+            <p className="font-bold text-orange-700">
+              🔥 Seguimientos pendientes: {seguimientosPendientes.length}
+            </p>
+            <p className="text-sm text-orange-700">
+              Estos clientes ya deberían ser contactados nuevamente.
+            </p>
+          </div>
+        )}
+
         {cargando ? (
           <p className="mt-8 text-gray-500">Cargando clientes...</p>
         ) : (
@@ -269,64 +334,110 @@ export default function Home() {
                 <div className="space-y-3">
                   {clientes
                     .filter((cliente) => cliente.etapa === estado)
-                    .map((cliente) => (
-                      <div
-                        key={cliente.id}
-                        className="bg-gray-100 p-3 rounded-lg"
-                      >
-                        <p className="font-semibold">
-                          {cliente.nombre || "Sin nombre"}
-                        </p>
+                    .map((cliente) => {
+                      const seguimientoVencido =
+                        cliente.proximo_seguimiento &&
+                        new Date(cliente.proximo_seguimiento) <= new Date() &&
+                        !["Pagó Adelanto", "Enviado", "Entregado"].includes(
+                          cliente.etapa
+                        );
 
-                        <p className="text-sm">📱 {cliente.telefono}</p>
-
-                        <p className="text-green-600 text-sm">
-                          📍 {cliente.ciudad || "Sin ciudad"}
-                        </p>
-
-                        <p className="text-xs mt-2 text-gray-500">
-                          Etapa: {cliente.etapa}
-                        </p>
-
-                        <select
-                          className="border w-full p-2 mt-3 rounded text-sm bg-white"
-                          value={cliente.etapa}
-                          onChange={(e) =>
-                            cambiarEtapa(cliente.id, e.target.value)
-                          }
+                      return (
+                        <div
+                          key={cliente.id}
+                          className={`p-3 rounded-lg ${
+                            seguimientoVencido
+                              ? "bg-orange-100 border border-orange-300"
+                              : "bg-gray-100"
+                          }`}
                         >
-                          {estados.map((estado) => (
-                            <option key={estado} value={estado}>
-                              {estado}
-                            </option>
-                          ))}
-                        </select>
-
-                        {cliente.asesor && (
-                          <p className="text-xs text-gray-500 mt-2">
-                            Asesor: {cliente.asesor}
+                          <p className="font-semibold">
+                            {cliente.nombre || "Sin nombre"}
                           </p>
-                        )}
 
-                        <button
-                          onClick={() => abrirConversacion(cliente)}
-                          className="block bg-blue-600 text-white text-center mt-3 py-2 rounded text-sm font-bold w-full"
-                        >
-                          Ver conversación
-                        </button>
+                          <p className="text-sm">📱 {cliente.telefono}</p>
 
-                        <a
-                          href={`https://wa.me/51${cliente.telefono.replace(
-                            /\s/g,
-                            ""
-                          )}`}
-                          target="_blank"
-                          className="block bg-green-600 text-white text-center mt-2 py-2 rounded text-sm font-bold"
-                        >
-                          Abrir WhatsApp
-                        </a>
-                      </div>
-                    ))}
+                          <p className="text-green-600 text-sm">
+                            📍 {cliente.ciudad || "Sin ciudad"}
+                          </p>
+
+                          {cliente.proximo_seguimiento && (
+                            <p className="text-orange-600 text-xs mt-1">
+                              📅 Seguimiento:{" "}
+                              {new Date(
+                                cliente.proximo_seguimiento
+                              ).toLocaleString()}
+                            </p>
+                          )}
+
+                          {cliente.observacion && (
+                            <p className="text-xs text-gray-600 mt-1">
+                              📝 {cliente.observacion}
+                            </p>
+                          )}
+
+                          <p className="text-blue-600 text-xs">
+                            🔥 Seguimientos:{" "}
+                            {cliente.cantidad_seguimientos || 0}
+                          </p>
+
+                          <p className="text-xs mt-2 text-gray-500">
+                            Etapa: {cliente.etapa}
+                          </p>
+
+                          <select
+                            className="border w-full p-2 mt-3 rounded text-sm bg-white"
+                            value={cliente.etapa}
+                            onChange={(e) =>
+                              cambiarEtapa(cliente.id, e.target.value)
+                            }
+                          >
+                            {estados.map((estado) => (
+                              <option key={estado} value={estado}>
+                                {estado}
+                              </option>
+                            ))}
+                          </select>
+
+                          {cliente.asesor && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              Asesor: {cliente.asesor}
+                            </p>
+                          )}
+
+                          <button
+                            onClick={() => abrirConversacion(cliente)}
+                            className="block bg-blue-600 text-white text-center mt-3 py-2 rounded text-sm font-bold w-full"
+                          >
+                            Ver conversación
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setClienteSeguimiento(cliente);
+                              setFechaSeguimiento("");
+                              setObservacionSeguimiento(
+                                cliente.observacion || ""
+                              );
+                            }}
+                            className="block bg-orange-500 text-white text-center mt-2 py-2 rounded text-sm font-bold w-full"
+                          >
+                            📅 Programar seguimiento
+                          </button>
+
+                          <a
+                            href={`https://wa.me/51${cliente.telefono.replace(
+                              /\s/g,
+                              ""
+                            )}`}
+                            target="_blank"
+                            className="block bg-green-600 text-white text-center mt-2 py-2 rounded text-sm font-bold"
+                          >
+                            Abrir WhatsApp
+                          </a>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             ))}
@@ -335,8 +446,8 @@ export default function Home() {
       </main>
 
       {clienteActivo && (
-        <div className="fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl z-50 p-5 overflow-y-auto">
-          <div className="flex justify-between items-center mb-4">
+        <div className="fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl z-50 flex flex-col">
+          <div className="flex justify-between items-center p-5 border-b">
             <h2 className="text-xl font-bold">Conversación</h2>
             <button
               onClick={() => setClienteActivo(null)}
@@ -346,13 +457,13 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="bg-gray-100 p-3 rounded-lg mb-4">
+          <div className="bg-gray-100 p-3 rounded-lg m-5">
             <p className="font-bold">{clienteActivo.nombre}</p>
             <p className="text-sm">📱 {clienteActivo.telefono}</p>
             <p className="text-sm">📍 {clienteActivo.ciudad || "Sin ciudad"}</p>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1 overflow-y-auto p-5">
             {conversaciones.length === 0 ? (
               <p className="text-gray-500 text-sm">
                 Aún no hay mensajes guardados para este cliente.
@@ -377,7 +488,7 @@ export default function Home() {
             )}
           </div>
 
-          <div className="mt-5 border-t pt-4">
+          <div className="border-t p-4">
             <textarea
               className="w-full border rounded-lg p-3"
               rows={3}
@@ -393,6 +504,50 @@ export default function Home() {
             >
               {enviando ? "Enviando..." : "Enviar WhatsApp"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {clienteSeguimiento && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl w-[430px] shadow-xl">
+            <h2 className="text-2xl font-bold mb-4">
+              Programar Seguimiento
+            </h2>
+
+            <p className="mb-3 text-sm">
+              Cliente: <strong>{clienteSeguimiento.nombre}</strong>
+            </p>
+
+            <input
+              type="datetime-local"
+              className="border w-full p-3 mb-3 rounded-lg"
+              value={fechaSeguimiento}
+              onChange={(e) => setFechaSeguimiento(e.target.value)}
+            />
+
+            <textarea
+              className="border w-full p-3 mb-3 rounded-lg"
+              placeholder="Observación del seguimiento"
+              value={observacionSeguimiento}
+              onChange={(e) => setObservacionSeguimiento(e.target.value)}
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setClienteSeguimiento(null)}
+                className="bg-gray-300 px-4 py-2 rounded-lg w-full"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={guardarSeguimiento}
+                className="bg-orange-500 text-white px-4 py-2 rounded-lg w-full font-bold"
+              >
+                Guardar
+              </button>
+            </div>
           </div>
         </div>
       )}
