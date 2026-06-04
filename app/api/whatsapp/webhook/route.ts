@@ -21,12 +21,24 @@ async function prepararTablas() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS conversaciones (
       id SERIAL PRIMARY KEY,
+      cliente_id INTEGER REFERENCES clientes(id) ON DELETE CASCADE,
+      telefono TEXT,
       whatsapp_message_id TEXT,
       mensaje TEXT,
       remitente TEXT,
       tipo TEXT DEFAULT 'text',
       created_at TIMESTAMP DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE conversaciones
+    ADD COLUMN IF NOT EXISTS cliente_id INTEGER;
+  `);
+
+  await pool.query(`
+    ALTER TABLE conversaciones
+    ADD COLUMN IF NOT EXISTS telefono TEXT;
   `);
 }
 
@@ -64,30 +76,43 @@ export async function POST(req: Request) {
     const whatsappMessageId = message.id || null;
     const tipo = message.type || "text";
 
-    await pool.query(
+    const clienteResult = await pool.query(
       `
       INSERT INTO clientes (nombre, telefono)
       VALUES ($1, $2)
       ON CONFLICT (telefono)
-      DO UPDATE SET nombre = EXCLUDED.nombre;
+      DO UPDATE SET nombre = EXCLUDED.nombre
+      RETURNING id, nombre, telefono;
       `,
       [nombre, telefono]
     );
 
+    const cliente = clienteResult.rows[0];
+
     await pool.query(
       `
       INSERT INTO conversaciones (
+        cliente_id,
+        telefono,
         whatsapp_message_id,
         mensaje,
         remitente,
         tipo
       )
-      VALUES ($1, $2, $3, $4);
+      VALUES ($1, $2, $3, $4, $5, $6);
       `,
-      [whatsappMessageId, mensaje, telefono, tipo]
+      [
+        cliente.id,
+        telefono,
+        whatsappMessageId,
+        mensaje,
+        "cliente",
+        tipo,
+      ]
     );
 
     console.log("WHATSAPP GUARDADO:", {
+      cliente_id: cliente.id,
       telefono,
       nombre,
       mensaje,
