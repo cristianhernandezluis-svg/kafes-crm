@@ -23,14 +23,12 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   try {
-    console.log("BODY WHATSAPP:", JSON.stringify(body, null, 2));
-
     const value = body?.entry?.[0]?.changes?.[0]?.value;
     const contact = value?.contacts?.[0];
     const message = value?.messages?.[0];
 
     if (!message || !contact) {
-      return NextResponse.json({ success: true, message: "Sin mensaje nuevo" });
+      return NextResponse.json({ success: true });
     }
 
     const telefono = contact.wa_id || message.from;
@@ -39,35 +37,30 @@ export async function POST(req: Request) {
     const whatsappMessageId = message.id || null;
     const tipo = message.type || "text";
 
-    const clienteResult = await pool.query(
+    await pool.query(
       `
       INSERT INTO clientes (nombre, telefono)
       VALUES ($1, $2)
       ON CONFLICT (telefono)
-      DO UPDATE SET nombre = EXCLUDED.nombre
-      RETURNING id;
+      DO UPDATE SET nombre = EXCLUDED.nombre;
       `,
       [nombre, telefono]
     );
 
-    const clienteId = clienteResult.rows[0].id;
-
     await pool.query(
       `
       INSERT INTO conversaciones (
-        cliente_id,
         whatsapp_message_id,
         mensaje,
         remitente,
         tipo
       )
-      VALUES ($1, $2, $3, $4, $5);
+      VALUES ($1, $2, $3, $4);
       `,
-      [clienteId, whatsappMessageId, mensaje, "cliente", tipo]
+      [whatsappMessageId, mensaje, telefono, tipo]
     );
 
-    console.log("WHATSAPP GUARDADO:", {
-      clienteId,
+    console.log("WHATSAPP GUARDADO SIN ID:", {
       telefono,
       nombre,
       mensaje,
