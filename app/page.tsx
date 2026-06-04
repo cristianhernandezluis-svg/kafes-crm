@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const estados = [
@@ -276,9 +277,12 @@ const seguimientosHoy = clientes.filter((c) => {
           <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
             Clientes
           </div>
-          <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
-            Seguimientos
-          </div>
+         <Link
+  href="/seguimientos"
+  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+>
+  Seguimientos
+</Link>
           <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
             Ventas
           </div>
