@@ -5,6 +5,31 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+async function prepararTablas() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clientes (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT,
+      telefono TEXT UNIQUE NOT NULL,
+      ciudad TEXT,
+      etapa TEXT DEFAULT 'Nuevo',
+      asesor TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS conversaciones (
+      id SERIAL PRIMARY KEY,
+      whatsapp_message_id TEXT,
+      mensaje TEXT,
+      remitente TEXT,
+      tipo TEXT DEFAULT 'text',
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
@@ -23,6 +48,8 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   try {
+    await prepararTablas();
+
     const value = body?.entry?.[0]?.changes?.[0]?.value;
     const contact = value?.contacts?.[0];
     const message = value?.messages?.[0];
@@ -60,7 +87,7 @@ export async function POST(req: Request) {
       [whatsappMessageId, mensaje, telefono, tipo]
     );
 
-    console.log("WHATSAPP GUARDADO SIN ID:", {
+    console.log("WHATSAPP GUARDADO:", {
       telefono,
       nombre,
       mensaje,
