@@ -347,7 +347,7 @@ export default function Home() {
                           key={cliente.id}
                           className={`p-3 rounded-lg ${
                             seguimientoVencido
-                              ? "bg-orange-100 border border-orange-300"
+                              ? "bg-red-100 border-2 border-red-500"
                               : "bg-gray-100"
                           }`}
                         >
@@ -380,6 +380,14 @@ export default function Home() {
                             🔥 Seguimientos:{" "}
                             {cliente.cantidad_seguimientos || 0}
                           </p>
+
+{cliente.ultima_gestion && (
+  <p className="text-xs text-purple-600 mt-1">
+    📞 Última gestión:
+    {" "}
+    {new Date(cliente.ultima_gestion).toLocaleDateString("es-PE")}
+  </p>
+)}
 
                           <p className="text-xs mt-2 text-gray-500">
                             Etapa: {cliente.etapa}
