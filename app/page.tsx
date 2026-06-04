@@ -53,11 +53,44 @@ export default function Home() {
 
     return () => clearInterval(intervalo);
   }, []);
+const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
+  try {
+    setClientes((prev) =>
+      prev.map((cliente) =>
+        cliente.id === id
+          ? { ...cliente, etapa: nuevaEtapa }
+          : cliente
+      )
+    );
 
+    const res = await fetch(`/api/clientes/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        etapa: nuevaEtapa,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert("No se pudo actualizar la etapa");
+      cargarClientes();
+    }
+  } catch (error) {
+    console.error("Error cambiando etapa:", error);
+    alert("Error cambiando etapa");
+    cargarClientes();
+  }
+};
   return (
     <div className="min-h-screen bg-gray-100 flex">
       <aside className="w-64 bg-black text-white p-5">
-        <h1 className="text-2xl font-bold text-yellow-400">Kafes CRM</h1>
+        <h1 className="text-2xl font-bold text-yellow-400">
+  Kafes CRM v2 TEST
+</h1>
 
         <div className="mt-10 space-y-4">
           <div className="bg-yellow-500 text-black p-3 rounded-lg font-bold">
@@ -140,7 +173,17 @@ export default function Home() {
                         <p className="text-xs mt-2 text-gray-500">
                           Etapa: {cliente.etapa}
                         </p>
-
+<select
+  className="border w-full p-2 mt-3 rounded text-sm bg-white"
+  value={cliente.etapa}
+  onChange={(e) => cambiarEtapa(cliente.id, e.target.value)}
+>
+  {estados.map((estado) => (
+    <option key={estado} value={estado}>
+      {estado}
+    </option>
+  ))}
+</select>
                         {cliente.asesor && (
                           <p className="text-xs text-gray-500">
                             Asesor: {cliente.asesor}
