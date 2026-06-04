@@ -201,7 +201,27 @@ const seguimientosHoy = clientes.filter((c) => {
     const nuevaCantidad = (clienteSeguimiento.cantidad_seguimientos || 0) + 1;
 
     try {
-      const res = await fetch(`/api/clientes/${clienteSeguimiento.id}`, {
+  console.log("GUARDANDO SEGUIMIENTO");
+
+  console.log({
+    cliente: clienteSeguimiento.id,
+    fechaSeguimiento,
+    observacionSeguimiento,
+    nuevaCantidad,
+  });
+
+  const res = await fetch(`/api/clientes/${clienteSeguimiento.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      proximo_seguimiento: fechaSeguimiento,
+      observacion: observacionSeguimiento,
+      ultima_gestion: new Date().toISOString(),
+      cantidad_seguimientos: nuevaCantidad,
+      etapa: "Seguimiento",
+    }),
+  });      
+const res = await fetch(`/api/clientes/${clienteSeguimiento.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
