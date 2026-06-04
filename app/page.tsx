@@ -22,10 +22,23 @@ type Cliente = {
   created_at: string;
 };
 
+type Conversacion = {
+  id: number;
+  cliente_id: number;
+  telefono: string;
+  mensaje: string;
+  tipo: string;
+  remitente: string;
+  created_at: string;
+};
+
 export default function Home() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
   const [mostrarModal, setMostrarModal] = useState(false);
+
+  const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
+  const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
 
   const [form, setForm] = useState({
     nombre: "",
@@ -39,12 +52,23 @@ export default function Home() {
     try {
       const res = await fetch("/api/clientes", { cache: "no-store" });
       const data = await res.json();
-
       if (data.success) setClientes(data.clientes);
-    } catch (error) {
-      console.error("Error cargando clientes:", error);
     } finally {
       setCargando(false);
+    }
+  };
+
+  const abrirConversacion = async (cliente: Cliente) => {
+    setClienteActivo(cliente);
+
+    const res = await fetch(`/api/conversaciones/${cliente.id}`, {
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      setConversaciones(data.conversaciones);
     }
   };
 
@@ -55,30 +79,17 @@ export default function Home() {
   }, []);
 
   const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
-    try {
-      setClientes((prev) =>
-        prev.map((cliente) =>
-          cliente.id === id ? { ...cliente, etapa: nuevaEtapa } : cliente
-        )
-      );
+    setClientes((prev) =>
+      prev.map((cliente) =>
+        cliente.id === id ? { ...cliente, etapa: nuevaEtapa } : cliente
+      )
+    );
 
-      const res = await fetch(`/api/clientes/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ etapa: nuevaEtapa }),
-      });
-
-      const data = await res.json();
-
-      if (!data.success) {
-        alert("No se pudo actualizar la etapa");
-        cargarClientes();
-      }
-    } catch (error) {
-      console.error("Error cambiando etapa:", error);
-      alert("Error cambiando etapa");
-      cargarClientes();
-    }
+    await fetch(`/api/clientes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ etapa: nuevaEtapa }),
+    });
   };
 
   const crearCliente = async () => {
@@ -87,34 +98,29 @@ export default function Home() {
       return;
     }
 
-    try {
-      const res = await fetch("/api/clientes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+    const res = await fetch("/api/clientes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (!data.success) {
-        alert("No se pudo crear el cliente");
-        return;
-      }
-
-      setMostrarModal(false);
-      setForm({
-        nombre: "",
-        telefono: "",
-        ciudad: "",
-        etapa: "Nuevo",
-        asesor: "",
-      });
-
-      cargarClientes();
-    } catch (error) {
-      console.error("Error creando cliente:", error);
-      alert("Error creando cliente");
+    if (!data.success) {
+      alert("No se pudo crear el cliente");
+      return;
     }
+
+    setMostrarModal(false);
+    setForm({
+      nombre: "",
+      telefono: "",
+      ciudad: "",
+      etapa: "Nuevo",
+      asesor: "",
+    });
+
+    cargarClientes();
   };
 
   return (
@@ -168,7 +174,7 @@ export default function Home() {
 
             <button
               onClick={() => setMostrarModal(true)}
-              className="bg-yellow-500 text-black px-5 py-3 rounded-lg font-bold hover:bg-yellow-400"
+              className="bg-yellow-500 text-black px-5 py-3 rounded-lg font-bold"
             >
               + Nuevo Cliente
             </button>
@@ -195,7 +201,10 @@ export default function Home() {
                   {clientes
                     .filter((cliente) => cliente.etapa === estado)
                     .map((cliente) => (
-                      <div key={cliente.id} className="bg-gray-100 p-3 rounded-lg">
+                      <div
+                        key={cliente.id}
+                        className="bg-gray-100 p-3 rounded-lg"
+                      >
                         <p className="font-semibold">
                           {cliente.nombre || "Sin nombre"}
                         </p>
@@ -224,11 +233,12 @@ export default function Home() {
                           ))}
                         </select>
 
-                        {cliente.asesor && (
-                          <p className="text-xs text-gray-500 mt-2">
-                            Asesor: {cliente.asesor}
-                          </p>
-                        )}
+                        <button
+                          onClick={() => abrirConversacion(cliente)}
+                          className="block bg-blue-600 text-white text-center mt-3 py-2 rounded text-sm font-bold w-full"
+                        >
+                          Ver conversación
+                        </button>
 
                         <a
                           href={`https://wa.me/51${cliente.telefono.replace(
@@ -236,7 +246,7 @@ export default function Home() {
                             ""
                           )}`}
                           target="_blank"
-                          className="block bg-green-600 text-white text-center mt-3 py-2 rounded text-sm font-bold"
+                          className="block bg-green-600 text-white text-center mt-2 py-2 rounded text-sm font-bold"
                         >
                           Abrir WhatsApp
                         </a>
@@ -248,6 +258,50 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {clienteActivo && (
+        <div className="fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl z-50 p-5 overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Conversación</h2>
+            <button
+              onClick={() => setClienteActivo(null)}
+              className="text-red-500 font-bold"
+            >
+              Cerrar
+            </button>
+          </div>
+
+          <div className="bg-gray-100 p-3 rounded-lg mb-4">
+            <p className="font-bold">{clienteActivo.nombre}</p>
+            <p className="text-sm">📱 {clienteActivo.telefono}</p>
+            <p className="text-sm">📍 {clienteActivo.ciudad || "Sin ciudad"}</p>
+          </div>
+
+          <div className="space-y-3">
+            {conversaciones.length === 0 ? (
+              <p className="text-gray-500 text-sm">
+                Aún no hay mensajes guardados para este cliente.
+              </p>
+            ) : (
+              conversaciones.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`p-3 rounded-lg text-sm ${
+                    msg.remitente === "cliente"
+                      ? "bg-green-100"
+                      : "bg-gray-200"
+                  }`}
+                >
+                  <p>{msg.mensaje}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {msg.remitente} · {new Date(msg.created_at).toLocaleString()}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {mostrarModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
