@@ -23,23 +23,26 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   try {
+    console.log("BODY WHATSAPP:", JSON.stringify(body, null, 2));
+
     const value = body?.entry?.[0]?.changes?.[0]?.value;
     const contact = value?.contacts?.[0];
     const message = value?.messages?.[0];
 
     if (!message || !contact) {
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, message: "Sin mensaje nuevo" });
     }
 
-    const telefono = contact.wa_id;
+    const telefono = contact.wa_id || message.from;
     const nombre = contact.profile?.name || "Cliente WhatsApp";
     const mensaje = message.text?.body || "";
-    const whatsappMessageId = message.id;
+    const whatsappMessageId = message.id || null;
+    const tipo = message.type || "text";
 
     const clienteResult = await pool.query(
       `
-      INSERT INTO clientes (nombre, telefono, etapa)
-      VALUES ($1, $2, 'Nuevo')
+      INSERT INTO clientes (nombre, telefono)
+      VALUES ($1, $2)
       ON CONFLICT (telefono)
       DO UPDATE SET nombre = EXCLUDED.nombre
       RETURNING id;
@@ -60,13 +63,15 @@ export async function POST(req: Request) {
       )
       VALUES ($1, $2, $3, $4, $5);
       `,
-      [clienteId, whatsappMessageId, mensaje, "cliente", message.type || "text"]
+      [clienteId, whatsappMessageId, mensaje, "cliente", tipo]
     );
 
     console.log("WHATSAPP GUARDADO:", {
+      clienteId,
       telefono,
       nombre,
       mensaje,
+      tipo,
     });
 
     return NextResponse.json({ success: true });
