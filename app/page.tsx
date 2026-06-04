@@ -25,18 +25,22 @@ type Cliente = {
 export default function Home() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [mostrarModal, setMostrarModal] = useState(false);
+
+  const [form, setForm] = useState({
+    nombre: "",
+    telefono: "",
+    ciudad: "",
+    etapa: "Nuevo",
+    asesor: "",
+  });
 
   const cargarClientes = async () => {
     try {
-      const res = await fetch("/api/clientes", {
-        cache: "no-store",
-      });
-
+      const res = await fetch("/api/clientes", { cache: "no-store" });
       const data = await res.json();
 
-      if (data.success) {
-        setClientes(data.clientes);
-      }
+      if (data.success) setClientes(data.clientes);
     } catch (error) {
       console.error("Error cargando clientes:", error);
     } finally {
@@ -46,51 +50,77 @@ export default function Home() {
 
   useEffect(() => {
     cargarClientes();
-
-    const intervalo = setInterval(() => {
-      cargarClientes();
-    }, 5000);
-
+    const intervalo = setInterval(cargarClientes, 5000);
     return () => clearInterval(intervalo);
   }, []);
-const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
-  try {
-    setClientes((prev) =>
-      prev.map((cliente) =>
-        cliente.id === id
-          ? { ...cliente, etapa: nuevaEtapa }
-          : cliente
-      )
-    );
 
-    const res = await fetch(`/api/clientes/${id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        etapa: nuevaEtapa,
-      }),
-    });
+  const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
+    try {
+      setClientes((prev) =>
+        prev.map((cliente) =>
+          cliente.id === id ? { ...cliente, etapa: nuevaEtapa } : cliente
+        )
+      );
 
-    const data = await res.json();
+      const res = await fetch(`/api/clientes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ etapa: nuevaEtapa }),
+      });
 
-    if (!data.success) {
-      alert("No se pudo actualizar la etapa");
+      const data = await res.json();
+
+      if (!data.success) {
+        alert("No se pudo actualizar la etapa");
+        cargarClientes();
+      }
+    } catch (error) {
+      console.error("Error cambiando etapa:", error);
+      alert("Error cambiando etapa");
       cargarClientes();
     }
-  } catch (error) {
-    console.error("Error cambiando etapa:", error);
-    alert("Error cambiando etapa");
-    cargarClientes();
-  }
-};
+  };
+
+  const crearCliente = async () => {
+    if (!form.nombre || !form.telefono) {
+      alert("Completa nombre y teléfono");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/clientes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert("No se pudo crear el cliente");
+        return;
+      }
+
+      setMostrarModal(false);
+      setForm({
+        nombre: "",
+        telefono: "",
+        ciudad: "",
+        etapa: "Nuevo",
+        asesor: "",
+      });
+
+      cargarClientes();
+    } catch (error) {
+      console.error("Error creando cliente:", error);
+      alert("Error creando cliente");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex">
       <aside className="w-64 bg-black text-white p-5">
-        <h1 className="text-2xl font-bold text-yellow-400">
-  Kafes CRM v2 TEST
-</h1>
+        <h1 className="text-2xl font-bold text-yellow-400">Kafes CRM</h1>
 
         <div className="mt-10 space-y-4">
           <div className="bg-yellow-500 text-black p-3 rounded-lg font-bold">
@@ -128,12 +158,21 @@ const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
         <div className="flex justify-between items-center">
           <h2 className="text-3xl font-bold">Embudo de Ventas</h2>
 
-          <button
-            onClick={cargarClientes}
-            className="bg-yellow-500 text-black px-5 py-3 rounded-lg font-bold hover:bg-yellow-400"
-          >
-            Actualizar
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={cargarClientes}
+              className="bg-gray-800 text-white px-5 py-3 rounded-lg font-bold"
+            >
+              Actualizar
+            </button>
+
+            <button
+              onClick={() => setMostrarModal(true)}
+              className="bg-yellow-500 text-black px-5 py-3 rounded-lg font-bold hover:bg-yellow-400"
+            >
+              + Nuevo Cliente
+            </button>
+          </div>
         </div>
 
         {cargando ? (
@@ -156,10 +195,7 @@ const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
                   {clientes
                     .filter((cliente) => cliente.etapa === estado)
                     .map((cliente) => (
-                      <div
-                        key={cliente.id}
-                        className="bg-gray-100 p-3 rounded-lg"
-                      >
+                      <div key={cliente.id} className="bg-gray-100 p-3 rounded-lg">
                         <p className="font-semibold">
                           {cliente.nombre || "Sin nombre"}
                         </p>
@@ -173,25 +209,32 @@ const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
                         <p className="text-xs mt-2 text-gray-500">
                           Etapa: {cliente.etapa}
                         </p>
-<select
-  className="border w-full p-2 mt-3 rounded text-sm bg-white"
-  value={cliente.etapa}
-  onChange={(e) => cambiarEtapa(cliente.id, e.target.value)}
->
-  {estados.map((estado) => (
-    <option key={estado} value={estado}>
-      {estado}
-    </option>
-  ))}
-</select>
+
+                        <select
+                          className="border w-full p-2 mt-3 rounded text-sm bg-white"
+                          value={cliente.etapa}
+                          onChange={(e) =>
+                            cambiarEtapa(cliente.id, e.target.value)
+                          }
+                        >
+                          {estados.map((estado) => (
+                            <option key={estado} value={estado}>
+                              {estado}
+                            </option>
+                          ))}
+                        </select>
+
                         {cliente.asesor && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-gray-500 mt-2">
                             Asesor: {cliente.asesor}
                           </p>
                         )}
 
                         <a
-                          href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
+                          href={`https://wa.me/51${cliente.telefono.replace(
+                            /\s/g,
+                            ""
+                          )}`}
                           target="_blank"
                           className="block bg-green-600 text-white text-center mt-3 py-2 rounded text-sm font-bold"
                         >
@@ -205,6 +248,70 @@ const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
           </div>
         )}
       </main>
+
+      {mostrarModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl w-[430px] shadow-xl">
+            <h2 className="text-2xl font-bold mb-4">Nuevo Cliente</h2>
+
+            <input
+              className="border w-full p-3 mb-3 rounded-lg"
+              placeholder="Nombre"
+              value={form.nombre}
+              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+            />
+
+            <input
+              className="border w-full p-3 mb-3 rounded-lg"
+              placeholder="Teléfono / WhatsApp"
+              value={form.telefono}
+              onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+            />
+
+            <input
+              className="border w-full p-3 mb-3 rounded-lg"
+              placeholder="Ciudad"
+              value={form.ciudad}
+              onChange={(e) => setForm({ ...form, ciudad: e.target.value })}
+            />
+
+            <input
+              className="border w-full p-3 mb-3 rounded-lg"
+              placeholder="Asesor"
+              value={form.asesor}
+              onChange={(e) => setForm({ ...form, asesor: e.target.value })}
+            />
+
+            <select
+              className="border w-full p-3 mb-4 rounded-lg"
+              value={form.etapa}
+              onChange={(e) => setForm({ ...form, etapa: e.target.value })}
+            >
+              {estados.map((estado) => (
+                <option key={estado} value={estado}>
+                  {estado}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setMostrarModal(false)}
+                className="bg-gray-300 px-4 py-2 rounded-lg w-full"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={crearCliente}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg w-full font-bold"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
