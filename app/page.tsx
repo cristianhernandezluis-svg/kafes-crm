@@ -25,7 +25,7 @@ type Cliente = {
 type Conversacion = {
   id: number;
   cliente_id: number;
-  telefono: string;
+  telefono: string | null;
   mensaje: string;
   tipo: string;
   remitente: string;
@@ -39,6 +39,8 @@ export default function Home() {
 
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
+  const [mensajeNuevo, setMensajeNuevo] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
   const [form, setForm] = useState({
     nombre: "",
@@ -52,7 +54,12 @@ export default function Home() {
     try {
       const res = await fetch("/api/clientes", { cache: "no-store" });
       const data = await res.json();
-      if (data.success) setClientes(data.clientes);
+
+      if (data.success) {
+        setClientes(data.clientes);
+      }
+    } catch (error) {
+      console.error("Error cargando clientes:", error);
     } finally {
       setCargando(false);
     }
@@ -61,35 +68,56 @@ export default function Home() {
   const abrirConversacion = async (cliente: Cliente) => {
     setClienteActivo(cliente);
 
-    const res = await fetch(`/api/conversaciones/${cliente.id}`, {
-      cache: "no-store",
-    });
+    try {
+      const res = await fetch(`/api/conversaciones/${cliente.id}`, {
+        cache: "no-store",
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.success) {
-      setConversaciones(data.conversaciones);
+      if (data.success) {
+        setConversaciones(data.conversaciones);
+      }
+    } catch (error) {
+      console.error("Error abriendo conversación:", error);
     }
   };
 
   useEffect(() => {
     cargarClientes();
-    const intervalo = setInterval(cargarClientes, 5000);
+
+    const intervalo = setInterval(() => {
+      cargarClientes();
+    }, 5000);
+
     return () => clearInterval(intervalo);
   }, []);
 
   const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
-    setClientes((prev) =>
-      prev.map((cliente) =>
-        cliente.id === id ? { ...cliente, etapa: nuevaEtapa } : cliente
-      )
-    );
+    try {
+      setClientes((prev) =>
+        prev.map((cliente) =>
+          cliente.id === id ? { ...cliente, etapa: nuevaEtapa } : cliente
+        )
+      );
 
-    await fetch(`/api/clientes/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ etapa: nuevaEtapa }),
-    });
+      const res = await fetch(`/api/clientes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ etapa: nuevaEtapa }),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert("No se pudo actualizar la etapa");
+        cargarClientes();
+      }
+    } catch (error) {
+      console.error("Error cambiando etapa:", error);
+      alert("Error cambiando etapa");
+      cargarClientes();
+    }
   };
 
   const crearCliente = async () => {
@@ -98,29 +126,70 @@ export default function Home() {
       return;
     }
 
-    const res = await fetch("/api/clientes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
+    try {
+      const res = await fetch("/api/clientes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!data.success) {
-      alert("No se pudo crear el cliente");
-      return;
+      if (!data.success) {
+        alert("No se pudo crear el cliente");
+        return;
+      }
+
+      setMostrarModal(false);
+      setForm({
+        nombre: "",
+        telefono: "",
+        ciudad: "",
+        etapa: "Nuevo",
+        asesor: "",
+      });
+
+      cargarClientes();
+    } catch (error) {
+      console.error("Error creando cliente:", error);
+      alert("Error creando cliente");
     }
+  };
 
-    setMostrarModal(false);
-    setForm({
-      nombre: "",
-      telefono: "",
-      ciudad: "",
-      etapa: "Nuevo",
-      asesor: "",
-    });
+  const enviarMensaje = async () => {
+    if (!clienteActivo || !mensajeNuevo.trim()) return;
 
-    cargarClientes();
+    try {
+      setEnviando(true);
+
+      const res = await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cliente_id: clienteActivo.id,
+          telefono: clienteActivo.telefono,
+          mensaje: mensajeNuevo,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        console.error("Error WhatsApp:", data);
+        alert("No se pudo enviar el mensaje");
+        return;
+      }
+
+      setMensajeNuevo("");
+      abrirConversacion(clienteActivo);
+    } catch (error) {
+      console.error("Error enviando mensaje:", error);
+      alert("Error enviando mensaje");
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
@@ -174,7 +243,7 @@ export default function Home() {
 
             <button
               onClick={() => setMostrarModal(true)}
-              className="bg-yellow-500 text-black px-5 py-3 rounded-lg font-bold"
+              className="bg-yellow-500 text-black px-5 py-3 rounded-lg font-bold hover:bg-yellow-400"
             >
               + Nuevo Cliente
             </button>
@@ -232,6 +301,12 @@ export default function Home() {
                             </option>
                           ))}
                         </select>
+
+                        {cliente.asesor && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Asesor: {cliente.asesor}
+                          </p>
+                        )}
 
                         <button
                           onClick={() => abrirConversacion(cliente)}
@@ -294,11 +369,30 @@ export default function Home() {
                 >
                   <p>{msg.mensaje}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {msg.remitente} · {new Date(msg.created_at).toLocaleString()}
+                    {msg.remitente} ·{" "}
+                    {new Date(msg.created_at).toLocaleString()}
                   </p>
                 </div>
               ))
             )}
+          </div>
+
+          <div className="mt-5 border-t pt-4">
+            <textarea
+              className="w-full border rounded-lg p-3"
+              rows={3}
+              placeholder="Escribe un mensaje..."
+              value={mensajeNuevo}
+              onChange={(e) => setMensajeNuevo(e.target.value)}
+            />
+
+            <button
+              onClick={enviarMensaje}
+              disabled={enviando}
+              className="w-full bg-green-600 text-white py-3 rounded-lg mt-3 font-bold disabled:bg-gray-400"
+            >
+              {enviando ? "Enviando..." : "Enviar WhatsApp"}
+            </button>
           </div>
         </div>
       )}
