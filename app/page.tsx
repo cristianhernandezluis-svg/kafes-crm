@@ -211,6 +211,10 @@ const guardarSeguimiento = async () => {
       nuevaCantidad,
     });
 
+alert(
+  `Cliente: ${clienteSeguimiento.nombre} | ID: ${clienteSeguimiento.id}`
+);
+
     const res = await fetch(
       `/api/clientes/${clienteSeguimiento.id}`,
       {
