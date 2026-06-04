@@ -66,6 +66,25 @@ export default function Home() {
       !["Pagó Adelanto", "Enviado", "Entregado"].includes(c.etapa)
   );
 
+const seguimientosVencidos = clientes.filter(
+  (c) =>
+    c.proximo_seguimiento &&
+    new Date(c.proximo_seguimiento) < new Date() &&
+    !["Pagó Adelanto", "Enviado", "Entregado"].includes(c.etapa)
+);
+
+const seguimientosHoy = clientes.filter((c) => {
+  if (!c.proximo_seguimiento) return false;
+
+  const fecha = new Date(c.proximo_seguimiento);
+  const hoy = new Date();
+
+  return (
+    fecha.toDateString() === hoy.toDateString() &&
+    !["Pagó Adelanto", "Enviado", "Entregado"].includes(c.etapa)
+  );
+});
+
   const cargarClientes = async () => {
     try {
       const res = await fetch("/api/clientes", { cache: "no-store" });
@@ -303,6 +322,36 @@ export default function Home() {
             </button>
           </div>
         </div>
+
+<div className="grid grid-cols-4 gap-4 mt-6">
+  <div className="bg-red-600 text-white rounded-xl p-4 shadow">
+    <p className="text-sm opacity-90">🚨 Vencidos</p>
+    <p className="text-3xl font-bold">
+      {seguimientosVencidos.length}
+    </p>
+  </div>
+
+  <div className="bg-orange-500 text-white rounded-xl p-4 shadow">
+    <p className="text-sm opacity-90">📅 Para hoy</p>
+    <p className="text-3xl font-bold">
+      {seguimientosHoy.length}
+    </p>
+  </div>
+
+  <div className="bg-gray-800 text-white rounded-xl p-4 shadow">
+    <p className="text-sm opacity-90">👥 Clientes</p>
+    <p className="text-3xl font-bold">
+      {clientes.length}
+    </p>
+  </div>
+
+  <div className="bg-green-600 text-white rounded-xl p-4 shadow">
+    <p className="text-sm opacity-90">💰 Adelantos</p>
+    <p className="text-3xl font-bold">
+      {clientes.filter((c) => c.etapa === "Pagó Adelanto").length}
+    </p>
+  </div>
+</div>
 
         {seguimientosPendientes.length > 0 && (
           <div className="mt-6 bg-orange-100 border border-orange-300 rounded-xl p-4">
