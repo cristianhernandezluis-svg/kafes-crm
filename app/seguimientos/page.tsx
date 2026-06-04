@@ -357,6 +357,51 @@ const abrirWhatsApp = (telefono: string) => {
           </div>
         )}
       </main>
+
+{clienteSeguimiento && (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-xl w-[430px] shadow-xl">
+      <h2 className="text-2xl font-bold mb-4">
+        Reprogramar Seguimiento
+      </h2>
+
+      <p className="mb-3 text-sm">
+        Cliente: <strong>{clienteSeguimiento.nombre}</strong>
+      </p>
+
+      <input
+        type="datetime-local"
+        className="border w-full p-3 mb-3 rounded-lg"
+        value={fechaSeguimiento}
+        onChange={(e) => setFechaSeguimiento(e.target.value)}
+      />
+
+      <textarea
+        className="border w-full p-3 mb-3 rounded-lg"
+        placeholder="Resultado de la gestión"
+        value={observacionSeguimiento}
+        onChange={(e) => setObservacionSeguimiento(e.target.value)}
+      />
+
+      <div className="flex gap-3">
+        <button
+          onClick={() => setClienteSeguimiento(null)}
+          className="bg-gray-300 px-4 py-2 rounded-lg w-full"
+        >
+          Cancelar
+        </button>
+
+        <button
+          onClick={guardarNuevoSeguimiento}
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg w-full font-bold"
+        >
+          Guardar seguimiento
+        </button>
+      </div>
     </div>
-  );
+  </div>
+)}
+
+</div>
+);
 }
