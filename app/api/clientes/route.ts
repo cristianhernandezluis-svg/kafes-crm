@@ -8,7 +8,7 @@ const pool = new Pool({
 export async function GET() {
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         id,
         nombre,
         telefono,
@@ -29,6 +29,56 @@ export async function GET() {
 
     return NextResponse.json(
       { success: false, clientes: [] },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+
+    const {
+      nombre,
+      telefono,
+      ciudad,
+      etapa = "Nuevo",
+      asesor = null,
+    } = body;
+
+    const result = await pool.query(
+      `
+      INSERT INTO clientes (
+        nombre,
+        telefono,
+        ciudad,
+        etapa,
+        asesor
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+      `,
+      [
+        nombre,
+        telefono,
+        ciudad,
+        etapa,
+        asesor,
+      ]
+    );
+
+    return NextResponse.json({
+      success: true,
+      cliente: result.rows[0],
+    });
+  } catch (error) {
+    console.error("ERROR CREANDO CLIENTE:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "No se pudo crear el cliente",
+      },
       { status: 500 }
     );
   }
