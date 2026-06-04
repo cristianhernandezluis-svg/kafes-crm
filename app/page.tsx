@@ -192,38 +192,32 @@ const seguimientosHoy = clientes.filter((c) => {
     }
   };
 
-  const guardarSeguimiento = async () => {
-    if (!clienteSeguimiento || !fechaSeguimiento) {
-      alert("Selecciona fecha y hora");
-      return;
-    }
+const guardarSeguimiento = async () => {
+  if (!clienteSeguimiento || !fechaSeguimiento) {
+    alert("Selecciona fecha y hora");
+    return;
+  }
 
-    const nuevaCantidad = (clienteSeguimiento.cantidad_seguimientos || 0) + 1;
+  const nuevaCantidad =
+    (clienteSeguimiento.cantidad_seguimientos || 0) + 1;
 
-    try {
-  console.log("GUARDANDO SEGUIMIENTO");
+  try {
+    console.log("GUARDANDO SEGUIMIENTO");
 
-  console.log({
-    cliente: clienteSeguimiento.id,
-    fechaSeguimiento,
-    observacionSeguimiento,
-    nuevaCantidad,
-  });
+    console.log({
+      cliente: clienteSeguimiento.id,
+      fechaSeguimiento,
+      observacionSeguimiento,
+      nuevaCantidad,
+    });
 
-  const res = await fetch(`/api/clientes/${clienteSeguimiento.id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      proximo_seguimiento: fechaSeguimiento,
-      observacion: observacionSeguimiento,
-      ultima_gestion: new Date().toISOString(),
-      cantidad_seguimientos: nuevaCantidad,
-      etapa: "Seguimiento",
-    }),
-  });      
-const res = await fetch(`/api/clientes/${clienteSeguimiento.id}`, {
+    const res = await fetch(
+      `/api/clientes/${clienteSeguimiento.id}`,
+      {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           proximo_seguimiento: fechaSeguimiento,
           observacion: observacionSeguimiento,
@@ -231,24 +225,28 @@ const res = await fetch(`/api/clientes/${clienteSeguimiento.id}`, {
           cantidad_seguimientos: nuevaCantidad,
           etapa: "Seguimiento",
         }),
-      });
-
-      const data = await res.json();
-
-      if (!data.success) {
-        alert("No se pudo guardar el seguimiento");
-        return;
       }
+    );
 
-      setClienteSeguimiento(null);
-      setFechaSeguimiento("");
-      setObservacionSeguimiento("");
-      cargarClientes();
-    } catch (error) {
-      console.error("Error guardando seguimiento:", error);
-      alert("Error guardando seguimiento");
+    const data = await res.json();
+
+    if (!data.success) {
+      alert("No se pudo guardar el seguimiento");
+      return;
     }
-  };
+
+    setClienteSeguimiento(null);
+    setFechaSeguimiento("");
+    setObservacionSeguimiento("");
+
+    await cargarClientes();
+
+    alert("Seguimiento guardado correctamente");
+  } catch (error) {
+    console.error("Error guardando seguimiento:", error);
+    alert("Error guardando seguimiento");
+  }
+};
 
   const enviarMensaje = async () => {
     if (!clienteActivo || !mensajeNuevo.trim()) return;
