@@ -20,6 +20,50 @@ type Cliente = {
 export default function SeguimientosPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
+const guardarNuevoSeguimiento = async () => {
+  if (!clienteSeguimiento || !fechaSeguimiento) {
+    alert("Selecciona fecha y hora");
+    return;
+  }
+
+  const nuevaCantidad =
+    (clienteSeguimiento.cantidad_seguimientos || 0) + 1;
+
+  try {
+    const res = await fetch(`/api/clientes/${clienteSeguimiento.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),
+        observacion: observacionSeguimiento,
+        ultima_gestion: new Date().toISOString(),
+        cantidad_seguimientos: nuevaCantidad,
+        etapa: "Seguimiento",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert("No se pudo guardar el seguimiento");
+      return;
+    }
+
+    setClienteSeguimiento(null);
+    setFechaSeguimiento("");
+    setObservacionSeguimiento("");
+    cargarClientes();
+
+    alert("Seguimiento actualizado correctamente");
+  } catch (error) {
+    console.error("Error guardando seguimiento:", error);
+    alert("Error guardando seguimiento");
+  }
+};
+const [clienteSeguimiento, setClienteSeguimiento] =
+  useState<Cliente | null>(null);
+const [fechaSeguimiento, setFechaSeguimiento] = useState("");
+const [observacionSeguimiento, setObservacionSeguimiento] = useState("");
 
   const cargarClientes = async () => {
     try {
@@ -84,35 +128,16 @@ export default function SeguimientosPage() {
     return fecha > hoy && fecha.toDateString() !== hoy.toDateString();
   });
 
-  const registrarSeguimiento = async (cliente: Cliente) => {
-    try {
-      const res = await fetch(`/api/clientes/${cliente.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ultima_gestion: new Date().toISOString(),
-          cantidad_seguimientos: (cliente.cantidad_seguimientos || 0) + 1,
-        }),
-      });
+  const registrarSeguimiento = (cliente: Cliente) => {
+  setClienteSeguimiento(cliente);
+  setFechaSeguimiento("");
+  setObservacionSeguimiento(cliente.observacion || "");
+};
 
-      const data = await res.json();
-
-      if (!data.success) {
-        alert("No se pudo registrar el seguimiento");
-        return;
-      }
-
-      cargarClientes();
-    } catch (error) {
-      console.error("Error registrando seguimiento:", error);
-      alert("Error registrando seguimiento");
-    }
-  };
-
-  const abrirWhatsApp = (telefono: string) => {
-    const numero = telefono.replace(/\s/g, "");
-    window.open(`https://wa.me/51${numero}`, "_blank");
-  };
+const abrirWhatsApp = (telefono: string) => {
+  const numero = telefono.replace(/\s/g, "");
+  window.open(`https://wa.me/51${numero}`, "_blank");
+};
 
   const CardCliente = ({ cliente }: { cliente: Cliente }) => (
     <div className="bg-white rounded-xl shadow p-4 border">
