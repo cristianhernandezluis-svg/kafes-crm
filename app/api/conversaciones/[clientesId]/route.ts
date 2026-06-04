@@ -7,10 +7,10 @@ const pool = new Pool({
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ clienteId: string }> }
+  context: { params: Promise<{ clientesId: string }> }
 ) {
   try {
-    const { clienteId } = await context.params;
+    const { clientesId } = await context.params;
 
     const result = await pool.query(
       `
@@ -26,7 +26,7 @@ export async function GET(
       WHERE cliente_id = $1
       ORDER BY created_at ASC
       `,
-      [clienteId]
+      [clientesId]
     );
 
     return NextResponse.json({
