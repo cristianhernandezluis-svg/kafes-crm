@@ -223,8 +223,7 @@ alert(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          proximo_seguimiento: fechaSeguimiento,
-          observacion: observacionSeguimiento,
+proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observacion: observacionSeguimiento,
           ultima_gestion: new Date().toISOString(),
           cantidad_seguimientos: nuevaCantidad,
           etapa: "Seguimiento",
