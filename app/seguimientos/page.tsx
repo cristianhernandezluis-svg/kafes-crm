@@ -245,6 +245,19 @@ const abrirWhatsApp = (telefono: string) => {
           </div>
 
           <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
+<Link
+  href="/mis-pendientes"
+  className="block p-3 hover:bg-zinc-800 rounded-lg"
+>
+  Mis Pendientes
+</Link>
+
+<Link
+  href="/adelantos"
+  className="block p-3 hover:bg-zinc-800 rounded-lg"
+>
+  Adelantos
+</Link>
             Ventas
           </div>
 
