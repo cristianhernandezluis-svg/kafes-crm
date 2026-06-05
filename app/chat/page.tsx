@@ -11,6 +11,10 @@ type Cliente = {
   etapa: string;
   asesor: string | null;
   created_at: string;
+  ultimo_mensaje?: string | null;
+  ultimo_tipo?: string | null;
+  ultimo_mensaje_fecha?: string | null;
+  no_leidos?: number;
 };
 
 type Conversacion = {
@@ -30,17 +34,30 @@ export default function ChatsPage() {
   const [mensajeNuevo, setMensajeNuevo] = useState("");
   const [enviando, setEnviando] = useState(false);
 
-  const cargarClientes = async () => {
-    const res = await fetch("/api/clientes", { cache: "no-store" });
-    const data = await res.json();
+const cargarClientes = async () => {
+  const res = await fetch("/api/chats", {
+    cache: "no-store",
+  });
 
-    if (data.success) {
-      setClientes(data.clientes);
-    }
-  };
+  const data = await res.json();
+
+  if (data.success) {
+    setClientes(data.chats);
+  }
+};
 
   const abrirConversacion = async (cliente: Cliente) => {
     setClienteActivo(cliente);
+
+await fetch("/api/chats", {
+  method: "PATCH",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    cliente_id: cliente.id,
+  }),
+});
+
+cargarClientes();
 
     const res = await fetch(`/api/conversaciones/${cliente.id}`, {
       cache: "no-store",
@@ -153,17 +170,53 @@ export default function ChatsPage() {
                   clienteActivo?.id === cliente.id ? "bg-yellow-100" : ""
                 }`}
               >
-                <p className="font-bold">{cliente.nombre || "Sin nombre"}</p>
-                <p className="text-sm">📱 {cliente.telefono}</p>
-                <p className="text-xs text-gray-500">Etapa: {cliente.etapa}</p>
-                {cliente.asesor && (
-                  <p className="text-xs text-gray-500">Asesor: {cliente.asesor}</p>
-                )}
-              </button>
-            ))}
-          </div>
-        </section>
+                <div className="flex justify-between gap-2">
+  <div className="min-w-0">
+    <p className="font-bold truncate">
+      {cliente.nombre || "Sin nombre"}
+    </p>
 
+    <p className="text-sm">📱 {cliente.telefono}</p>
+  </div>
+
+  <div className="text-right shrink-0">
+    {cliente.ultimo_mensaje_fecha && (
+      <p className="text-xs text-gray-500">
+        {new Date(cliente.ultimo_mensaje_fecha).toLocaleTimeString("es-PE", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+      </p>
+    )}
+
+    {(cliente.no_leidos || 0) > 0 && (
+      <span className="inline-block bg-green-500 text-white text-xs rounded-full px-2 py-0.5 mt-1 font-bold">
+        {cliente.no_leidos}
+      </span>
+    )}
+  </div>
+</div>
+
+<p className="text-sm text-gray-600 truncate mt-1">
+  {cliente.ultimo_tipo === "image"
+    ? "📷 Imagen"
+    : cliente.ultimo_tipo === "document"
+    ? "📄 Documento"
+    : cliente.ultimo_mensaje || "Sin mensajes"}
+</p>
+
+<p className="text-xs text-gray-500">Etapa: {cliente.etapa}</p>
+
+{cliente.asesor && (
+  <p className="text-xs text-gray-500">
+    Asesor: {cliente.asesor}
+  </p>
+)}
+
+</button>
+))}
+</div>
+</section>
         <section className="flex-1 flex flex-col">
           {!clienteActivo ? (
             <div className="flex-1 flex items-center justify-center text-gray-500">
