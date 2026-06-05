@@ -18,6 +18,7 @@ type ResumenAsesor = {
   clientes: number;
   vencidos: number;
   seguimientos: number;
+  seguimientosHoy: number;
   adelantos: number;
   enviados: number;
   entregados: number;
@@ -66,6 +67,16 @@ export default function ProductividadPage() {
     return {
       asesor,
       clientes: propios.length,
+
+seguimientosHoy: propios.filter((c) => {
+  if (!c.ultima_gestion) return false;
+
+  const fecha = new Date(c.ultima_gestion);
+  const hoy = new Date();
+
+  return fecha.toDateString() === hoy.toDateString();
+}).length,
+
       vencidos: propios.filter(
         (c) =>
           c.proximo_seguimiento &&
@@ -192,7 +203,36 @@ export default function ProductividadPage() {
                 </p>
               </div>
             </div>
+<div className="bg-white rounded-xl shadow p-4 mb-6">
+  <h3 className="text-xl font-bold mb-4">
+    📞 Actividad de Hoy
+  </h3>
 
+  <table className="w-full">
+    <thead>
+      <tr className="border-b">
+        <th className="text-left p-2">Asesor</th>
+        <th className="text-center p-2">
+          Seguimientos Hoy
+        </th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {ranking.map((asesor) => (
+        <tr key={asesor.asesor}>
+          <td className="p-2 font-bold">
+            {asesor.asesor}
+          </td>
+
+          <td className="text-center p-2">
+            {asesor.seguimientosHoy}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
             <div className="bg-white rounded-xl shadow overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-black text-white">
