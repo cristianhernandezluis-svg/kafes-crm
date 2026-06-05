@@ -67,6 +67,15 @@ export default function MisPendientesPage() {
     return fecha.toDateString() === hoy.toDateString();
   });
 
+const proximos = activos.filter((c) => {
+  if (!c.proximo_seguimiento) return false;
+
+  const fecha = new Date(c.proximo_seguimiento);
+  const hoy = new Date();
+
+  return fecha > hoy && fecha.toDateString() !== hoy.toDateString();
+});
+
   const sinSeguimiento = activos.filter(
     (c) => !c.proximo_seguimiento
   );
@@ -198,56 +207,67 @@ export default function MisPendientesPage() {
             <p className="text-3xl font-bold">{paraHoy.length}</p>
           </div>
 
-          <div className="bg-gray-800 text-white rounded-xl p-4">
-            <p>🕳 Sin seguimiento</p>
-            <p className="text-3xl font-bold">{sinSeguimiento.length}</p>
-          </div>
+         <div className="bg-gray-800 text-white rounded-xl p-4">
+  <p>🕳 Sin seguimiento</p>
+  <p className="text-3xl font-bold">{sinSeguimiento.length}</p>
+</div>
 
-          <div className="bg-green-600 text-white rounded-xl p-4">
-            <p>💰 Posibles adelantos</p>
-            <p className="text-3xl font-bold">{pendientesAdelanto.length}</p>
-          </div>
-        </div>
+<div className="bg-blue-600 text-white rounded-xl p-4">
+  <p>📌 Próximos</p>
+  <p className="text-3xl font-bold">{proximos.length}</p>
+</div>
+</div>
 
-        {cargando ? (
-          <p className="mt-8 text-gray-500">Cargando pendientes...</p>
-        ) : (
-          <div className="mt-8 space-y-10">
-            <section>
-              <h3 className="text-xl font-bold text-red-600 mb-4">
-                🚨 Vencidos
-              </h3>
-              <div className="grid grid-cols-3 gap-4">
-                {vencidos.map((cliente) => (
-                  <CardCliente key={cliente.id} cliente={cliente} />
-                ))}
-              </div>
-            </section>
+{cargando ? (
+  <p className="mt-8 text-gray-500">Cargando pendientes...</p>
+) : (
+  <div className="mt-8 space-y-10">
+    <section>
+      <h3 className="text-xl font-bold text-red-600 mb-4">
+        🚨 Vencidos
+      </h3>
+      <div className="grid grid-cols-3 gap-4">
+        {vencidos.map((cliente) => (
+          <CardCliente key={cliente.id} cliente={cliente} />
+        ))}
+      </div>
+    </section>
 
-            <section>
-              <h3 className="text-xl font-bold text-orange-600 mb-4">
-                📅 Para hoy
-              </h3>
-              <div className="grid grid-cols-3 gap-4">
-                {paraHoy.map((cliente) => (
-                  <CardCliente key={cliente.id} cliente={cliente} />
-                ))}
-              </div>
-            </section>
+    <section>
+      <h3 className="text-xl font-bold text-orange-600 mb-4">
+        📅 Para hoy
+      </h3>
+      <div className="grid grid-cols-3 gap-4">
+        {paraHoy.map((cliente) => (
+          <CardCliente key={cliente.id} cliente={cliente} />
+        ))}
+      </div>
+    </section>
 
-            <section>
-              <h3 className="text-xl font-bold text-gray-700 mb-4">
-                🕳 Sin seguimiento programado
-              </h3>
-              <div className="grid grid-cols-3 gap-4">
-                {sinSeguimiento.map((cliente) => (
-                  <CardCliente key={cliente.id} cliente={cliente} />
-                ))}
-              </div>
-            </section>
-          </div>
-        )}
-      </main>
-    </div>
-  );
+    <section>
+      <h3 className="text-xl font-bold text-blue-600 mb-4">
+        📌 Próximos
+      </h3>
+      <div className="grid grid-cols-3 gap-4">
+        {proximos.map((cliente) => (
+          <CardCliente key={cliente.id} cliente={cliente} />
+        ))}
+      </div>
+    </section>
+
+    <section>
+      <h3 className="text-xl font-bold text-gray-700 mb-4">
+        🕳 Sin seguimiento programado
+      </h3>
+      <div className="grid grid-cols-3 gap-4">
+        {sinSeguimiento.map((cliente) => (
+          <CardCliente key={cliente.id} cliente={cliente} />
+        ))}
+      </div>
+    </section>
+  </div>
+)}
+</main>
+</div>
+);
 }
