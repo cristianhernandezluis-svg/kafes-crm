@@ -137,8 +137,36 @@ export default function ProductividadPage() {
           <p className="mt-8 text-gray-500">Cargando productividad...</p>
         ) : (
           <div className="mt-8 space-y-6">
-            <div className="grid grid-cols-4 gap-4">
-              <div className="bg-gray-800 text-white rounded-xl p-4">
+<div className="grid grid-cols-4 gap-4 mb-6">
+<div className="grid grid-cols-4 gap-4">
+  <div className="bg-blue-600 text-white rounded-xl p-4">
+    <p>🎯 Meta Seguimientos</p>
+    <p className="text-3xl font-bold">
+      {resumen.reduce((t, a) => t + a.seguimientos, 0)} / 50
+    </p>
+  </div>
+
+  <div className="bg-green-700 text-white rounded-xl p-4">
+    <p>💰 Meta Adelantos</p>
+    <p className="text-3xl font-bold">
+      {resumen.reduce((t, a) => t + a.adelantos, 0)} / 5
+    </p>
+  </div>
+
+  <div className="bg-yellow-500 text-black rounded-xl p-4">
+    <p>📦 Meta Entregados</p>
+    <p className="text-3xl font-bold">
+      {resumen.reduce((t, a) => t + a.entregados, 0)} / 10
+    </p>
+  </div>
+
+  <div className="bg-red-700 text-white rounded-xl p-4">
+    <p>🚨 Clientes Vencidos</p>
+    <p className="text-3xl font-bold">
+      {resumen.reduce((t, a) => t + a.vencidos, 0)}
+    </p>
+  </div>
+</div>              <div className="bg-gray-800 text-white rounded-xl p-4">
                 <p>👥 Asesores</p>
                 <p className="text-3xl font-bold">{resumen.length}</p>
               </div>
