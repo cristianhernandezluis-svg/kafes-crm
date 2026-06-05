@@ -5,6 +5,16 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+function limpiarTelefono(telefono: string) {
+  const limpio = telefono.replace(/\D/g, "");
+
+  if (limpio.startsWith("51")) {
+    return limpio;
+  }
+
+  return `51${limpio}`;
+}
+
 export async function POST(req: Request) {
   try {
     const { cliente_id, telefono, mensaje } = await req.json();
@@ -16,6 +26,15 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!process.env.WHATSAPP_PHONE_NUMBER_ID || !process.env.WHATSAPP_TOKEN) {
+      return NextResponse.json(
+        { success: false, error: "Faltan variables de WhatsApp en EasyPanel" },
+        { status: 500 }
+      );
+    }
+
+    const telefonoFinal = limpiarTelefono(telefono);
+
     const response = await fetch(
       `https://graph.facebook.com/v25.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
@@ -26,7 +45,7 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",
-          to: telefono,
+          to: telefonoFinal,
           type: "text",
           text: {
             body: mensaje,
@@ -38,8 +57,13 @@ export async function POST(req: Request) {
     const data = await response.json();
 
     if (!response.ok) {
+      console.error("ERROR META WHATSAPP:", data);
+
       return NextResponse.json(
-        { success: false, error: data },
+        {
+          success: false,
+          error: data,
+        },
         { status: 500 }
       );
     }
@@ -58,7 +82,7 @@ export async function POST(req: Request) {
       `,
       [
         cliente_id,
-        telefono,
+        telefonoFinal,
         data.messages?.[0]?.id || null,
         mensaje,
         "asesor",
@@ -68,6 +92,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
+      telefono: telefonoFinal,
       data,
     });
   } catch (error) {
