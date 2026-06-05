@@ -7,6 +7,7 @@ const estados = [
   "Nuevo",
   "Interesado",
   "Seguimiento",
+  "Pendiente Adelanto",
   "Pagó Adelanto",
   "Enviado",
   "Entregado",
