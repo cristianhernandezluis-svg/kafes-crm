@@ -78,6 +78,12 @@ export async function POST(request: Request) {
       proximo_seguimiento = null,
     } = body;
 
+let telefonoLimpio = telefono.replace(/\D/g, "");
+
+if (!telefonoLimpio.startsWith("51")) {
+  telefonoLimpio = `51${telefonoLimpio}`;
+}
+
     const result = await pool.query(
       `
       INSERT INTO clientes (
@@ -92,16 +98,15 @@ export async function POST(request: Request) {
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
       `,
-      [
-        nombre,
-        telefono,
-        ciudad,
-        etapa,
-        asesor,
-        observacion,
-        proximo_seguimiento,
-      ]
-    );
+[
+  nombre,
+  telefonoLimpio,
+  ciudad,
+  etapa,
+  asesor,
+  observacion,
+  proximo_seguimiento,
+]    );
 
     return NextResponse.json({
       success: true,
