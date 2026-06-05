@@ -305,6 +305,19 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 >
   Seguimientos
 </Link>
+<Link
+  href="/mis-pendientes"
+  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+>
+  Mis Pendientes
+</Link>
+
+<Link
+  href="/adelantos"
+  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+>
+  Adelantos
+</Link>
           <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
             Ventas
           </div>
