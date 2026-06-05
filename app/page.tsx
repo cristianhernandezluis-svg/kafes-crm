@@ -293,38 +293,57 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
         <h1 className="text-2xl font-bold text-yellow-400">Kafes CRM</h1>
 
         <div className="mt-10 space-y-4">
-          <div className="bg-yellow-500 text-black p-3 rounded-lg font-bold">
-            Dashboard
-          </div>
-          <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
-            Clientes
-          </div>
-         <Link
-  href="/seguimientos"
-  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
->
-  Seguimientos
-</Link>
-<Link
-  href="/mis-pendientes"
-  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
->
-  Mis Pendientes
-</Link>
+  <div className="bg-yellow-500 text-black p-3 rounded-lg font-bold">
+    Dashboard
+  </div>
 
-<Link
-  href="/adelantos"
-  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
->
-  Adelantos
-</Link>
-          <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
-            Ventas
-          </div>
-          <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
-            Reportes
-          </div>
-        </div>
+  <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
+    Clientes
+  </div>
+
+  <Link
+    href="/seguimientos"
+    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+  >
+    Seguimientos
+  </Link>
+
+  <Link
+    href="/mis-pendientes"
+    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+  >
+    Mis Pendientes
+  </Link>
+
+  <Link
+    href="/adelantos"
+    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+  >
+    Adelantos
+  </Link>
+
+  <Link
+    href="/chat"
+    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+  >
+    Chats
+  </Link>
+
+  <Link
+    href="/productividad"
+    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+  >
+    Productividad
+  </Link>
+
+  <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
+    Ventas
+  </div>
+
+  <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
+    Reportes
+  </div>
+</div>
 
         <div className="mt-10 bg-zinc-900 p-4 rounded-xl">
           <p className="text-sm text-gray-400">Resumen hoy</p>
