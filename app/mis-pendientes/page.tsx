@@ -111,6 +111,26 @@ const proximos = activos.filter((c) => {
     cargarClientes();
   };
 
+const marcarPendienteAdelanto = async (cliente: Cliente) => {
+  const res = await fetch(`/api/clientes/${cliente.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      etapa: "Pendiente Adelanto",
+      ultima_gestion: new Date().toISOString(),
+    }),
+  });
+
+  const data = await res.json();
+
+  if (!data.success) {
+    alert("No se pudo marcar como Pendiente Adelanto");
+    return;
+  }
+
+  cargarClientes();
+};
+
   const CardCliente = ({ cliente }: { cliente: Cliente }) => (
     <div className="bg-white rounded-xl shadow p-4 border">
       <h3 className="font-bold text-lg">{cliente.nombre || "Sin nombre"}</h3>
@@ -149,11 +169,22 @@ const proximos = activos.filter((c) => {
         >
           Reprogramar
         </Link>
-
+<button
+  onClick={() => marcarPendienteAdelanto(cliente)}
+  className="col-span-2 bg-orange-500 text-white py-2 rounded-lg font-bold text-sm"
+>
+  🔥 Pendiente Adelanto
+</button>
         <button
           onClick={() => marcarPagoAdelanto(cliente)}
           className="col-span-2 bg-yellow-500 text-black py-2 rounded-lg font-bold text-sm"
         >
+<button
+  onClick={() => marcarPendienteAdelanto(cliente)}
+  className="col-span-2 bg-orange-500 text-white py-2 rounded-lg font-bold text-sm"
+>
+  🔥 Pendiente Adelanto
+</button>
           💰 Pagó Adelanto
         </button>
       </div>
