@@ -257,6 +257,18 @@ cargarClientes();
       window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
     }
   />
+) : msg.tipo === "document" && msg.media_id ? (
+  <button
+    onClick={() =>
+      window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
+    }
+    className="bg-white border rounded-lg p-3 text-left hover:bg-gray-50"
+  >
+    <p className="font-bold">📄 Documento recibido</p>
+    <p className="text-xs text-gray-500">
+      {msg.filename || "Abrir documento"}
+    </p>
+  </button>
 ) : (
   <p>{msg.mensaje}</p>
 )}
