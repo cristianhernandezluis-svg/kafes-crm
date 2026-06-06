@@ -21,7 +21,10 @@ export async function GET(
         mensaje,
         tipo,
         remitente,
-        created_at
+        created_at,
+        media_id,
+        mime_type,
+        filename
       FROM conversaciones
       WHERE cliente_id = $1
       ORDER BY created_at ASC
