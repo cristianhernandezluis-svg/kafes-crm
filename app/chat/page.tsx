@@ -236,50 +236,58 @@ cargarClientes();
               </div>
 
               <div className="flex-1 overflow-y-auto p-5 space-y-3">
-                {conversaciones.length === 0 ? (
-                  <p className="text-gray-500">No hay mensajes todavía.</p>
-                ) : (
-                  conversaciones.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`max-w-[70%] p-3 rounded-xl text-sm ${
-                        msg.remitente === "cliente"
-                          ? "bg-green-100 mr-auto"
-                          : "bg-gray-200 ml-auto"
-                      }`}
-                    >
-{msg.tipo === "image" && msg.media_id ? (
-  <img
-    src={`/api/whatsapp/media/${msg.media_id}`}
-    alt="Imagen enviada por cliente"
-    className="max-w-xs rounded-lg border cursor-pointer"
-    onClick={() =>
-      window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
-    }
-  />
-) : msg.tipo === "document" && msg.media_id ? (
-  <button
-    onClick={() =>
-      window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
-    }
-    className="bg-white border rounded-lg p-3 text-left hover:bg-gray-50"
-  >
-    <p className="font-bold">📄 Documento recibido</p>
-    <p className="text-xs text-gray-500">
-      {msg.filename || "Abrir documento"}
-    </p>
-  </button>
+{conversaciones.length === 0 ? (
+  <p className="text-gray-500">No hay mensajes todavía.</p>
 ) : (
-  <p>{msg.mensaje}</p>
+  conversaciones.map((msg) => (
+    <div
+      key={msg.id}
+      className={`max-w-[70%] p-3 rounded-xl text-sm ${
+        msg.remitente === "cliente"
+          ? "bg-green-100 mr-auto"
+          : "bg-gray-200 ml-auto"
+      }`}
+    >
+      {msg.tipo === "image" && msg.media_id ? (
+        <img
+          src={`/api/whatsapp/media/${msg.media_id}`}
+          alt="Imagen enviada por cliente"
+          className="max-w-xs rounded-lg border cursor-pointer"
+          onClick={() =>
+            window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
+          }
+        />
+      ) : msg.tipo === "document" && msg.media_id ? (
+        <button
+          onClick={() =>
+            window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
+          }
+          className="bg-white border rounded-lg p-3 text-left hover:bg-gray-50"
+        >
+          <p className="font-bold">📄 Documento recibido</p>
+          <p className="text-xs text-gray-500">
+            {msg.filename || "Abrir documento"}
+          </p>
+        </button>
+      ) : msg.tipo === "audio" && msg.media_id ? (
+        <audio controls className="max-w-xs">
+          <source
+            src={`/api/whatsapp/media/${msg.media_id}`}
+            type={msg.mime_type || "audio/ogg"}
+          />
+        </audio>
+      ) : (
+        <p>{msg.mensaje}</p>
+      )}
+
+      <p className="text-xs text-gray-500 mt-1">
+        {msg.remitente} ·{" "}
+        {new Date(msg.created_at).toLocaleString("es-PE")}
+      </p>
+    </div>
+  ))
 )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        {msg.remitente} ·{" "}
-                        {new Date(msg.created_at).toLocaleString("es-PE")}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
+</div>
 
               <div className="bg-white border-t p-4">
                 <textarea
