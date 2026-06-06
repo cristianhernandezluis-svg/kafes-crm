@@ -155,7 +155,15 @@ const iniciarGrabacion = async () => {
 
     audioChunksRef.current = [];
 
-    const mediaRecorder = new MediaRecorder(stream);
+    const mimeType = MediaRecorder.isTypeSupported(
+      "audio/ogg;codecs=opus"
+    )
+      ? "audio/ogg;codecs=opus"
+      : "audio/webm;codecs=opus";
+
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType,
+    });
 
     mediaRecorderRef.current = mediaRecorder;
 
@@ -166,18 +174,22 @@ const iniciarGrabacion = async () => {
     };
 
     mediaRecorder.onstop = async () => {
+      const extension = mimeType.includes("ogg")
+        ? "ogg"
+        : "webm";
+
       const audioBlob = new Blob(
         audioChunksRef.current,
         {
-          type: "audio/webm",
+          type: mimeType,
         }
       );
 
       const audioFile = new File(
         [audioBlob],
-        `audio-${Date.now()}.webm`,
+        `audio-${Date.now()}.${extension}`,
         {
-          type: "audio/webm",
+          type: mimeType,
         }
       );
 
@@ -191,7 +203,7 @@ const iniciarGrabacion = async () => {
     mediaRecorder.start();
     setGrabandoAudio(true);
   } catch (error) {
-    console.error(error);
+    console.error("Error iniciando grabación:", error);
     alert("No se pudo acceder al micrófono");
   }
 };
