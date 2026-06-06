@@ -25,6 +25,9 @@ type Conversacion = {
   tipo: string;
   remitente: string;
   created_at: string;
+media_id?: string | null;
+mime_type?: string | null;
+filename?: string | null;
 };
 
 export default function ChatsPage() {
@@ -245,7 +248,18 @@ cargarClientes();
                           : "bg-gray-200 ml-auto"
                       }`}
                     >
-                      <p>{msg.mensaje}</p>
+{msg.tipo === "image" && msg.media_id ? (
+  <img
+    src={`/api/whatsapp/media/${msg.media_id}`}
+    alt="Imagen enviada por cliente"
+    className="max-w-xs rounded-lg border cursor-pointer"
+    onClick={() =>
+      window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
+    }
+  />
+) : (
+  <p>{msg.mensaje}</p>
+)}
                       <p className="text-xs text-gray-500 mt-1">
                         {msg.remitente} ·{" "}
                         {new Date(msg.created_at).toLocaleString("es-PE")}
