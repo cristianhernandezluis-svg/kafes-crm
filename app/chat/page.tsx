@@ -156,7 +156,7 @@ const iniciarGrabacion = async () => {
 audioChunksRef.current = [];
 
 // WhatsApp Cloud API acepta audio/ogg
-const mimeType = "audio/ogg";
+const mimeType = "audio/webm;codecs=opus";
 
 const mediaRecorder = new MediaRecorder(stream, {
   mimeType,
@@ -171,7 +171,7 @@ const mediaRecorder = new MediaRecorder(stream, {
     };
 
     mediaRecorder.onstop = async () => {
-const extension = "ogg";
+const extension = "webm";
 
       const audioBlob = new Blob(
         audioChunksRef.current,
@@ -198,9 +198,9 @@ const extension = "ogg";
     mediaRecorder.start();
     setGrabandoAudio(true);
   } catch (error) {
-    console.error("Error iniciando grabación:", error);
-    alert("No se pudo acceder al micrófono");
-  }
+  console.error("MIC ERROR:", error);
+  alert(String(error));
+}
 };
 
 const detenerGrabacion = () => {
