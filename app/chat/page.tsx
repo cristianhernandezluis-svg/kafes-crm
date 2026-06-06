@@ -153,17 +153,14 @@ const iniciarGrabacion = async () => {
       audio: true,
     });
 
-    audioChunksRef.current = [];
+audioChunksRef.current = [];
 
-    const mimeType = MediaRecorder.isTypeSupported(
-      "audio/ogg;codecs=opus"
-    )
-      ? "audio/ogg;codecs=opus"
-      : "audio/webm;codecs=opus";
+// WhatsApp Cloud API acepta audio/ogg
+const mimeType = "audio/ogg";
 
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType,
-    });
+const mediaRecorder = new MediaRecorder(stream, {
+  mimeType,
+});
 
     mediaRecorderRef.current = mediaRecorder;
 
@@ -174,9 +171,7 @@ const iniciarGrabacion = async () => {
     };
 
     mediaRecorder.onstop = async () => {
-      const extension = mimeType.includes("ogg")
-        ? "ogg"
-        : "webm";
+const extension = "ogg";
 
       const audioBlob = new Blob(
         audioChunksRef.current,
