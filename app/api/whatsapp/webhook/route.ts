@@ -36,6 +36,21 @@ async function prepararTablas() {
     ADD COLUMN IF NOT EXISTS cliente_id INTEGER;
   `);
 
+await pool.query(`
+  ALTER TABLE conversaciones
+  ADD COLUMN IF NOT EXISTS media_id TEXT;
+`);
+
+await pool.query(`
+  ALTER TABLE conversaciones
+  ADD COLUMN IF NOT EXISTS mime_type TEXT;
+`);
+
+await pool.query(`
+  ALTER TABLE conversaciones
+  ADD COLUMN IF NOT EXISTS filename TEXT;
+`);
+
   await pool.query(`
     ALTER TABLE conversaciones
     ADD COLUMN IF NOT EXISTS telefono TEXT;
@@ -70,12 +85,40 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
-    const telefono = contact.wa_id || message.from;
-    const nombre = contact.profile?.name || "Cliente WhatsApp";
-    const mensaje = message.text?.body || "";
-    const whatsappMessageId = message.id || null;
-    const tipo = message.type || "text";
+const telefono = contact.wa_id || message.from;
+const nombre = contact.profile?.name || "Cliente WhatsApp";
 
+const tipo = message.type || "text";
+
+let mensaje = "";
+let mediaId = null;
+let mimeType = null;
+let filename = null;
+
+if (tipo === "text") {
+  mensaje = message.text?.body || "";
+}
+
+if (tipo === "image") {
+  mensaje = "📷 Imagen";
+  mediaId = message.image?.id || null;
+  mimeType = message.image?.mime_type || null;
+}
+
+if (tipo === "document") {
+  mensaje = "📄 Documento";
+  mediaId = message.document?.id || null;
+  mimeType = message.document?.mime_type || null;
+  filename = message.document?.filename || null;
+}
+
+if (tipo === "audio") {
+  mensaje = "🎤 Audio";
+  mediaId = message.audio?.id || null;
+  mimeType = message.audio?.mime_type || null;
+}
+
+const whatsappMessageId = message.id || null;
     const clienteResult = await pool.query(
       `
       INSERT INTO clientes (nombre, telefono)
@@ -91,24 +134,29 @@ export async function POST(req: Request) {
 
     await pool.query(
       `
-      INSERT INTO conversaciones (
-        cliente_id,
-        telefono,
-        whatsapp_message_id,
-        mensaje,
-        remitente,
-        tipo
-      )
-      VALUES ($1, $2, $3, $4, $5, $6);
-      `,
-      [
-        cliente.id,
-        telefono,
-        whatsappMessageId,
-        mensaje,
-        "cliente",
-        tipo,
-      ]
+INSERT INTO conversaciones (
+  cliente_id,
+  telefono,
+  whatsapp_message_id,
+  mensaje,
+  remitente,
+  tipo,
+  media_id,
+  mime_type,
+  filename
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);      `,
+[
+  cliente.id,
+  telefono,
+  whatsappMessageId,
+  mensaje,
+  "cliente",
+  tipo,
+  mediaId,
+  mimeType,
+  filename,
+]
     );
 
     console.log("WHATSAPP GUARDADO:", {
