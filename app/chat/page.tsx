@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Cliente = {
   id: number;
@@ -37,6 +37,10 @@ export default function ChatsPage() {
   const [mensajeNuevo, setMensajeNuevo] = useState("");
   const [enviando, setEnviando] = useState(false);
 const [enviandoArchivo, setEnviandoArchivo] = useState(false);
+
+const [grabandoAudio, setGrabandoAudio] = useState(false);
+const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+const audioChunksRef = useRef<Blob[]>([]);
 
 const cargarClientes = async () => {
   const res = await fetch("/api/chats", {
@@ -140,6 +144,62 @@ const enviarArchivo = async (archivo: File) => {
     alert("Error enviando archivo");
   } finally {
     setEnviandoArchivo(false);
+  }
+};
+
+const iniciarGrabacion = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+    });
+
+    audioChunksRef.current = [];
+
+    const mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorderRef.current = mediaRecorder;
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(
+        audioChunksRef.current,
+        {
+          type: "audio/webm",
+        }
+      );
+
+      const audioFile = new File(
+        [audioBlob],
+        `audio-${Date.now()}.webm`,
+        {
+          type: "audio/webm",
+        }
+      );
+
+      stream.getTracks().forEach((track) =>
+        track.stop()
+      );
+
+      await enviarArchivo(audioFile);
+    };
+
+    mediaRecorder.start();
+    setGrabandoAudio(true);
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo acceder al micrófono");
+  }
+};
+
+const detenerGrabacion = () => {
+  if (mediaRecorderRef.current) {
+    mediaRecorderRef.current.stop();
+    setGrabandoAudio(false);
   }
 };
 
@@ -352,6 +412,19 @@ const enviarArchivo = async (archivo: File) => {
     }}
   />
 </label>
+
+<button
+  onClick={grabandoAudio ? detenerGrabacion : iniciarGrabacion}
+  className={`w-full py-3 rounded-lg mt-3 font-bold ${
+    grabandoAudio
+      ? "bg-red-600 text-white"
+      : "bg-blue-600 text-white"
+  }`}
+>
+  {grabandoAudio
+    ? "⏹️ Detener y enviar audio"
+    : "🎙️ Grabar audio"}
+</button>
 
 <button
   onClick={enviarMensaje}
