@@ -36,6 +36,7 @@ export default function ChatsPage() {
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [mensajeNuevo, setMensajeNuevo] = useState("");
   const [enviando, setEnviando] = useState(false);
+const [enviandoArchivo, setEnviandoArchivo] = useState(false);
 
 const cargarClientes = async () => {
   const res = await fetch("/api/chats", {
@@ -108,6 +109,39 @@ cargarClientes();
       setEnviando(false);
     }
   };
+
+const enviarArchivo = async (archivo: File) => {
+  if (!clienteActivo) return;
+
+  try {
+    setEnviandoArchivo(true);
+
+    const formData = new FormData();
+    formData.append("cliente_id", String(clienteActivo.id));
+    formData.append("telefono", clienteActivo.telefono);
+    formData.append("archivo", archivo);
+
+    const res = await fetch("/api/whatsapp/send-media", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert("No se pudo enviar el archivo");
+      return;
+    }
+
+    abrirConversacion(clienteActivo);
+    cargarClientes();
+  } catch (error) {
+    console.error("Error enviando archivo:", error);
+    alert("Error enviando archivo");
+  } finally {
+    setEnviandoArchivo(false);
+  }
+};
 
   useEffect(() => {
     cargarClientes();
@@ -290,21 +324,42 @@ cargarClientes();
 </div>
 
               <div className="bg-white border-t p-4">
-                <textarea
-                  className="w-full border rounded-lg p-3"
-                  rows={3}
-                  placeholder="Escribe un mensaje..."
-                  value={mensajeNuevo}
-                  onChange={(e) => setMensajeNuevo(e.target.value)}
-                />
+<textarea
+  className="w-full border rounded-lg p-3"
+  rows={3}
+  placeholder="Escribe un mensaje..."
+  value={mensajeNuevo}
+  onChange={(e) => setMensajeNuevo(e.target.value)}
+/>
 
-                <button
-                  onClick={enviarMensaje}
-                  disabled={enviando}
-                  className="w-full bg-green-600 text-white py-3 rounded-lg mt-3 font-bold disabled:bg-gray-400"
-                >
-                  {enviando ? "Enviando..." : "Enviar WhatsApp"}
-                </button>
+<label className="block w-full bg-gray-200 text-gray-800 py-3 rounded-lg mt-3 font-bold text-center cursor-pointer hover:bg-gray-300">
+  {enviandoArchivo
+    ? "Enviando archivo..."
+    : "📎 Adjuntar imagen / PDF / audio"}
+
+  <input
+    type="file"
+    className="hidden"
+    accept="image/*,application/pdf,audio/*"
+    onChange={(e) => {
+      const archivo = e.target.files?.[0];
+
+      if (archivo) {
+        enviarArchivo(archivo);
+      }
+
+      e.target.value = "";
+    }}
+  />
+</label>
+
+<button
+  onClick={enviarMensaje}
+  disabled={enviando}
+  className="w-full bg-green-600 text-white py-3 rounded-lg mt-3 font-bold disabled:bg-gray-400"
+>
+  {enviando ? "Enviando..." : "Enviar WhatsApp"}
+</button>
               </div>
             </>
           )}
