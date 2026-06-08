@@ -390,6 +390,13 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
   Plantillas
 </Link>
 
+<Link
+  href="/configuracion/planes"
+  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+>
+  Suscripción
+</Link>
+
 </div>
         <div className="mt-10 bg-zinc-900 p-4 rounded-xl">
           <p className="text-sm text-gray-400">Resumen hoy</p>
