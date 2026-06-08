@@ -7,53 +7,28 @@ const pool = new Pool({
 
 async function prepararTablas() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS clientes (
-      id SERIAL PRIMARY KEY,
-      nombre TEXT,
-      telefono TEXT UNIQUE NOT NULL,
-      ciudad TEXT,
-      etapa TEXT DEFAULT 'Nuevo',
-      asesor TEXT,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS conversaciones (
-      id SERIAL PRIMARY KEY,
-      cliente_id INTEGER REFERENCES clientes(id) ON DELETE CASCADE,
-      telefono TEXT,
-      whatsapp_message_id TEXT,
-      mensaje TEXT,
-      remitente TEXT,
-      tipo TEXT DEFAULT 'text',
-      created_at TIMESTAMP DEFAULT NOW()
-    );
+    ALTER TABLE clientes
+    ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
   `);
 
   await pool.query(`
     ALTER TABLE conversaciones
-    ADD COLUMN IF NOT EXISTS cliente_id INTEGER;
+    ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
   `);
-
-await pool.query(`
-  ALTER TABLE conversaciones
-  ADD COLUMN IF NOT EXISTS media_id TEXT;
-`);
-
-await pool.query(`
-  ALTER TABLE conversaciones
-  ADD COLUMN IF NOT EXISTS mime_type TEXT;
-`);
-
-await pool.query(`
-  ALTER TABLE conversaciones
-  ADD COLUMN IF NOT EXISTS filename TEXT;
-`);
 
   await pool.query(`
     ALTER TABLE conversaciones
-    ADD COLUMN IF NOT EXISTS telefono TEXT;
+    ADD COLUMN IF NOT EXISTS media_id TEXT;
+  `);
+
+  await pool.query(`
+    ALTER TABLE conversaciones
+    ADD COLUMN IF NOT EXISTS mime_type TEXT;
+  `);
+
+  await pool.query(`
+    ALTER TABLE conversaciones
+    ADD COLUMN IF NOT EXISTS filename TEXT;
   `);
 }
 
@@ -85,81 +60,104 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
-const telefono = contact.wa_id || message.from;
-const nombre = contact.profile?.name || "Cliente WhatsApp";
+    const phoneNumberId = value?.metadata?.phone_number_id;
 
-const tipo = message.type || "text";
+    const configResult = await pool.query(
+      `
+      SELECT empresa_id
+      FROM integraciones_whatsapp
+      WHERE phone_number_id = $1 AND estado = 'activo'
+      LIMIT 1
+      `,
+      [phoneNumberId]
+    );
 
-let mensaje = "";
-let mediaId = null;
-let mimeType = null;
-let filename = null;
+    const empresaId = configResult.rows[0]?.empresa_id;
 
-if (tipo === "text") {
-  mensaje = message.text?.body || "";
-}
+    if (!empresaId) {
+      console.error("No se encontró empresa para phone_number_id:", phoneNumberId);
+      return NextResponse.json({ success: true });
+    }
 
-if (tipo === "image") {
-  mensaje = "📷 Imagen";
-  mediaId = message.image?.id || null;
-  mimeType = message.image?.mime_type || null;
-}
+    const telefono = contact.wa_id || message.from;
+    const nombre = contact.profile?.name || "Cliente WhatsApp";
+    const tipo = message.type || "text";
 
-if (tipo === "document") {
-  mensaje = "📄 Documento";
-  mediaId = message.document?.id || null;
-  mimeType = message.document?.mime_type || null;
-  filename = message.document?.filename || null;
-}
+    let mensaje = "";
+    let mediaId = null;
+    let mimeType = null;
+    let filename = null;
 
-if (tipo === "audio") {
-  mensaje = "🎤 Audio";
-  mediaId = message.audio?.id || null;
-  mimeType = message.audio?.mime_type || null;
-}
+    if (tipo === "text") {
+      mensaje = message.text?.body || "";
+    }
 
-const whatsappMessageId = message.id || null;
+    if (tipo === "image") {
+      mensaje = "📷 Imagen";
+      mediaId = message.image?.id || null;
+      mimeType = message.image?.mime_type || null;
+    }
+
+    if (tipo === "document") {
+      mensaje = "📄 Documento";
+      mediaId = message.document?.id || null;
+      mimeType = message.document?.mime_type || null;
+      filename = message.document?.filename || null;
+    }
+
+    if (tipo === "audio") {
+      mensaje = "🎤 Audio";
+      mediaId = message.audio?.id || null;
+      mimeType = message.audio?.mime_type || null;
+    }
+
+    const whatsappMessageId = message.id || null;
+
     const clienteResult = await pool.query(
       `
-      INSERT INTO clientes (nombre, telefono)
-      VALUES ($1, $2)
-      ON CONFLICT (telefono)
+      INSERT INTO clientes (empresa_id, nombre, telefono)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (empresa_id, telefono)
       DO UPDATE SET nombre = EXCLUDED.nombre
-      RETURNING id, nombre, telefono;
+      RETURNING id, empresa_id, nombre, telefono;
       `,
-      [nombre, telefono]
+      [empresaId, nombre, telefono]
     );
 
     const cliente = clienteResult.rows[0];
 
     await pool.query(
       `
-INSERT INTO conversaciones (
-  cliente_id,
-  telefono,
-  whatsapp_message_id,
-  mensaje,
-  remitente,
-  tipo,
-  media_id,
-  mime_type,
-  filename
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);      `,
-[
-  cliente.id,
-  telefono,
-  whatsappMessageId,
-  mensaje,
-  "cliente",
-  tipo,
-  mediaId,
-  mimeType,
-  filename,
-]
+      INSERT INTO conversaciones (
+        empresa_id,
+        cliente_id,
+        telefono,
+        whatsapp_message_id,
+        mensaje,
+        remitente,
+        tipo,
+        media_id,
+        mime_type,
+        filename
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+      `,
+      [
+        empresaId,
+        cliente.id,
+        telefono,
+        whatsappMessageId,
+        mensaje,
+        "cliente",
+        tipo,
+        mediaId,
+        mimeType,
+        filename,
+      ]
     );
 
     console.log("WHATSAPP GUARDADO:", {
+      empresa_id: empresaId,
       cliente_id: cliente.id,
       telefono,
       nombre,

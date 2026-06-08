@@ -7,35 +7,51 @@ const pool = new Pool({
 
 function limpiarTelefono(telefono: string) {
   const limpio = telefono.replace(/\D/g, "");
-
-  if (limpio.startsWith("51")) {
-    return limpio;
-  }
-
-  return `51${limpio}`;
+  return limpio.startsWith("51") ? limpio : `51${limpio}`;
 }
 
 export async function POST(req: Request) {
   try {
     const { cliente_id, telefono, mensaje } = await req.json();
 
-    if (!telefono || !mensaje) {
+    if (!cliente_id || !telefono || !mensaje) {
       return NextResponse.json(
-        { success: false, error: "Falta teléfono o mensaje" },
+        { success: false, error: "Falta cliente, teléfono o mensaje" },
         { status: 400 }
       );
     }
 
-    if (
-      !process.env.WHATSAPP_PHONE_NUMBER_ID ||
-      !process.env.WHATSAPP_TOKEN
-    ) {
+    const clienteResult = await pool.query(
+      `SELECT empresa_id FROM clientes WHERE id = $1 LIMIT 1`,
+      [cliente_id]
+    );
+
+    const empresaId = clienteResult.rows[0]?.empresa_id;
+
+    if (!empresaId) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Faltan variables de WhatsApp en EasyPanel",
-        },
-        { status: 500 }
+        { success: false, error: "Cliente sin empresa_id" },
+        { status: 400 }
+      );
+    }
+
+    const configResult = await pool.query(
+      `
+      SELECT phone_number_id, token
+      FROM integraciones_whatsapp
+      WHERE empresa_id = $1 AND estado = 'activo'
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
+      [empresaId]
+    );
+
+    const config = configResult.rows[0];
+
+    if (!config) {
+      return NextResponse.json(
+        { success: false, error: "Esta empresa no tiene WhatsApp configurado" },
+        { status: 400 }
       );
     }
 
@@ -52,18 +68,12 @@ export async function POST(req: Request) {
       },
     };
 
-    console.log("PAYLOAD WHATSAPP:", payload);
-    console.log(
-      "PHONE_NUMBER_ID:",
-      process.env.WHATSAPP_PHONE_NUMBER_ID
-    );
-
     const response = await fetch(
-      `https://graph.facebook.com/v25.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/v25.0/${config.phone_number_id}/messages`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+          Authorization: `Bearer ${config.token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
@@ -72,16 +82,11 @@ export async function POST(req: Request) {
 
     const data = await response.json();
 
-    console.log("RESPUESTA META:", data);
-
     if (!response.ok) {
       console.error("ERROR META WHATSAPP:", data);
 
       return NextResponse.json(
-        {
-          success: false,
-          error: data,
-        },
+        { success: false, error: data },
         { status: 500 }
       );
     }
@@ -89,6 +94,7 @@ export async function POST(req: Request) {
     await pool.query(
       `
       INSERT INTO conversaciones (
+        empresa_id,
         cliente_id,
         telefono,
         whatsapp_message_id,
@@ -96,9 +102,10 @@ export async function POST(req: Request) {
         remitente,
         tipo
       )
-      VALUES ($1, $2, $3, $4, $5, $6)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       `,
       [
+        empresaId,
         cliente_id,
         telefonoFinal,
         data.messages?.[0]?.id || null,
@@ -117,10 +124,7 @@ export async function POST(req: Request) {
     console.error("ERROR ENVIANDO WHATSAPP:", error);
 
     return NextResponse.json(
-      {
-        success: false,
-        error: "Error enviando mensaje",
-      },
+      { success: false, error: "Error enviando mensaje" },
       { status: 500 }
     );
   }
