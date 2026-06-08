@@ -371,6 +371,16 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
         <div className="flex justify-between items-center">
           <h2 className="text-3xl font-bold">Embudo de Ventas</h2>
 
+<button
+  onClick={() => {
+    localStorage.removeItem("usuario");
+    window.location.href = "/login";
+  }}
+  className="bg-red-600 text-white px-5 py-3 rounded-lg font-bold"
+>
+  Cerrar sesión
+</button>
+
           <div className="flex gap-3">
             <button
               onClick={cargarClientes}
