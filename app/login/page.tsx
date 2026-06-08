@@ -22,7 +22,7 @@ export default function LoginPage() {
 
     if (data.success) {
       localStorage.setItem("usuario", JSON.stringify(data.usuario));
-      window.location.href = "/";
+      window.location.href = "/onboarding";
     } else {
       setMensaje(data.error || "No se pudo ingresar");
     }
