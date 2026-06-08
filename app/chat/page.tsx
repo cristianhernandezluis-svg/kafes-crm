@@ -51,7 +51,15 @@ const [enviandoArchivo, setEnviandoArchivo] = useState(false);
 const [grabandoAudio, setGrabandoAudio] = useState(false);
 const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 const audioChunksRef = useRef<Blob[]>([]);
-
+const mensajesFinRef = useRef<HTMLDivElement | null>(null);
+const bajarAlFinal = () => {
+  setTimeout(() => {
+    mensajesFinRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, 100);
+};
 const cargarClientes = async () => {
   const res = await fetch("/api/chats", {
     cache: "no-store",
@@ -65,6 +73,7 @@ const cargarClientes = async () => {
 };
 
 const cargarPlantillas = async () => {
+  
   const usuarioGuardado = localStorage.getItem("usuario");
 
   if (!usuarioGuardado) return;
@@ -105,8 +114,9 @@ cargarClientes();
     const data = await res.json();
 
     if (data.success) {
-      setConversaciones(data.conversaciones);
-    }
+  setConversaciones(data.conversaciones);
+  bajarAlFinal();
+}
   };
 
   const enviarMensaje = async () => {
@@ -289,7 +299,7 @@ const detenerGrabacion = () => {
       </aside>
 
       <main className="flex-1 flex">
-        <section className="w-[360px] bg-white border-r overflow-y-auto">
+        <section className="w-[360px] bg-white border-r overflow-y-auto h-screen">
           <div className="p-5 border-b">
             <h2 className="text-2xl font-bold">💬 Chats</h2>
             <p className="text-sm text-gray-500">
@@ -297,8 +307,8 @@ const detenerGrabacion = () => {
             </p>
           </div>
 
-          <div>
-            {clientes.map((cliente) => (
+          <div className="overflow-y-auto h-[calc(100vh-90px)]">
+  {clientes.map((cliente) => (
               <button
                 key={cliente.id}
                 onClick={() => abrirConversacion(cliente)}
@@ -353,7 +363,7 @@ const detenerGrabacion = () => {
 ))}
 </div>
 </section>
-        <section className="flex-1 flex flex-col">
+        <section className="flex-1 flex flex-col h-screen">
           {!clienteActivo ? (
             <div className="flex-1 flex items-center justify-center text-gray-500">
               Selecciona un chat para responder.
@@ -420,6 +430,9 @@ const detenerGrabacion = () => {
     </div>
   ))
 )}
+
+<div ref={mensajesFinRef} />
+
 </div>
 
               <div className="bg-white border-t p-4">
@@ -467,6 +480,12 @@ const detenerGrabacion = () => {
   placeholder="Escribe un mensaje..."
   value={mensajeNuevo}
   onChange={(e) => setMensajeNuevo(e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      enviarMensaje();
+    }
+  }}
 />
 
 <label className="block w-full bg-gray-200 text-gray-800 py-3 rounded-lg mt-3 font-bold text-center cursor-pointer hover:bg-gray-300">
