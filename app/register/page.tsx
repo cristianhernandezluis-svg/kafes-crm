@@ -28,10 +28,14 @@ export default function RegisterPage() {
     const data = await res.json();
 
     if (data.success) {
-      setMensaje("Cuenta creada correctamente ✅");
-    } else {
-      setMensaje(data.error);
-    }
+  setMensaje("Cuenta creada correctamente ✅ Redirigiendo al login...");
+
+  setTimeout(() => {
+    window.location.href = "/login";
+  }, 1200);
+} else {
+  setMensaje(data.error);
+}
   };
 
   return (
