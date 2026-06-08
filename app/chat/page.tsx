@@ -53,6 +53,17 @@ const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 const audioChunksRef = useRef<Blob[]>([]);
 
 const cargarClientes = async () => {
+  const res = await fetch("/api/chats", {
+    cache: "no-store",
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    setClientes(data.chats);
+  }
+};
+
 const cargarPlantillas = async () => {
   const usuarioGuardado = localStorage.getItem("usuario");
 
@@ -71,16 +82,6 @@ const cargarPlantillas = async () => {
 
   if (data.success) {
     setPlantillas(data.plantillas);
-  }
-};
-  const res = await fetch("/api/chats", {
-    cache: "no-store",
-  });
-
-  const data = await res.json();
-
-  if (data.success) {
-    setClientes(data.chats);
   }
 };
 
