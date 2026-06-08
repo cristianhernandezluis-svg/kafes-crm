@@ -41,6 +41,13 @@ type Conversacion = {
 export default function Home() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
+useEffect(() => {
+  const usuario = localStorage.getItem("usuario");
+
+  if (!usuario) {
+    window.location.href = "/login";
+  }
+}, []);
   const [mostrarModal, setMostrarModal] = useState(false);
 
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
