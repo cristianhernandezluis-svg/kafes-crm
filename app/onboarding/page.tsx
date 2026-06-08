@@ -34,7 +34,7 @@ export default function OnboardingPage() {
           </a>
 
           <a
-            href="/"
+            href="/dashboard"
             className="block border rounded-xl p-5 hover:bg-gray-50"
           >
             <h2 className="text-xl font-bold">3. Abre tu embudo</h2>
@@ -45,7 +45,7 @@ export default function OnboardingPage() {
         </div>
 
         <a
-          href="/"
+          href="/dashboard"
           className="block bg-black text-white text-center rounded-xl py-4 mt-8 font-bold"
         >
           Ir al CRM
