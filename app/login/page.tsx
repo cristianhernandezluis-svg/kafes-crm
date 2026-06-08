@@ -58,6 +58,13 @@ export default function LoginPage() {
           Ingresar
         </button>
 
+<p className="text-center mt-4 text-sm text-gray-600">
+  ¿No tienes cuenta?{" "}
+  <a href="/register" className="font-bold text-blue-600">
+    Crear cuenta gratis
+  </a>
+</p>
+
         {mensaje && <p className="mt-4 text-center text-red-600">{mensaje}</p>}
       </form>
     </main>
