@@ -78,7 +78,7 @@ export default function PlanesPage() {
           />
 
           <PlanCard
-            nombre="Emprendedor"
+            nombre="pro"
             precio="S/49/mes"
             destacado
             items={[
