@@ -383,6 +383,13 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
   Configuración WhatsApp
 </Link>
 
+<Link
+  href="/plantillas"
+  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+>
+  Plantillas
+</Link>
+
 </div>
         <div className="mt-10 bg-zinc-900 p-4 rounded-xl">
           <p className="text-sm text-gray-400">Resumen hoy</p>
