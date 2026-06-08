@@ -30,11 +30,21 @@ mime_type?: string | null;
 filename?: string | null;
 };
 
+type Plantilla = {
+  id: number;
+  empresa_id: number;
+  nombre: string;
+  mensaje: string;
+  created_at: string;
+};
+
 export default function ChatsPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [mensajeNuevo, setMensajeNuevo] = useState("");
+const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
+const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
   const [enviando, setEnviando] = useState(false);
 const [enviandoArchivo, setEnviandoArchivo] = useState(false);
 
@@ -43,6 +53,26 @@ const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 const audioChunksRef = useRef<Blob[]>([]);
 
 const cargarClientes = async () => {
+const cargarPlantillas = async () => {
+  const usuarioGuardado = localStorage.getItem("usuario");
+
+  if (!usuarioGuardado) return;
+
+  const usuario = JSON.parse(usuarioGuardado);
+
+  const res = await fetch(
+    `/api/plantillas?empresa_id=${usuario.empresa_id}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  const data = await res.json();
+
+  if (data.success) {
+    setPlantillas(data.plantillas);
+  }
+};
   const res = await fetch("/api/chats", {
     cache: "no-store",
   });
@@ -211,7 +241,8 @@ const detenerGrabacion = () => {
 };
 
   useEffect(() => {
-    cargarClientes();
+  cargarClientes();
+  cargarPlantillas();
 
     const intervalo = setInterval(() => {
       cargarClientes();
@@ -391,6 +422,44 @@ const detenerGrabacion = () => {
 </div>
 
               <div className="bg-white border-t p-4">
+  <button
+    onClick={() => setMostrarPlantillas(!mostrarPlantillas)}
+    className="w-full bg-yellow-400 text-black py-3 rounded-lg mb-3 font-bold hover:bg-yellow-300"
+  >
+    📋 Usar plantilla
+  </button>
+
+  {mostrarPlantillas && (
+    <div className="border rounded-lg p-3 mb-3 bg-gray-50 max-h-48 overflow-y-auto space-y-2">
+      {plantillas.length === 0 ? (
+        <p className="text-sm text-gray-500">
+          No tienes plantillas creadas.
+        </p>
+      ) : (
+        plantillas.map((plantilla) => (
+          <button
+            key={plantilla.id}
+            onClick={() => {
+              const texto = plantilla.mensaje.replaceAll(
+                "{{nombre}}",
+                clienteActivo?.nombre || ""
+              );
+
+              setMensajeNuevo(texto);
+              setMostrarPlantillas(false);
+            }}
+            className="w-full text-left bg-white border rounded-lg p-3 hover:bg-yellow-50"
+          >
+            <p className="font-bold">{plantilla.nombre}</p>
+            <p className="text-xs text-gray-500">
+              {plantilla.mensaje}
+            </p>
+          </button>
+        ))
+      )}
+    </div>
+  )}
+
 <textarea
   className="w-full border rounded-lg p-3"
   rows={3}
