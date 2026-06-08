@@ -375,8 +375,15 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 >
   Usuarios
 </Link>
-</div>
 
+<Link
+  href="/configuracion/whatsapp"
+  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+>
+  Configuración WhatsApp
+</Link>
+
+</div>
         <div className="mt-10 bg-zinc-900 p-4 rounded-xl">
           <p className="text-sm text-gray-400">Resumen hoy</p>
           <p className="mt-2">Clientes: {clientes.length}</p>
