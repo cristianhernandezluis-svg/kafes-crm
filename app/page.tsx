@@ -6,7 +6,7 @@ export default function LandingPage() {
       <header className="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
         <h1 className="text-2xl font-black text-yellow-400">Kafes CRM</h1>
 
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
           <Link href="/login" className="text-white font-bold">
             Iniciar sesión
           </Link>
@@ -31,8 +31,8 @@ export default function LandingPage() {
           </h2>
 
           <p className="text-zinc-300 mt-6 text-lg">
-            Kafes CRM ayuda a tu equipo a responder más rápido, hacer seguimiento
-            y no perder clientes de WhatsApp.
+            Kafes CRM ayuda a tu equipo a responder más rápido, hacer
+            seguimiento y no perder clientes de WhatsApp.
           </p>
 
           <div className="flex flex-col md:flex-row gap-4 mt-8">
@@ -84,7 +84,7 @@ export default function LandingPage() {
   );
 }
 
-function Card({ title, value }: any) {
+function Card({ title, value }: { title: string; value: string }) {
   return (
     <div className="bg-gray-100 rounded-xl p-4">
       <p className="text-gray-500 text-sm">{title}</p>
@@ -93,7 +93,7 @@ function Card({ title, value }: any) {
   );
 }
 
-function Feature({ title, text }: any) {
+function Feature({ title, text }: { title: string; text: string }) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl">
       <h3 className="text-2xl font-black text-yellow-400">{title}</h3>
