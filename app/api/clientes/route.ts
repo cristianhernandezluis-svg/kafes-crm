@@ -25,15 +25,33 @@ async function prepararColumnasClientes() {
     ALTER TABLE clientes
     ADD COLUMN IF NOT EXISTS cantidad_seguimientos INTEGER DEFAULT 0;
   `);
+
+  await pool.query(`
+    ALTER TABLE clientes
+    ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
+  `);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await prepararColumnasClientes();
 
-    const result = await pool.query(`
+    const { searchParams } = new URL(request.url);
+    const empresaId = searchParams.get("empresa_id");
+
+    if (!empresaId) {
+      return NextResponse.json({
+        success: false,
+        clientes: [],
+        error: "empresa_id es obligatorio",
+      });
+    }
+
+    const result = await pool.query(
+      `
       SELECT
         id,
+        empresa_id,
         nombre,
         telefono,
         ciudad,
@@ -45,8 +63,11 @@ export async function GET() {
         cantidad_seguimientos,
         created_at
       FROM clientes
+      WHERE empresa_id = $1
       ORDER BY created_at DESC;
-    `);
+      `,
+      [empresaId]
+    );
 
     return NextResponse.json({
       success: true,
@@ -69,6 +90,7 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const {
+      empresa_id,
       nombre,
       telefono,
       ciudad,
@@ -78,15 +100,23 @@ export async function POST(request: Request) {
       proximo_seguimiento = null,
     } = body;
 
-let telefonoLimpio = telefono.replace(/\D/g, "");
+    if (!empresa_id) {
+      return NextResponse.json(
+        { success: false, error: "empresa_id es obligatorio" },
+        { status: 400 }
+      );
+    }
 
-if (!telefonoLimpio.startsWith("51")) {
-  telefonoLimpio = `51${telefonoLimpio}`;
-}
+    let telefonoLimpio = telefono.replace(/\D/g, "");
+
+    if (!telefonoLimpio.startsWith("51")) {
+      telefonoLimpio = `51${telefonoLimpio}`;
+    }
 
     const result = await pool.query(
       `
       INSERT INTO clientes (
+        empresa_id,
         nombre,
         telefono,
         ciudad,
@@ -95,18 +125,20 @@ if (!telefonoLimpio.startsWith("51")) {
         observacion,
         proximo_seguimiento
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
       `,
-[
-  nombre,
-  telefonoLimpio,
-  ciudad,
-  etapa,
-  asesor,
-  observacion,
-  proximo_seguimiento,
-]    );
+      [
+        empresa_id,
+        nombre,
+        telefonoLimpio,
+        ciudad,
+        etapa,
+        asesor,
+        observacion,
+        proximo_seguimiento,
+      ]
+    );
 
     return NextResponse.json({
       success: true,

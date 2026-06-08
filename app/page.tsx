@@ -96,7 +96,18 @@ const seguimientosHoy = clientes.filter((c) => {
 
   const cargarClientes = async () => {
     try {
-      const res = await fetch("/api/clientes", { cache: "no-store" });
+      const usuarioGuardado = localStorage.getItem("usuario");
+
+if (!usuarioGuardado) {
+  window.location.href = "/login";
+  return;
+}
+
+const usuario = JSON.parse(usuarioGuardado);
+
+const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}`, {
+  cache: "no-store",
+});
       const data = await res.json();
 
       if (data.success) {
@@ -171,11 +182,18 @@ const seguimientosHoy = clientes.filter((c) => {
     }
 
     try {
-      const res = await fetch("/api/clientes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const usuario = JSON.parse(
+  localStorage.getItem("usuario") || "{}"
+);
+
+const res = await fetch("/api/clientes", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    ...form,
+    empresa_id: usuario.empresa_id,
+  }),
+});
 
       const data = await res.json();
 
@@ -350,6 +368,13 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
   <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
     Reportes
   </div>
+
+<Link
+  href="/usuarios"
+  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
+>
+  Usuarios
+</Link>
 </div>
 
         <div className="mt-10 bg-zinc-900 p-4 rounded-xl">
