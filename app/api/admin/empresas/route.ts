@@ -48,16 +48,22 @@ export async function PATCH(request: Request) {
     }
 
     const result = await pool.query(
-      `
-      UPDATE empresas
-      SET
-        plan = COALESCE($1, plan),
-        estado = COALESCE($2, estado)
-      WHERE id = $3
-      RETURNING *
-      `,
-      [plan || null, estado || null, empresa_id]
-    );
+  `
+  UPDATE empresas
+  SET
+    plan = COALESCE($1, plan),
+    estado = COALESCE($2, estado),
+    fecha_vencimiento = COALESCE($3, fecha_vencimiento)
+  WHERE id = $4
+  RETURNING *
+  `,
+  [
+    plan || null,
+    estado || null,
+    fecha_vencimiento || null,
+    empresa_id,
+  ]
+);
 
     return NextResponse.json({
       success: true,
