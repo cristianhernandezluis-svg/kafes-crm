@@ -43,20 +43,22 @@ export default function AdminEmpresasPage() {
   };
 
   const actualizarEmpresa = async (
-    empresa_id: number,
-    plan: string,
-    estado: string
-  ) => {
+  empresa_id: number,
+  plan: string,
+  estado: string,
+  fecha_vencimiento?: string
+) => {
     const res = await fetch("/api/admin/empresas", {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        empresa_id,
-        plan,
-        estado,
-      }),
+  empresa_id,
+  plan,
+  estado,
+  fecha_vencimiento,
+}),
     });
 
     const data = await res.json();
@@ -145,11 +147,23 @@ export default function AdminEmpresasPage() {
                     </select>
                   </td>
 <td className="border p-3">
-  {empresa.fecha_vencimiento
-    ? new Date(
-        empresa.fecha_vencimiento
-      ).toLocaleDateString("es-PE")
-    : "Sin fecha"}
+  <input
+    type="date"
+    className="border rounded p-2"
+    value={
+      empresa.fecha_vencimiento
+        ? empresa.fecha_vencimiento.slice(0, 10)
+        : ""
+    }
+    onChange={(e) =>
+      actualizarEmpresa(
+        empresa.id,
+        empresa.plan,
+        empresa.estado,
+        e.target.value
+      )
+    }
+  />
 </td>
                   <td className="border p-3">
                     {new Date(empresa.created_at).toLocaleDateString("es-PE")}
