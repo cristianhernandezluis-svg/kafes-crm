@@ -8,6 +8,7 @@ type Empresa = {
   plan: string;
   estado: string;
   usuarios: number;
+  fecha_vencimiento: string | null;
   created_at: string;
 };
 
@@ -97,7 +98,8 @@ export default function AdminEmpresasPage() {
                 <th className="border p-3 text-left">Usuarios</th>
                 <th className="border p-3 text-left">Plan</th>
                 <th className="border p-3 text-left">Estado</th>
-                <th className="border p-3 text-left">Creada</th>
+		<th className="border p-3 text-left">Vencimiento</th>
+		<th className="border p-3 text-left">Creada</th>
               </tr>
             </thead>
 
@@ -142,7 +144,13 @@ export default function AdminEmpresasPage() {
                       <option value="suspendido">suspendido</option>
                     </select>
                   </td>
-
+<td className="border p-3">
+  {empresa.fecha_vencimiento
+    ? new Date(
+        empresa.fecha_vencimiento
+      ).toLocaleDateString("es-PE")
+    : "Sin fecha"}
+</td>
                   <td className="border p-3">
                     {new Date(empresa.created_at).toLocaleDateString("es-PE")}
                   </td>
@@ -151,7 +159,7 @@ export default function AdminEmpresasPage() {
 
               {empresas.length === 0 && (
                 <tr>
-                  <td className="p-5 text-center text-gray-500" colSpan={6}>
+                  <td className="p-5 text-center text-gray-500" colSpan={7}>
                     No hay empresas registradas.
                   </td>
                 </tr>
