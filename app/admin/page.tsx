@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
+type Metricas = {
+  empresas: number;
+  usuarios: number;
+  clientes: number;
+  activas: number;
+  suspendidas: number;
+  vencidas: number;
+};
+
 export default function AdminPage() {
-  useEffect(() => {
+  const [metricas, setMetricas] = useState<Metricas | null>(null);
+
+  const cargarMetricas = async () => {
     const usuarioGuardado = localStorage.getItem("usuario");
 
     if (!usuarioGuardado) {
@@ -17,7 +28,22 @@ export default function AdminPage() {
     if (usuario.email !== "cristianluis_03@live.com") {
       alert("No tienes permiso para acceder a esta página");
       window.location.href = "/dashboard";
+      return;
     }
+
+    const res = await fetch("/api/admin/dashboard", {
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      setMetricas(data.metricas);
+    }
+  };
+
+  useEffect(() => {
+    cargarMetricas();
   }, []);
 
   return (
@@ -27,6 +53,17 @@ export default function AdminPage() {
         <p className="text-gray-500 mb-8">
           Control interno del SaaS. Solo visible para Cristian.
         </p>
+
+        {metricas && (
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <MetricCard titulo="🏢 Empresas" valor={metricas.empresas} />
+            <MetricCard titulo="👥 Usuarios" valor={metricas.usuarios} />
+            <MetricCard titulo="💬 Clientes CRM" valor={metricas.clientes} />
+            <MetricCard titulo="🟢 Activas" valor={metricas.activas} />
+            <MetricCard titulo="🔴 Suspendidas" valor={metricas.suspendidas} />
+            <MetricCard titulo="⏰ Vencidas" valor={metricas.vencidas} />
+          </div>
+        )}
 
         <div className="grid md:grid-cols-3 gap-6">
           <AdminCard
@@ -56,6 +93,21 @@ export default function AdminPage() {
         </Link>
       </div>
     </main>
+  );
+}
+
+function MetricCard({
+  titulo,
+  valor,
+}: {
+  titulo: string;
+  valor: number;
+}) {
+  return (
+    <div className="bg-white rounded-xl shadow p-6">
+      <p className="text-gray-500">{titulo}</p>
+      <p className="text-4xl font-black mt-2">{valor}</p>
+    </div>
   );
 }
 
