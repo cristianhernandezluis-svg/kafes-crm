@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import VerificarSuscripcion from "@/components/VerificarSuscripcion";
 
 type Usuario = {
   id: number;
@@ -90,6 +91,9 @@ export default function UsuariosPage() {
   }, []);
 
   return (
+  <>
+    <VerificarSuscripcion />
+
     <main className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
@@ -178,6 +182,7 @@ export default function UsuariosPage() {
           </div>
         </div>
       </div>
-    </main>
-  );
+        </main>
+  </>
+);
 }
