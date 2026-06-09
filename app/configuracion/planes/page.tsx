@@ -135,9 +135,15 @@ function PlanCard({
         ))}
       </ul>
 
-      <button className="w-full bg-black text-white py-3 rounded-lg mt-6 font-bold">
-        Solicitar este plan
-      </button>
+      <a
+  href={`https://wa.me/51980296583?text=${encodeURIComponent(
+  `Hola, quiero contratar el plan ${nombre} de Kafes CRM`
+)}`}
+  target="_blank"
+  className="block w-full bg-black text-white py-3 rounded-lg mt-6 font-bold text-center"
+>
+  Solicitar este plan
+</a>
     </div>
   );
 }
