@@ -1,275 +1,122 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import VerificarSuscripcion from "@/components/VerificarSuscripcion";
 
-type Cliente = {
-  id: number;
-  nombre: string;
-  etapa: string;
-  asesor: string | null;
-  proximo_seguimiento?: string | null;
-  ultima_gestion?: string | null;
-  cantidad_seguimientos?: number;
-};
-
-type ResumenAsesor = {
+type Productividad = {
   asesor: string;
   clientes: number;
-  vencidos: number;
   seguimientos: number;
-  seguimientosHoy: number;
+  pendientes_adelanto: number;
   adelantos: number;
   enviados: number;
   entregados: number;
+  no_responde: number;
 };
 
 export default function ProductividadPage() {
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [cargando, setCargando] = useState(true);
+  const [data, setData] = useState<Productividad[]>([]);
 
-  const cargarClientes = async () => {
-    try {
-      const res = await fetch("/api/clientes", { cache: "no-store" });
-      const data = await res.json();
+  const cargarProductividad = async () => {
+    const usuarioGuardado = localStorage.getItem("usuario");
 
-      if (data.success) {
-        setClientes(data.clientes);
-      }
-    } catch (error) {
-      console.error("Error cargando productividad:", error);
-    } finally {
-      setCargando(false);
+    if (!usuarioGuardado) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const usuario = JSON.parse(usuarioGuardado);
+
+    const res = await fetch(`/api/productividad?empresa_id=${usuario.empresa_id}`, {
+      cache: "no-store",
+    });
+
+    const json = await res.json();
+
+    if (json.success) {
+      setData(json.productividad);
     }
   };
 
   useEffect(() => {
-    cargarClientes();
-    const intervalo = setInterval(cargarClientes, 5000);
-    return () => clearInterval(intervalo);
+    cargarProductividad();
   }, []);
 
-  const hoy = new Date();
-
-  const asesores = Array.from(
-    new Set(
-      clientes
-        .map((c) => c.asesor?.trim())
-        .filter((a): a is string => Boolean(a))
-    )
-  );
-
-  const resumen: ResumenAsesor[] = asesores.map((asesor) => {
-    const propios = clientes.filter(
-      (c) => c.asesor?.toLowerCase() === asesor.toLowerCase()
-    );
-
-    return {
-      asesor,
-      clientes: propios.length,
-
-seguimientosHoy: propios.filter((c) => {
-  if (!c.ultima_gestion) return false;
-
-  const fecha = new Date(c.ultima_gestion);
-  const hoy = new Date();
-
-  return fecha.toDateString() === hoy.toDateString();
-}).length,
-
-      vencidos: propios.filter(
-        (c) =>
-          c.proximo_seguimiento &&
-          new Date(c.proximo_seguimiento) < hoy &&
-          !["Pagó Adelanto", "Enviado", "Entregado"].includes(c.etapa)
-      ).length,
-      seguimientos: propios.reduce(
-        (total, c) => total + (c.cantidad_seguimientos || 0),
-        0
-      ),
-      adelantos: propios.filter((c) => c.etapa === "Pagó Adelanto").length,
-      enviados: propios.filter((c) => c.etapa === "Enviado").length,
-      entregados: propios.filter((c) => c.etapa === "Entregado").length,
-    };
-  });
-
-  const ranking = resumen.sort(
-    (a, b) =>
-      b.seguimientos +
-      b.adelantos * 5 +
-      b.entregados * 10 -
-      (a.seguimientos + a.adelantos * 5 + a.entregados * 10)
-  );
-
   return (
-    <div className="min-h-screen bg-gray-100 flex">
-      <aside className="w-64 bg-black text-white p-5">
-        <h1 className="text-2xl font-bold text-yellow-400">Kafes CRM</h1>
+    <>
+      <VerificarSuscripcion />
 
-        <div className="mt-10 space-y-4">
-          <Link href="/" className="block p-3 hover:bg-zinc-800 rounded-lg">
-            Dashboard
-          </Link>
+      <main className="min-h-screen bg-gray-100 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-3xl font-bold">Productividad por asesor</h1>
+              <p className="text-gray-500">
+                Revisa cuántos clientes, seguimientos y cierres tiene cada asesor.
+              </p>
+            </div>
 
-          <Link
-            href="/mis-pendientes"
-            className="block p-3 hover:bg-zinc-800 rounded-lg"
-          >
-            Mis Pendientes
-          </Link>
+            <a href="/dashboard" className="bg-black text-white px-5 py-3 rounded-lg font-bold">
+              Volver
+            </a>
+          </div>
 
-          <Link
-            href="/seguimientos"
-            className="block p-3 hover:bg-zinc-800 rounded-lg"
-          >
-            Seguimientos
-          </Link>
+          <div className="grid md:grid-cols-3 gap-4 mb-8">
+            <Resumen titulo="Total clientes" valor={data.reduce((a, b) => a + b.clientes, 0)} />
+            <Resumen titulo="Adelantos" valor={data.reduce((a, b) => a + b.adelantos, 0)} />
+            <Resumen titulo="Entregados" valor={data.reduce((a, b) => a + b.entregados, 0)} />
+          </div>
 
-          <Link
-            href="/adelantos"
-            className="block p-3 hover:bg-zinc-800 rounded-lg"
-          >
-            Adelantos
-          </Link>
+          <div className="bg-white rounded-xl shadow overflow-x-auto">
+            <table className="w-full text-sm border">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border p-3 text-left">Asesor</th>
+                  <th className="border p-3">Clientes</th>
+                  <th className="border p-3">Seguimientos</th>
+                  <th className="border p-3">Pend. Adelanto</th>
+                  <th className="border p-3">Pagó Adelanto</th>
+                  <th className="border p-3">Enviado</th>
+                  <th className="border p-3">Entregado</th>
+                  <th className="border p-3">No Responde</th>
+                </tr>
+              </thead>
 
-          <div className="bg-yellow-500 text-black p-3 rounded-lg font-bold">
-            Productividad
+              <tbody>
+                {data.map((item) => (
+                  <tr key={item.asesor}>
+                    <td className="border p-3 font-bold">{item.asesor}</td>
+                    <td className="border p-3 text-center">{item.clientes}</td>
+                    <td className="border p-3 text-center">{item.seguimientos}</td>
+                    <td className="border p-3 text-center">{item.pendientes_adelanto}</td>
+                    <td className="border p-3 text-center">{item.adelantos}</td>
+                    <td className="border p-3 text-center">{item.enviados}</td>
+                    <td className="border p-3 text-center">{item.entregados}</td>
+                    <td className="border p-3 text-center">{item.no_responde}</td>
+                  </tr>
+                ))}
+
+                {data.length === 0 && (
+                  <tr>
+                    <td className="p-5 text-center text-gray-500" colSpan={8}>
+                      No hay datos de productividad todavía.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </aside>
-
-      <main className="flex-1 p-8">
-        <h2 className="text-3xl font-bold">🎯 Productividad por Asesor</h2>
-        <p className="text-gray-500 mt-1">
-          Mide quién está haciendo seguimiento y quién está cerrando más.
-        </p>
-
-        {cargando ? (
-          <p className="mt-8 text-gray-500">Cargando productividad...</p>
-        ) : (
-          <div className="mt-8 space-y-6">
-<div className="grid grid-cols-4 gap-4 mb-6">
-<div className="grid grid-cols-4 gap-4">
-  <div className="bg-blue-600 text-white rounded-xl p-4">
-    <p>🎯 Meta Seguimientos</p>
-    <p className="text-3xl font-bold">
-      {resumen.reduce((t, a) => t + a.seguimientos, 0)} / 50
-    </p>
-  </div>
-
-  <div className="bg-green-700 text-white rounded-xl p-4">
-    <p>💰 Meta Adelantos</p>
-    <p className="text-3xl font-bold">
-      {resumen.reduce((t, a) => t + a.adelantos, 0)} / 5
-    </p>
-  </div>
-
-  <div className="bg-yellow-500 text-black rounded-xl p-4">
-    <p>📦 Meta Entregados</p>
-    <p className="text-3xl font-bold">
-      {resumen.reduce((t, a) => t + a.entregados, 0)} / 10
-    </p>
-  </div>
-
-  <div className="bg-red-700 text-white rounded-xl p-4">
-    <p>🚨 Clientes Vencidos</p>
-    <p className="text-3xl font-bold">
-      {resumen.reduce((t, a) => t + a.vencidos, 0)}
-    </p>
-  </div>
-</div>              <div className="bg-gray-800 text-white rounded-xl p-4">
-                <p>👥 Asesores</p>
-                <p className="text-3xl font-bold">{resumen.length}</p>
-              </div>
-
-              <div className="bg-purple-600 text-white rounded-xl p-4">
-                <p>🔥 Seguimientos</p>
-                <p className="text-3xl font-bold">
-                  {resumen.reduce((t, a) => t + a.seguimientos, 0)}
-                </p>
-              </div>
-
-              <div className="bg-green-600 text-white rounded-xl p-4">
-                <p>💰 Adelantos</p>
-                <p className="text-3xl font-bold">
-                  {resumen.reduce((t, a) => t + a.adelantos, 0)}
-                </p>
-              </div>
-
-              <div className="bg-red-600 text-white rounded-xl p-4">
-                <p>🚨 Vencidos</p>
-                <p className="text-3xl font-bold">
-                  {resumen.reduce((t, a) => t + a.vencidos, 0)}
-                </p>
-              </div>
-            </div>
-<div className="bg-white rounded-xl shadow p-4 mb-6">
-  <h3 className="text-xl font-bold mb-4">
-    📞 Actividad de Hoy
-  </h3>
-
-  <table className="w-full">
-    <thead>
-      <tr className="border-b">
-        <th className="text-left p-2">Asesor</th>
-        <th className="text-center p-2">
-          Seguimientos Hoy
-        </th>
-      </tr>
-    </thead>
-
-    <tbody>
-      {ranking.map((asesor) => (
-        <tr key={asesor.asesor}>
-          <td className="p-2 font-bold">
-            {asesor.asesor}
-          </td>
-
-          <td className="text-center p-2">
-            {asesor.seguimientosHoy}
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
-            <div className="bg-white rounded-xl shadow overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-black text-white">
-                  <tr>
-                    <th className="p-3 text-left">Asesor</th>
-                    <th className="p-3">Clientes</th>
-                    <th className="p-3">Seguimientos</th>
-                    <th className="p-3">Adelantos</th>
-                    <th className="p-3">Enviados</th>
-                    <th className="p-3">Entregados</th>
-                    <th className="p-3">Vencidos</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {ranking.map((asesor, index) => (
-                    <tr key={asesor.asesor} className="border-b">
-                      <td className="p-3 font-bold">
-                        {index === 0 ? "🥇 " : index === 1 ? "🥈 " : index === 2 ? "🥉 " : ""}
-                        {asesor.asesor}
-                      </td>
-                      <td className="p-3 text-center">{asesor.clientes}</td>
-                      <td className="p-3 text-center">{asesor.seguimientos}</td>
-                      <td className="p-3 text-center">{asesor.adelantos}</td>
-                      <td className="p-3 text-center">{asesor.enviados}</td>
-                      <td className="p-3 text-center">{asesor.entregados}</td>
-                      <td className="p-3 text-center text-red-600 font-bold">
-                        {asesor.vencidos}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </main>
+    </>
+  );
+}
+
+function Resumen({ titulo, valor }: { titulo: string; valor: number }) {
+  return (
+    <div className="bg-white rounded-xl shadow p-5">
+      <p className="text-gray-500">{titulo}</p>
+      <p className="text-3xl font-black mt-2">{valor}</p>
     </div>
   );
 }
