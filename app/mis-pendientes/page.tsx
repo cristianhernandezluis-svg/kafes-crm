@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import VerificarSuscripcion from "@/components/VerificarSuscripcion";
 
 type Cliente = {
   id: number;
@@ -156,42 +157,41 @@ const marcarPendienteAdelanto = async (cliente: Cliente) => {
       </p>
 
       <div className="grid grid-cols-2 gap-2 mt-4">
-        <button
-          onClick={() => abrirWhatsApp(cliente.telefono)}
-          className="bg-green-600 text-white py-2 rounded-lg font-bold text-sm"
-        >
-          WhatsApp
-        </button>
+  <button
+    onClick={() => abrirWhatsApp(cliente.telefono)}
+    className="bg-green-600 text-white py-2 rounded-lg font-bold text-sm"
+  >
+    WhatsApp
+  </button>
 
-        <Link
-          href="/seguimientos"
-          className="bg-purple-600 text-white text-center py-2 rounded-lg font-bold text-sm"
-        >
-          Reprogramar
-        </Link>
-<button
-  onClick={() => marcarPendienteAdelanto(cliente)}
-  className="col-span-2 bg-orange-500 text-white py-2 rounded-lg font-bold text-sm"
->
-  🔥 Pendiente Adelanto
-</button>
-        <button
-          onClick={() => marcarPagoAdelanto(cliente)}
-          className="col-span-2 bg-yellow-500 text-black py-2 rounded-lg font-bold text-sm"
-        >
-<button
-  onClick={() => marcarPendienteAdelanto(cliente)}
-  className="col-span-2 bg-orange-500 text-white py-2 rounded-lg font-bold text-sm"
->
-  🔥 Pendiente Adelanto
-</button>
-          💰 Pagó Adelanto
-        </button>
-      </div>
+  <Link
+    href="/seguimientos"
+    className="bg-purple-600 text-white text-center py-2 rounded-lg font-bold text-sm"
+  >
+    Reprogramar
+  </Link>
+
+  <button
+    onClick={() => marcarPendienteAdelanto(cliente)}
+    className="col-span-2 bg-orange-500 text-white py-2 rounded-lg font-bold text-sm"
+  >
+    🔥 Pendiente Adelanto
+  </button>
+
+  <button
+    onClick={() => marcarPagoAdelanto(cliente)}
+    className="col-span-2 bg-yellow-500 text-black py-2 rounded-lg font-bold text-sm"
+  >
+    💰 Pagó Adelanto
+  </button>
+</div>
     </div>
   );
 
   return (
+  <>
+    <VerificarSuscripcion />
+
     <div className="min-h-screen bg-gray-100 flex">
       <aside className="w-64 bg-black text-white p-5">
         <h1 className="text-2xl font-bold text-yellow-400">Kafes CRM</h1>
@@ -315,5 +315,6 @@ const marcarPendienteAdelanto = async (cliente: Cliente) => {
 )}
 </main>
 </div>
+</>
 );
 }
