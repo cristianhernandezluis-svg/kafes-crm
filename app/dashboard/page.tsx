@@ -42,11 +42,34 @@ export default function Home() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
 useEffect(() => {
-  const usuario = localStorage.getItem("usuario");
+  const verificar = async () => {
+    const usuarioGuardado = localStorage.getItem("usuario");
 
-  if (!usuario) {
-    window.location.href = "/login";
-  }
+    if (!usuarioGuardado) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const usuario = JSON.parse(usuarioGuardado);
+
+    const res = await fetch("/api/auth/verificar-suscripcion", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        empresa_id: usuario.empresa_id,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.activa) {
+      window.location.href = "/suscripcion-vencida";
+    }
+  };
+
+  verificar();
 }, []);
   const [mostrarModal, setMostrarModal] = useState(false);
 
