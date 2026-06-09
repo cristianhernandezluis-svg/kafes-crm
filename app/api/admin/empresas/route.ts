@@ -9,12 +9,13 @@ export async function GET() {
   try {
     const result = await pool.query(`
       SELECT
-        e.id,
-        e.nombre,
-        e.plan,
-        e.estado,
-        e.created_at,
-        COUNT(u.id)::int AS usuarios
+  e.id,
+  e.nombre,
+  e.plan,
+  e.estado,
+  e.fecha_vencimiento,
+  e.created_at,
+  COUNT(u.id)::int AS usuarios
       FROM empresas e
       LEFT JOIN usuarios u ON u.empresa_id = e.id
       GROUP BY e.id
@@ -37,7 +38,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { empresa_id, plan, estado } = body;
+    const { empresa_id, plan, estado, fecha_vencimiento } = body;
 
     if (!empresa_id) {
       return NextResponse.json(
