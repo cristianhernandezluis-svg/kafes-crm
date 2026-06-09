@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import VerificarSuscripcion from "@/components/VerificarSuscripcion";
 
 type Plantilla = {
   id: number;
@@ -84,7 +85,10 @@ export default function PlantillasPage() {
     cargarPlantillas();
   }, []);
 
-  return (
+    return (
+  <>
+    <VerificarSuscripcion />
+
     <main className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
@@ -149,6 +153,7 @@ export default function PlantillasPage() {
           </div>
         </div>
       </div>
-    </main>
-  );
+        </main>
+  </>
+);
 }
