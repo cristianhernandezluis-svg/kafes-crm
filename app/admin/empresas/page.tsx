@@ -155,7 +155,7 @@ export default function AdminEmpresasPage() {
         ? empresa.fecha_vencimiento.slice(0, 10)
         : ""
     }
-    onChange={(e) =>
+    onBlur={(e) =>
       actualizarEmpresa(
         empresa.id,
         empresa.plan,
