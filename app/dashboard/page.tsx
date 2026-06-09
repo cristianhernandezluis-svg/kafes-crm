@@ -420,6 +420,17 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
   Suscripción
 </Link>
 
+{typeof window !== "undefined" &&
+  JSON.parse(localStorage.getItem("usuario") || "{}")?.email ===
+    "cristianluis_03@live.com" && (
+    <Link
+      href="/admin"
+      className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer text-yellow-400 font-bold"
+    >
+      👑 Admin
+    </Link>
+)}
+
 </div>
         <div className="mt-10 bg-zinc-900 p-4 rounded-xl">
           <p className="text-sm text-gray-400">Resumen hoy</p>
