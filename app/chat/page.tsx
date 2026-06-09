@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import VerificarSuscripcion from "@/components/VerificarSuscripcion";
 
 type Cliente = {
   id: number;
@@ -267,6 +268,9 @@ const detenerGrabacion = () => {
   }, [clienteActivo]);
 
   return (
+  <>
+    <VerificarSuscripcion />
+
     <div className="min-h-screen bg-gray-100 flex">
       <aside className="w-64 bg-black text-white p-5">
         <h1 className="text-2xl font-bold text-yellow-400">Kafes CRM</h1>
@@ -534,6 +538,7 @@ const detenerGrabacion = () => {
           )}
         </section>
       </main>
-    </div>
-  );
+        </div>
+  </>
+);
 }
