@@ -56,33 +56,35 @@ export async function POST(request: Request) {
       );
     }
 
-const empresaResult = await pool.query(
-  "SELECT plan FROM empresas WHERE id = $1",
-  [empresa_id]
-);
+    const empresaResult = await pool.query(
+      "SELECT plan FROM empresas WHERE id = $1",
+      [empresa_id]
+    );
 
-const plan = empresaResult.rows[0]?.plan || "gratis";
+    const plan = empresaResult.rows[0]?.plan || "gratis";
 
-const limites: any = {
-  gratis: 1,
-  pro: 5,
-  empresa: 999,
-};
+    const limites: Record<string, number> = {
+      gratis: 1,
+      pro: 5,
+      empresa: 999,
+    };
 
-const totalUsuarios = await pool.query(
-  "SELECT COUNT(*)::int AS total FROM usuarios WHERE empresa_id = $1",
-  [empresa_id]
-);
+    const totalUsuarios = await pool.query(
+      "SELECT COUNT(*)::int AS total FROM usuarios WHERE empresa_id = $1",
+      [empresa_id]
+    );
 
-if (totalUsuarios.rows[0].total >= limites[plan]) {
-  return NextResponse.json(
-    {
-      success: false,
-      error: `Tu plan ${plan} permite máximo ${limites[plan]} usuario(s).`,
-    },
-    { status: 403 }
-  );
-}
+    if (totalUsuarios.rows[0].total >= (limites[plan] || limites.gratis)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Tu plan ${plan} permite máximo ${
+            limites[plan] || limites.gratis
+          } usuario(s).`,
+        },
+        { status: 403 }
+      );
+    }
 
     const existe = await pool.query(
       "SELECT id FROM usuarios WHERE email = $1",
