@@ -148,22 +148,23 @@ export default function AdminEmpresasPage() {
                   </td>
 <td className="border p-3">
   <input
-    type="date"
-    className="border rounded p-2"
-    value={
-      empresa.fecha_vencimiento
-        ? empresa.fecha_vencimiento.slice(0, 10)
-        : ""
-    }
-    onBlur={(e) =>
-      actualizarEmpresa(
-        empresa.id,
-        empresa.plan,
-        empresa.estado,
-        e.target.value
-      )
-    }
-  />
+  type="text"
+  placeholder="2026-07-09"
+  className="border rounded p-2 w-32"
+  defaultValue={
+    empresa.fecha_vencimiento
+      ? empresa.fecha_vencimiento.slice(0, 10)
+      : ""
+  }
+  onBlur={(e) =>
+    actualizarEmpresa(
+      empresa.id,
+      empresa.plan,
+      empresa.estado,
+      e.target.value
+    )
+  }
+/>
 </td>
                   <td className="border p-3">
                     {new Date(empresa.created_at).toLocaleDateString("es-PE")}
