@@ -806,7 +806,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
                         
                           <div
   key={cliente.id}
-  className={`p-4 rounded-xl border transition-all hover:border-green-500 ${
+  className={`p-3 rounded-xl border transition-all hover:border-green-500 ${
     seguimientoVencido
       ? "bg-red-950/60 border-red-500"
       : "bg-[#0f172a] border-slate-800"
@@ -814,7 +814,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 >
   <div className="flex items-start justify-between gap-3">
     <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center text-black font-black">
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center text-black font-black">
         {(cliente.nombre || "S").charAt(0).toUpperCase()}
       </div>
 
