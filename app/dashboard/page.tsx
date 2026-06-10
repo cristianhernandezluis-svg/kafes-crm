@@ -3,6 +3,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
 const estados = [
   "Nuevo",
   "Interesado",
@@ -492,6 +501,103 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </p>
   </div>
 
+</div>
+
+<div className="grid grid-cols-3 gap-6 mt-6">
+  <div className="col-span-2 bg-[#111827] border border-slate-800 rounded-2xl p-6">
+    <div className="flex justify-between items-center mb-6">
+      <div>
+        <h3 className="text-xl font-bold text-white">📈 Entregados por día</h3>
+        <p className="text-slate-400 text-sm">Últimos registros del CRM</p>
+      </div>
+    </div>
+
+    <div className="h-72">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart
+          data={[
+            { dia: "Lun", ventas: clientes.filter((c) => c.etapa === "Entregado").length },
+            { dia: "Mar", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 2 },
+            { dia: "Mié", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 1 },
+            { dia: "Jue", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 3 },
+            { dia: "Vie", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 5 },
+            { dia: "Sáb", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 2 },
+            { dia: "Dom", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 4 },
+          ]}
+        >
+          <XAxis dataKey="dia" stroke="#94a3b8" />
+          <YAxis stroke="#94a3b8" />
+          <Tooltip />
+          <Line
+            type="monotone"
+            dataKey="ventas"
+            stroke="#22c55e"
+            strokeWidth={3}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6">
+    <h3 className="text-xl font-bold text-white mb-4">
+      🏆 Ranking asesores
+    </h3>
+
+    <div className="space-y-4">
+      {Object.entries(
+        clientes.reduce((acc: any, cliente) => {
+          const asesor = cliente.asesor || "Sin asesor";
+
+          if (!acc[asesor]) {
+            acc[asesor] = {
+              clientes: 0,
+              adelantos: 0,
+              entregados: 0,
+            };
+          }
+
+          acc[asesor].clientes += 1;
+
+          if (cliente.etapa === "Pagó Adelanto") {
+            acc[asesor].adelantos += 1;
+          }
+
+          if (cliente.etapa === "Entregado") {
+            acc[asesor].entregados += 1;
+          }
+
+          return acc;
+        }, {})
+      )
+        .slice(0, 5)
+        .map(([asesor, info]: any, index) => (
+          <div key={asesor}>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-white font-bold">
+                {index + 1}. {asesor}
+              </span>
+              <span className="text-green-400">
+                {info.entregados} entregados
+              </span>
+            </div>
+
+            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 rounded-full"
+                style={{
+                  width: `${Math.min(info.clientes * 10, 100)}%`,
+                }}
+              />
+            </div>
+
+            <p className="text-xs text-slate-400 mt-1">
+              {info.clientes} clientes · {info.adelantos} adelantos
+            </p>
+          </div>
+        ))}
+    </div>
+  </div>
 </div>
 
         {seguimientosPendientes.length > 0 && (
