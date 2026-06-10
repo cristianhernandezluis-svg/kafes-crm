@@ -355,7 +355,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
   return (
     <div className="min-h-screen bg-[#0b1220] flex text-white">
-      <aside className="w-64 bg-[#08111f] text-white p-4 flex flex-col min-h-screen border-r border-slate-800">
+      <aside className="w-64 bg-[#08111f] text-white p-3 flex flex-col min-h-screen border-r border-slate-800">
   <div className="flex items-center gap-3 mb-8">
     <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
       ☕
@@ -420,7 +420,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
       )}
   </nav>
 
-  <div className="mt-auto bg-[#111827] border border-slate-700 rounded-2xl p-4">
+  <div className="mt-auto bg-[#111827] border border-slate-700 rounded-2xl p-">
     <p className="text-sm text-slate-400 mb-3">Conexión WhatsApp</p>
 
     <div className="flex items-center gap-3">
@@ -587,7 +587,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 </div>
 
 <div className="grid grid-cols-4 gap-4 mt-6">
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
     <h3 className="text-base font-bold text-white">📈 Entregados</h3>
     <p className="text-slate-400 text-xs mb-3">Últimos registros</p>
 
@@ -613,7 +613,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </div>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
     <h3 className="text-base font-bold text-white mb-2">🥇 Leads</h3>
 
     <div className="h-28">
@@ -679,7 +679,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </div>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
     <h3 className="text-base font-bold text-white mb-2">
       📊 Conversión
     </h3>
@@ -711,7 +711,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </div>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
     <div className="flex justify-between items-center mb-3">
       <div>
         <h3 className="text-base font-bold text-white">
@@ -764,7 +764,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
   </div>
 </div>
 {seguimientosPendientes.length > 0 && (
-          <div className="mt-6 bg-orange-100 border border-orange-300 rounded-xl p-4">
+          <div className="mt-6 bg-orange-100 border border-orange-300 rounded-xl p-3">
             <p className="font-bold text-orange-700">
               🔥 Seguimientos pendientes: {seguimientosPendientes.length}
             </p>
@@ -781,7 +781,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
             {estados.map((estado) => (
               <div
                 key={estado}
-                className="bg-[#111827] border border-slate-800 rounded-2xl p-4 min-h-[500px]"
+                className="bg-[#111827] border border-slate-800 rounded-2xl p-3 min-h-[420px]"
               >
                 <h3 className="font-bold mb-3">
                   {estado}{" "}
@@ -958,7 +958,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
             )}
           </div>
 
-          <div className="border-t p-4">
+          <div className="border-t p-3">
             <textarea
               className="w-full border rounded-lg p-3"
               rows={3}
