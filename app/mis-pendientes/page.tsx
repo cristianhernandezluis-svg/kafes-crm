@@ -197,9 +197,9 @@ const marcarPendienteAdelanto = async (cliente: Cliente) => {
         <h1 className="text-2xl font-bold text-yellow-400">Kafes CRM</h1>
 
         <div className="mt-10 space-y-4">
-  <Link href="/" className="block p-3 hover:bg-zinc-800 rounded-lg">
-    Dashboard
-  </Link>
+  <Link href="/dashboard" className="block p-3 hover:bg-zinc-800 rounded-lg">
+  Dashboard
+</Link>
 
   <div className="bg-yellow-500 text-black p-3 rounded-lg font-bold">
     Mis Pendientes
