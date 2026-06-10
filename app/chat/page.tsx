@@ -271,36 +271,48 @@ const detenerGrabacion = () => {
   <>
     <VerificarSuscripcion />
 
-    <div className="min-h-screen bg-gray-100 flex">
-      <aside className="w-64 bg-black text-white p-5">
-        <h1 className="text-2xl font-bold text-yellow-400">Kafes CRM</h1>
+    <div className="min-h-screen bg-[#0b1220] flex text-white">
+      <aside className="w-64 bg-[#08111f] text-white p-4 flex flex-col min-h-screen border-r border-slate-800">
+  <div className="flex items-center gap-3 mb-8">
+    <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
+      ☕
+    </div>
+    <h1 className="text-xl font-black">
+      Kafes <span className="text-yellow-400">CRM</span>
+    </h1>
+  </div>
 
-        <div className="mt-10 space-y-4">
-          <Link href="/" className="block p-3 hover:bg-zinc-800 rounded-lg">
-            Dashboard
-          </Link>
+  <p className="text-xs text-slate-500 uppercase mb-3">Principal</p>
 
-          <Link href="/mis-pendientes" className="block p-3 hover:bg-zinc-800 rounded-lg">
-            Mis Pendientes
-          </Link>
+  <nav className="space-y-2">
+    <Link href="/dashboard" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      📊 Dashboard
+    </Link>
 
-          <Link href="/seguimientos" className="block p-3 hover:bg-zinc-800 rounded-lg">
-            Seguimientos
-          </Link>
+    <Link href="/chat" className="flex items-center justify-between bg-yellow-500 text-black p-3 rounded-xl font-bold">
+      <span>💬 Conversaciones</span>
+      <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+        {clientes.length}
+      </span>
+    </Link>
 
-          <Link href="/adelantos" className="block p-3 hover:bg-zinc-800 rounded-lg">
-            Adelantos
-          </Link>
+    <Link href="/mis-pendientes" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      🔥 Mis Pendientes
+    </Link>
 
-          <div className="bg-yellow-500 text-black p-3 rounded-lg font-bold">
-            Chats
-          </div>
+    <Link href="/seguimientos" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      ⏰ Seguimientos
+    </Link>
 
-          <Link href="/productividad" className="block p-3 hover:bg-zinc-800 rounded-lg">
-            Productividad
-          </Link>
-        </div>
-      </aside>
+    <Link href="/adelantos" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      💰 Adelantos
+    </Link>
+
+    <Link href="/productividad" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      📈 Productividad
+    </Link>
+  </nav>
+</aside>
 
       <main className="flex-1 flex">
         <section className="w-[360px] bg-white border-r overflow-y-auto h-screen">
