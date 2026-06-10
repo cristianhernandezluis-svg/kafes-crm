@@ -315,13 +315,13 @@ const detenerGrabacion = () => {
 </aside>
 
       <main className="flex-1 flex">
-        <section className="w-[360px] bg-white border-r overflow-y-auto h-screen">
-          <div className="p-5 border-b">
-            <h2 className="text-2xl font-bold">💬 Chats</h2>
-            <p className="text-sm text-gray-500">
-              Mensajes recibidos desde WhatsApp Cloud API.
-            </p>
-          </div>
+        <section className="w-[380px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen">
+          <div className="p-5 border-b border-slate-800">
+  <h2 className="text-2xl font-black text-white">💬 Conversaciones</h2>
+  <p className="text-sm text-slate-400">
+    Atiende tus mensajes de WhatsApp.
+  </p>
+</div>
 
           <div className="overflow-y-auto h-[calc(100vh-90px)]">
   {clientes.map((cliente) => (
