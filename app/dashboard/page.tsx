@@ -800,93 +800,78 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
                         );
 
                       return (
-                        <div
-                          key={cliente.id}
-                          className={`p-3 rounded-lg ${
-  seguimientoVencido
-    ? "bg-red-950 border border-red-500"
-    : "bg-slate-900"
-}`}
-                        >
-                          <p className="font-semibold">
-                            {cliente.nombre || "Sin nombre"}
-                          </p>
+                        
+                          <div
+  key={cliente.id}
+  className={`p-4 rounded-xl border transition-all hover:border-green-500 ${
+    seguimientoVencido
+      ? "bg-red-950/60 border-red-500"
+      : "bg-[#0f172a] border-slate-800"
+  }`}
+>
+  <div className="flex items-start justify-between gap-3">
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center text-black font-black">
+        {(cliente.nombre || "S").charAt(0).toUpperCase()}
+      </div>
 
-                          <p className="text-sm">📱 {cliente.telefono}</p>
+      <div>
+        <p className="font-bold text-white text-sm">
+          {cliente.nombre || "Sin nombre"}
+        </p>
 
-                          <p className="text-green-600 text-sm">
-                            📍 {cliente.ciudad || "Sin ciudad"}
-                          </p>
+        <p className="text-xs text-slate-400">
+          {cliente.observacion || "Sin último mensaje"}
+        </p>
+      </div>
+    </div>
 
-                          {cliente.proximo_seguimiento && (
-                            <p className="text-orange-600 text-xs mt-1">
-                              📅 Seguimiento:{" "}
-                              {new Date(
-                                cliente.proximo_seguimiento
-                              ).toLocaleString()}
-                            </p>
-                          )}
+    <a
+      href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
+      target="_blank"
+      className="text-green-400 hover:text-green-300 text-sm"
+    >
+      🟢
+    </a>
+  </div>
 
-                          {cliente.observacion && (
-                            <p className="text-xs text-gray-600 mt-1">
-                              📝 {cliente.observacion}
-                            </p>
-                          )}
+  <div className="flex items-center justify-between mt-3">
+    <span className="text-xs text-slate-500">
+      {cliente.ultima_gestion
+        ? new Date(cliente.ultima_gestion).toLocaleTimeString("es-PE", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Sin gestión"}
+    </span>
 
-                          <p className="text-blue-600 text-xs">
-                            🔥 Seguimientos:{" "}
-                            {cliente.cantidad_seguimientos || 0}
-                          </p>
+    <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-400">
+      {cliente.etapa}
+    </span>
+  </div>
 
-{cliente.ultima_gestion && (
-  <p className="text-xs text-purple-600 mt-1">
-    📞 Última gestión:
-    {" "}
-    {new Date(cliente.ultima_gestion).toLocaleDateString("es-PE")}
-  </p>
-)}
+  <div className="flex gap-2 mt-3">
+    <button
+      onClick={() => abrirConversacion(cliente)}
+      className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-lg text-xs font-bold"
+    >
+      💬 Chat
+    </button>
 
-                          <p className="text-xs mt-2 text-gray-500">
-                            Etapa: {cliente.etapa}
-                          </p>
-
-                          <select
-                            className="border w-full p-2 mt-3 rounded text-sm bg-white"
-                            value={cliente.etapa}
-                            onChange={(e) =>
-                              cambiarEtapa(cliente.id, e.target.value)
-                            }
-                          >
-                            {estados.map((estado) => (
-                              <option key={estado} value={estado}>
-                                {estado}
-                              </option>
-                            ))}
-                          </select>
-
-                          {cliente.asesor && (
-                            <p className="text-xs text-gray-500 mt-2">
-                              Asesor: {cliente.asesor}
-                            </p>
-                          )}
-
-                          <div className="flex gap-2 mt-3">
-  <button
-    onClick={() => abrirConversacion(cliente)}
-    className="flex-1 bg-slate-800 text-white py-2 rounded text-xs"
-  >
-    💬
-  </button>
-
-  <a
-    href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
-    target="_blank"
-    className="flex-1 bg-green-600 text-white text-center py-2 rounded text-xs"
-  >
-    WA
-  </a>
+    <select
+      className="flex-1 bg-[#020617] border border-slate-700 text-slate-300 p-2 rounded-lg text-xs"
+      value={cliente.etapa}
+      onChange={(e) => cambiarEtapa(cliente.id, e.target.value)}
+    >
+      {estados.map((estado) => (
+        <option key={estado} value={estado}>
+          {estado}
+        </option>
+      ))}
+    </select>
+  </div>
 </div>
-                        </div>
+
                       );
                     })}
                 </div>
