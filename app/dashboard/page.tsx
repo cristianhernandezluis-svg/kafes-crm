@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  AlertTriangle,
+  CalendarClock,
+  Users,
+  DollarSign,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -474,32 +480,108 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
 <div className="grid grid-cols-4 gap-6 mt-6">
 
-  <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800">
-    <p className="text-slate-400">🚨 Vencidos</p>
-    <p className="text-4xl font-black text-red-500 mt-2">
-      {seguimientosVencidos.length}
-    </p>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-red-500 transition-all">
+
+    <div className="flex items-center gap-4">
+
+      <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center">
+        <AlertTriangle className="text-red-500" size={28} />
+      </div>
+
+      <div>
+        <p className="text-slate-400 text-sm">
+          Vencidos
+        </p>
+
+        <h2 className="text-4xl font-black text-white">
+          {seguimientosVencidos.length}
+        </h2>
+
+        <p className="text-red-400 text-sm">
+          Seguimientos atrasados
+        </p>
+      </div>
+
+    </div>
+
   </div>
 
-  <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800">
-    <p className="text-slate-400">📅 Para hoy</p>
-    <p className="text-4xl font-black text-orange-500 mt-2">
-      {seguimientosHoy.length}
-    </p>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-orange-500 transition-all">
+
+    <div className="flex items-center gap-4">
+
+      <div className="w-14 h-14 rounded-full bg-orange-500/20 flex items-center justify-center">
+        <CalendarClock className="text-orange-500" size={28} />
+      </div>
+
+      <div>
+        <p className="text-slate-400 text-sm">
+          Para hoy
+        </p>
+
+        <h2 className="text-4xl font-black text-white">
+          {seguimientosHoy.length}
+        </h2>
+
+        <p className="text-orange-400 text-sm">
+          Contactar hoy
+        </p>
+      </div>
+
+    </div>
+
   </div>
 
-  <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800">
-    <p className="text-slate-400">👥 Clientes</p>
-    <p className="text-4xl font-black text-blue-500 mt-2">
-      {clientes.length}
-    </p>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-blue-500 transition-all">
+
+    <div className="flex items-center gap-4">
+
+      <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center">
+        <Users className="text-blue-500" size={28} />
+      </div>
+
+      <div>
+        <p className="text-slate-400 text-sm">
+          Clientes
+        </p>
+
+        <h2 className="text-4xl font-black text-white">
+          {clientes.length}
+        </h2>
+
+        <p className="text-green-400 text-sm">
+          CRM activo
+        </p>
+      </div>
+
+    </div>
+
   </div>
 
-  <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800">
-    <p className="text-slate-400">💰 Adelantos</p>
-    <p className="text-4xl font-black text-green-500 mt-2">
-      {clientes.filter((c) => c.etapa === "Pagó Adelanto").length}
-    </p>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-green-500 transition-all">
+
+    <div className="flex items-center gap-4">
+
+      <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
+        <DollarSign className="text-green-500" size={28} />
+      </div>
+
+      <div>
+        <p className="text-slate-400 text-sm">
+          Adelantos
+        </p>
+
+        <h2 className="text-4xl font-black text-white">
+          {clientes.filter((c) => c.etapa === "Pagó Adelanto").length}
+        </h2>
+
+        <p className="text-green-400 text-sm">
+          Pagos recibidos
+        </p>
+      </div>
+
+    </div>
+
   </div>
 
 </div>
