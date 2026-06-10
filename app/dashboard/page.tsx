@@ -336,7 +336,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="min-h-screen bg-[#0b1220] flex text-white">
       <aside className="w-64 bg-[#08111f] text-white p-4 flex flex-col min-h-screen border-r border-slate-800">
   <div className="flex items-center gap-3 mb-8">
     <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
@@ -431,7 +431,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
   </button>
 </aside>
 
-      <main className="flex-1 p-8 overflow-x-auto">
+      <main className="flex-1 p-8 overflow-x-auto bg-[#0b1220]">
         <div className="flex justify-between items-center">
           <h2 className="text-3xl font-bold">Embudo de Ventas</h2>
 
@@ -462,34 +462,36 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
           </div>
         </div>
 
-<div className="grid grid-cols-4 gap-4 mt-6">
-  <div className="bg-red-600 text-white rounded-xl p-4 shadow">
-    <p className="text-sm opacity-90">🚨 Vencidos</p>
-    <p className="text-3xl font-bold">
+<div className="grid grid-cols-4 gap-6 mt-6">
+
+  <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800">
+    <p className="text-slate-400">🚨 Vencidos</p>
+    <p className="text-4xl font-black text-red-500 mt-2">
       {seguimientosVencidos.length}
     </p>
   </div>
 
-  <div className="bg-orange-500 text-white rounded-xl p-4 shadow">
-    <p className="text-sm opacity-90">📅 Para hoy</p>
-    <p className="text-3xl font-bold">
+  <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800">
+    <p className="text-slate-400">📅 Para hoy</p>
+    <p className="text-4xl font-black text-orange-500 mt-2">
       {seguimientosHoy.length}
     </p>
   </div>
 
-  <div className="bg-gray-800 text-white rounded-xl p-4 shadow">
-    <p className="text-sm opacity-90">👥 Clientes</p>
-    <p className="text-3xl font-bold">
+  <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800">
+    <p className="text-slate-400">👥 Clientes</p>
+    <p className="text-4xl font-black text-blue-500 mt-2">
       {clientes.length}
     </p>
   </div>
 
-  <div className="bg-green-600 text-white rounded-xl p-4 shadow">
-    <p className="text-sm opacity-90">💰 Adelantos</p>
-    <p className="text-3xl font-bold">
+  <div className="bg-[#111827] rounded-2xl p-5 border border-slate-800">
+    <p className="text-slate-400">💰 Adelantos</p>
+    <p className="text-4xl font-black text-green-500 mt-2">
       {clientes.filter((c) => c.etapa === "Pagó Adelanto").length}
     </p>
   </div>
+
 </div>
 
         {seguimientosPendientes.length > 0 && (
@@ -510,7 +512,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
             {estados.map((estado) => (
               <div
                 key={estado}
-                className="bg-white rounded-xl shadow p-4 min-h-[500px]"
+                className="bg-[#111827] border border-slate-800 rounded-2xl p-4 min-h-[500px]"
               >
                 <h3 className="font-bold mb-3">
                   {estado}{" "}
@@ -534,10 +536,10 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
                         <div
                           key={cliente.id}
                           className={`p-3 rounded-lg ${
-                            seguimientoVencido
-                              ? "bg-red-100 border-2 border-red-500"
-                              : "bg-gray-100"
-                          }`}
+  seguimientoVencido
+    ? "bg-red-950 border border-red-500"
+    : "bg-slate-900"
+}`}
                         >
                           <p className="font-semibold">
                             {cliente.nombre || "Sin nombre"}
