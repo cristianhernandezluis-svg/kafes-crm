@@ -601,6 +601,37 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 </div>
 
 <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
+<div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
+  <h3 className="text-xl font-bold text-white mb-4">
+    📊 Conversión por etapa
+  </h3>
+
+  <div className="space-y-4">
+    {estados.map((estado) => {
+      const total = clientes.length || 1;
+      const cantidad = clientes.filter((c) => c.etapa === estado).length;
+      const porcentaje = Math.round((cantidad / total) * 100);
+
+      return (
+        <div key={estado}>
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-slate-300">{estado}</span>
+            <span className="text-green-400 font-bold">
+              {cantidad} ({porcentaje}%)
+            </span>
+          </div>
+
+          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-green-500 rounded-full"
+              style={{ width: `${porcentaje}%` }}
+            />
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
   <div className="flex justify-between items-center mb-4">
     <div>
       <h3 className="text-xl font-bold text-white">🚨 Clientes sin respuesta</h3>
