@@ -853,26 +853,57 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </span>
   </div>
 
-  <div className="flex gap-2 mt-3">
-    <button
-      onClick={() => abrirConversacion(cliente)}
-      className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-lg text-xs font-bold"
-    >
-      💬 Chat
-    </button>
+<div
+  key={cliente.id}
+  onClick={() => abrirConversacion(cliente)}
+  className={`p-3 rounded-xl border cursor-pointer transition-all hover:border-green-500 ${
+    seguimientoVencido
+      ? "bg-red-950/60 border-red-500"
+      : "bg-[#0f172a] border-slate-800"
+  }`}
+>
+  <div className="flex items-start justify-between gap-2">
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center text-black font-black text-xs shrink-0">
+        {(cliente.nombre || "S").charAt(0).toUpperCase()}
+      </div>
 
-    <select
-      className="flex-1 bg-[#020617] border border-slate-700 text-slate-300 p-2 rounded-lg text-xs"
-      value={cliente.etapa}
-      onChange={(e) => cambiarEtapa(cliente.id, e.target.value)}
+      <div className="min-w-0">
+        <p className="font-bold text-white text-xs truncate max-w-[110px]">
+          {cliente.nombre || "Sin nombre"}
+        </p>
+
+        <p className="text-[11px] text-slate-400 truncate max-w-[120px]">
+          {cliente.observacion?.slice(0, 28) || "Sin último mensaje"}
+        </p>
+      </div>
+    </div>
+
+    <a
+      href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
+      target="_blank"
+      onClick={(e) => e.stopPropagation()}
+      className="text-green-400 hover:text-green-300 text-xs shrink-0"
     >
-      {estados.map((estado) => (
-        <option key={estado} value={estado}>
-          {estado}
-        </option>
-      ))}
-    </select>
+      🟢
+    </a>
   </div>
+
+  <div className="flex items-center justify-between mt-2">
+    <span className="text-[11px] text-slate-500">
+      {cliente.ultima_gestion
+        ? new Date(cliente.ultima_gestion).toLocaleTimeString("es-PE", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Sin gestión"}
+    </span>
+
+    <span className="text-[10px] px-2 py-1 rounded-full bg-green-500/10 text-green-400">
+      {cliente.etapa}
+    </span>
+  </div>
+</div>
 </div>
 
                       );
