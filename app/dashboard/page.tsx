@@ -10,6 +10,9 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 const estados = [
@@ -505,61 +508,8 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
 <div className="grid grid-cols-3 gap-6 mt-6">
   <div className="col-span-2 bg-[#111827] border border-slate-800 rounded-2xl p-6">
-    <div className="flex justify-between items-center mb-6">
-      <div>
-        <h3 className="text-xl font-bold text-white">📈 Entregados por día</h3>
-        <p className="text-slate-400 text-sm">Últimos registros del CRM</p>
-      </div>
-    </div>
-
-<div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
-  <div className="flex justify-between items-center mb-4">
-    <div>
-      <h3 className="text-xl font-bold text-white">
-        🚨 Clientes sin respuesta
-      </h3>
-      <p className="text-slate-400 text-sm">
-        Clientes sin gestión reciente
-      </p>
-    </div>
-
-    <Link href="/mis-pendientes" className="text-green-400 text-sm font-bold">
-      Ver todos
-    </Link>
-  </div>
-
-  <div className="grid grid-cols-3 gap-4">
-    {clientes
-      .filter((c) => !c.ultima_gestion)
-      .slice(0, 6)
-      .map((cliente) => (
-        <div
-          key={cliente.id}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-4"
-        >
-          <p className="font-bold text-white">
-            {cliente.nombre || "Sin nombre"}
-          </p>
-
-          <p className="text-sm text-slate-400">
-            📱 {cliente.telefono}
-          </p>
-
-          <p className="text-sm text-red-400 mt-2">
-            Sin gestión registrada
-          </p>
-
-          <a
-            href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
-            target="_blank"
-            className="block bg-green-600 text-white text-center mt-3 py-2 rounded-lg text-sm font-bold"
-          >
-            Enviar WhatsApp
-          </a>
-        </div>
-      ))}
-  </div>
-</div>
+    <h3 className="text-xl font-bold text-white">📈 Entregados por día</h3>
+    <p className="text-slate-400 text-sm mb-6">Últimos registros del CRM</p>
 
     <div className="h-72">
       <ResponsiveContainer width="100%" height="100%">
@@ -577,46 +527,30 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
           <XAxis dataKey="dia" stroke="#94a3b8" />
           <YAxis stroke="#94a3b8" />
           <Tooltip />
-          <Line
-            type="monotone"
-            dataKey="ventas"
-            stroke="#22c55e"
-            strokeWidth={3}
-          />
+          <Line type="monotone" dataKey="ventas" stroke="#22c55e" strokeWidth={3} />
         </LineChart>
       </ResponsiveContainer>
     </div>
   </div>
 
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6">
-    <h3 className="text-xl font-bold text-white mb-4">
-      🏆 Ranking asesores
-    </h3>
+    <h3 className="text-xl font-bold text-white mb-4">🏆 Ranking asesores</h3>
 
     <div className="space-y-4">
       {Object.entries(
         clientes.reduce((acc: any, cliente) => {
           const asesor = cliente.asesor
-  ? cliente.asesor.trim().toLowerCase()
-  : "Sin asesor";
+            ? cliente.asesor.trim().toLowerCase()
+            : "sin asesor";
 
           if (!acc[asesor]) {
-            acc[asesor] = {
-              clientes: 0,
-              adelantos: 0,
-              entregados: 0,
-            };
+            acc[asesor] = { clientes: 0, adelantos: 0, entregados: 0 };
           }
 
           acc[asesor].clientes += 1;
 
-          if (cliente.etapa === "Pagó Adelanto") {
-            acc[asesor].adelantos += 1;
-          }
-
-          if (cliente.etapa === "Entregado") {
-            acc[asesor].entregados += 1;
-          }
+          if (cliente.etapa === "Pagó Adelanto") acc[asesor].adelantos += 1;
+          if (cliente.etapa === "Entregado") acc[asesor].entregados += 1;
 
           return acc;
         }, {})
@@ -628,17 +562,13 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
               <span className="text-white font-bold">
                 {index + 1}. {asesor.charAt(0).toUpperCase() + asesor.slice(1)}
               </span>
-              <span className="text-green-400">
-                {info.entregados} entregados
-              </span>
+              <span className="text-green-400">{info.entregados} entregados</span>
             </div>
 
             <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-green-500 rounded-full"
-                style={{
-                  width: `${Math.min(info.clientes * 10, 100)}%`,
-                }}
+                style={{ width: `${Math.min(info.clientes * 10, 100)}%` }}
               />
             </div>
 
@@ -648,6 +578,43 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
           </div>
         ))}
     </div>
+  </div>
+</div>
+
+<div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
+  <div className="flex justify-between items-center mb-4">
+    <div>
+      <h3 className="text-xl font-bold text-white">🚨 Clientes sin respuesta</h3>
+      <p className="text-slate-400 text-sm">Clientes sin gestión reciente</p>
+    </div>
+
+    <Link href="/mis-pendientes" className="text-green-400 text-sm font-bold">
+      Ver todos
+    </Link>
+  </div>
+
+  <div className="grid grid-cols-3 gap-4">
+    {clientes
+      .filter((c) => !c.ultima_gestion)
+      .slice(0, 6)
+      .map((cliente) => (
+        <div
+          key={cliente.id}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-4"
+        >
+          <p className="font-bold text-white">{cliente.nombre || "Sin nombre"}</p>
+          <p className="text-sm text-slate-400">📱 {cliente.telefono}</p>
+          <p className="text-sm text-red-400 mt-2">Sin gestión registrada</p>
+
+          <a
+            href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
+            target="_blank"
+            className="block bg-green-600 text-white text-center mt-3 py-2 rounded-lg text-sm font-bold"
+          >
+            Enviar WhatsApp
+          </a>
+        </div>
+      ))}
   </div>
 </div>
 
