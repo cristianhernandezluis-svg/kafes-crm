@@ -445,17 +445,15 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
       <main className="flex-1 p-8 overflow-x-auto bg-[#0b1220]">
         <div className="flex justify-between items-center">
-          <h2 className="text-3xl font-bold">Embudo de Ventas</h2>
+  <div>
+    <h1 className="text-4xl font-black text-white">
+      Hola Cristian 👋
+    </h1>
 
-<button
-  onClick={() => {
-    localStorage.removeItem("usuario");
-    window.location.href = "/login";
-  }}
-  className="bg-red-600 text-white px-5 py-3 rounded-lg font-bold"
->
-  Cerrar sesión
-</button>
+    <p className="text-slate-400 mt-1">
+      Aquí tienes el resumen general de tu CRM
+    </p>
+  </div>
 
           <div className="flex gap-3">
             <button
