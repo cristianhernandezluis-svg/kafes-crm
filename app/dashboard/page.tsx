@@ -534,47 +534,66 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
   </div>
 
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6">
-    <h3 className="text-xl font-bold text-white mb-4">🏆 Ranking asesores</h3>
+    <h3 className="text-xl font-bold text-white mb-4">🥇 Leads por asesor</h3>
 
-    <div className="space-y-4">
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={Object.entries(
+              clientes.reduce((acc: any, cliente) => {
+                const asesor = cliente.asesor
+                  ? cliente.asesor.trim().toLowerCase()
+                  : "sin asesor";
+
+                if (!acc[asesor]) acc[asesor] = 0;
+                acc[asesor] += 1;
+
+                return acc;
+              }, {})
+            )
+              .slice(0, 5)
+              .map(([asesor, total]: any) => ({
+                name: asesor.charAt(0).toUpperCase() + asesor.slice(1),
+                value: total,
+              }))}
+            dataKey="value"
+            nameKey="name"
+            innerRadius={55}
+            outerRadius={85}
+            paddingAngle={4}
+          >
+            {["#22c55e", "#3b82f6", "#eab308", "#a855f7", "#ef4444"].map(
+              (color, index) => (
+                <Cell key={index} fill={color} />
+              )
+            )}
+          </Pie>
+          <Tooltip />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+
+    <div className="space-y-2 mt-4">
       {Object.entries(
         clientes.reduce((acc: any, cliente) => {
           const asesor = cliente.asesor
             ? cliente.asesor.trim().toLowerCase()
             : "sin asesor";
 
-          if (!acc[asesor]) {
-            acc[asesor] = { clientes: 0, adelantos: 0, entregados: 0 };
-          }
-
-          acc[asesor].clientes += 1;
-
-          if (cliente.etapa === "Pagó Adelanto") acc[asesor].adelantos += 1;
-          if (cliente.etapa === "Entregado") acc[asesor].entregados += 1;
+          if (!acc[asesor]) acc[asesor] = 0;
+          acc[asesor] += 1;
 
           return acc;
         }, {})
       )
         .slice(0, 5)
-        .map(([asesor, info]: any, index) => (
-          <div key={asesor}>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-white font-bold">
-                {index + 1}. {asesor.charAt(0).toUpperCase() + asesor.slice(1)}
-              </span>
-              <span className="text-green-400">{info.entregados} entregados</span>
-            </div>
-
-            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-green-500 rounded-full"
-                style={{ width: `${Math.min(info.clientes * 10, 100)}%` }}
-              />
-            </div>
-
-            <p className="text-xs text-slate-400 mt-1">
-              {info.clientes} clientes · {info.adelantos} adelantos
-            </p>
+        .map(([asesor, total]: any, index) => (
+          <div key={asesor} className="flex justify-between text-sm">
+            <span className="text-slate-300">
+              {index + 1}. {asesor.charAt(0).toUpperCase() + asesor.slice(1)}
+            </span>
+            <span className="text-green-400 font-bold">{total}</span>
           </div>
         ))}
     </div>
@@ -617,7 +636,6 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
       ))}
   </div>
 </div>
-
         {seguimientosPendientes.length > 0 && (
           <div className="mt-6 bg-orange-100 border border-orange-300 rounded-xl p-4">
             <p className="font-bold text-orange-700">
