@@ -512,6 +512,55 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
       </div>
     </div>
 
+<div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
+  <div className="flex justify-between items-center mb-4">
+    <div>
+      <h3 className="text-xl font-bold text-white">
+        🚨 Clientes sin respuesta
+      </h3>
+      <p className="text-slate-400 text-sm">
+        Clientes sin gestión reciente
+      </p>
+    </div>
+
+    <Link href="/mis-pendientes" className="text-green-400 text-sm font-bold">
+      Ver todos
+    </Link>
+  </div>
+
+  <div className="grid grid-cols-3 gap-4">
+    {clientes
+      .filter((c) => !c.ultima_gestion)
+      .slice(0, 6)
+      .map((cliente) => (
+        <div
+          key={cliente.id}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-4"
+        >
+          <p className="font-bold text-white">
+            {cliente.nombre || "Sin nombre"}
+          </p>
+
+          <p className="text-sm text-slate-400">
+            📱 {cliente.telefono}
+          </p>
+
+          <p className="text-sm text-red-400 mt-2">
+            Sin gestión registrada
+          </p>
+
+          <a
+            href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
+            target="_blank"
+            className="block bg-green-600 text-white text-center mt-3 py-2 rounded-lg text-sm font-bold"
+          >
+            Enviar WhatsApp
+          </a>
+        </div>
+      ))}
+  </div>
+</div>
+
     <div className="h-72">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
@@ -547,7 +596,9 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     <div className="space-y-4">
       {Object.entries(
         clientes.reduce((acc: any, cliente) => {
-          const asesor = cliente.asesor || "Sin asesor";
+          const asesor = cliente.asesor
+  ? cliente.asesor.trim().toLowerCase()
+  : "Sin asesor";
 
           if (!acc[asesor]) {
             acc[asesor] = {
@@ -575,7 +626,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
           <div key={asesor}>
             <div className="flex justify-between text-sm mb-1">
               <span className="text-white font-bold">
-                {index + 1}. {asesor}
+                {index + 1}. {asesor.charAt(0).toUpperCase() + asesor.slice(1)}
               </span>
               <span className="text-green-400">
                 {info.entregados} entregados
