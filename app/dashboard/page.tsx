@@ -599,7 +599,6 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 </div>
 
 <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
-<div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
   <h3 className="text-xl font-bold text-white mb-4">
     📊 Conversión por etapa
   </h3>
@@ -630,10 +629,16 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     })}
   </div>
 </div>
+
+<div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
   <div className="flex justify-between items-center mb-4">
     <div>
-      <h3 className="text-xl font-bold text-white">🚨 Clientes sin respuesta</h3>
-      <p className="text-slate-400 text-sm">Clientes sin gestión reciente</p>
+      <h3 className="text-xl font-bold text-white">
+        🚨 Clientes sin respuesta
+      </h3>
+      <p className="text-slate-400 text-sm">
+        Clientes sin gestión reciente
+      </p>
     </div>
 
     <Link href="/mis-pendientes" className="text-green-400 text-sm font-bold">
@@ -650,9 +655,17 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
           key={cliente.id}
           className="bg-slate-900 border border-slate-800 rounded-xl p-4"
         >
-          <p className="font-bold text-white">{cliente.nombre || "Sin nombre"}</p>
-          <p className="text-sm text-slate-400">📱 {cliente.telefono}</p>
-          <p className="text-sm text-red-400 mt-2">Sin gestión registrada</p>
+          <p className="font-bold text-white">
+            {cliente.nombre || "Sin nombre"}
+          </p>
+
+          <p className="text-sm text-slate-400">
+            📱 {cliente.telefono}
+          </p>
+
+          <p className="text-sm text-red-400 mt-2">
+            Sin gestión registrada
+          </p>
 
           <a
             href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
@@ -694,8 +707,9 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
                 <div className="space-y-3">
                   {clientes
-                    .filter((cliente) => cliente.etapa === estado)
-                    .map((cliente) => {
+  .filter((cliente) => cliente.etapa === estado)
+  .slice(0, 3)
+  .map((cliente) => {
                       const seguimientoVencido =
                         cliente.proximo_seguimiento &&
                         new Date(cliente.proximo_seguimiento) <= new Date() &&
@@ -774,36 +788,22 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
                             </p>
                           )}
 
-                          <button
-                            onClick={() => abrirConversacion(cliente)}
-                            className="block bg-blue-600 text-white text-center mt-3 py-2 rounded text-sm font-bold w-full"
-                          >
-                            Ver conversación
-                          </button>
+                          <div className="flex gap-2 mt-3">
+  <button
+    onClick={() => abrirConversacion(cliente)}
+    className="flex-1 bg-slate-800 text-white py-2 rounded text-xs"
+  >
+    💬
+  </button>
 
-                          <button
-                            onClick={() => {
-                              setClienteSeguimiento(cliente);
-                              setFechaSeguimiento("");
-                              setObservacionSeguimiento(
-                                cliente.observacion || ""
-                              );
-                            }}
-                            className="block bg-orange-500 text-white text-center mt-2 py-2 rounded text-sm font-bold w-full"
-                          >
-                            📅 Programar seguimiento
-                          </button>
-
-                          <a
-                            href={`https://wa.me/51${cliente.telefono.replace(
-                              /\s/g,
-                              ""
-                            )}`}
-                            target="_blank"
-                            className="block bg-green-600 text-white text-center mt-2 py-2 rounded text-sm font-bold"
-                          >
-                            Abrir WhatsApp
-                          </a>
+  <a
+    href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
+    target="_blank"
+    className="flex-1 bg-green-600 text-white text-center py-2 rounded text-xs"
+  >
+    WA
+  </a>
+</div>
                         </div>
                       );
                     })}
