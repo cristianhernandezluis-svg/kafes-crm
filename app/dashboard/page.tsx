@@ -586,12 +586,12 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
 </div>
 
-<div className="grid grid-cols-3 gap-6 mt-6">
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <h3 className="text-lg font-bold text-white">📈 Entregados por día</h3>
-    <p className="text-slate-400 text-xs mb-4">Últimos registros del CRM</p>
+<div className="grid grid-cols-4 gap-4 mt-6">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+    <h3 className="text-base font-bold text-white">📈 Entregados</h3>
+    <p className="text-slate-400 text-xs mb-3">Últimos registros</p>
 
-    <div className="h-56">
+    <div className="h-36">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={[
@@ -613,10 +613,10 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </div>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <h3 className="text-lg font-bold text-white mb-3">🥇 Leads por asesor</h3>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+    <h3 className="text-base font-bold text-white mb-2">🥇 Leads</h3>
 
-    <div className="h-44">
+    <div className="h-28">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -639,8 +639,8 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
               }))}
             dataKey="value"
             nameKey="name"
-            innerRadius={45}
-            outerRadius={70}
+            innerRadius={35}
+            outerRadius={55}
             paddingAngle={4}
           >
             {["#22c55e", "#3b82f6", "#eab308", "#a855f7", "#ef4444"].map(
@@ -667,10 +667,10 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
           return acc;
         }, {})
       )
-        .slice(0, 5)
+        .slice(0, 4)
         .map(([asesor, total]: any, index) => (
-          <div key={asesor} className="flex justify-between text-xs">
-            <span className="text-slate-300">
+          <div key={asesor} className="flex justify-between text-[11px]">
+            <span className="text-slate-300 truncate">
               {index + 1}. {asesor.charAt(0).toUpperCase() + asesor.slice(1)}
             </span>
             <span className="text-green-400 font-bold">{total}</span>
@@ -679,12 +679,12 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </div>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <h3 className="text-lg font-bold text-white mb-3">
-      📊 Conversión por etapa
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+    <h3 className="text-base font-bold text-white mb-2">
+      📊 Conversión
     </h3>
 
-    <div className="space-y-3">
+    <div className="space-y-2">
       {estados.map((estado) => {
         const total = clientes.length || 1;
         const cantidad = clientes.filter((c) => c.etapa === estado).length;
@@ -692,14 +692,14 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
         return (
           <div key={estado}>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-slate-300">{estado}</span>
+            <div className="flex justify-between text-[11px] mb-1">
+              <span className="text-slate-300 truncate">{estado}</span>
               <span className="text-green-400 font-bold">
                 {cantidad} ({porcentaje}%)
               </span>
             </div>
 
-            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-green-500 rounded-full"
                 style={{ width: `${porcentaje}%` }}
@@ -710,59 +710,60 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
       })}
     </div>
   </div>
-</div>
 
-<div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 mt-6">
-  <div className="flex justify-between items-center mb-4">
-    <div>
-      <h3 className="text-lg font-bold text-white">
-        🚨 Clientes sin respuesta
-      </h3>
-      <p className="text-slate-400 text-xs">
-        Clientes sin gestión reciente
-      </p>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+    <div className="flex justify-between items-center mb-3">
+      <div>
+        <h3 className="text-base font-bold text-white">
+          🚨 Sin respuesta
+        </h3>
+        <p className="text-slate-400 text-xs">
+          Sin gestión reciente
+        </p>
+      </div>
+
+      <Link href="/mis-pendientes" className="text-green-400 text-xs font-bold">
+        Ver
+      </Link>
     </div>
 
-    <Link href="/mis-pendientes" className="text-green-400 text-xs font-bold">
-      Ver todos
-    </Link>
-  </div>
-
-  <div className="grid grid-cols-3 gap-3">
-    {clientes
-      .filter((c) => !c.ultima_gestion)
-      .slice(0, 6)
-      .map((cliente) => (
-        <div
-          key={cliente.id}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center text-black font-black text-sm">
-              {(cliente.nombre || "S").charAt(0).toUpperCase()}
-            </div>
-
-            <div>
-              <p className="font-bold text-white text-sm">
-                {cliente.nombre || "Sin nombre"}
-              </p>
-              <p className="text-xs text-slate-400">
-                Sin gestión registrada
-              </p>
-            </div>
-          </div>
-
-          <a
-            href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
-            target="_blank"
-            className="text-green-400 text-lg"
+    <div className="space-y-2">
+      {clientes
+        .filter((c) => !c.ultima_gestion)
+        .slice(0, 3)
+        .map((cliente) => (
+          <div
+            key={cliente.id}
+            className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex items-center justify-between"
           >
-            🟢
-          </a>
-        </div>
-      ))}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center text-black font-black text-xs">
+                {(cliente.nombre || "S").charAt(0).toUpperCase()}
+              </div>
+
+              <div>
+                <p className="font-bold text-white text-xs truncate max-w-[110px]">
+                  {cliente.nombre || "Sin nombre"}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  Sin gestión
+                </p>
+              </div>
+            </div>
+
+            <a
+              href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
+              target="_blank"
+              className="text-green-400 text-sm"
+            >
+              🟢
+            </a>
+          </div>
+        ))}
+    </div>
   </div>
-</div>        {seguimientosPendientes.length > 0 && (
+</div>
+{seguimientosPendientes.length > 0 && (
           <div className="mt-6 bg-orange-100 border border-orange-300 rounded-xl p-4">
             <p className="font-bold text-orange-700">
               🔥 Seguimientos pendientes: {seguimientosPendientes.length}
