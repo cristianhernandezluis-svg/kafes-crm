@@ -337,115 +337,99 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
-      <aside className="w-64 bg-black text-white p-5">
-        <h1 className="text-2xl font-bold text-yellow-400">Kafes CRM</h1>
-
-        <div className="mt-10 space-y-4">
-  <div className="bg-yellow-500 text-black p-3 rounded-lg font-bold">
-    Dashboard
+      <aside className="w-64 bg-[#08111f] text-white p-4 flex flex-col min-h-screen border-r border-slate-800">
+  <div className="flex items-center gap-3 mb-8">
+    <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
+      ☕
+    </div>
+    <h1 className="text-xl font-black">
+      Kafes <span className="text-yellow-400">CRM</span>
+    </h1>
   </div>
 
-  <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
-    Clientes
-  </div>
+  <p className="text-xs text-slate-500 uppercase mb-3">Principal</p>
 
-  <Link
-    href="/seguimientos"
-    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
-  >
-    Seguimientos
-  </Link>
-
-  <Link
-    href="/mis-pendientes"
-    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
-  >
-    Mis Pendientes
-  </Link>
-
-  <Link
-    href="/adelantos"
-    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
-  >
-    Adelantos
-  </Link>
-
-  <Link
-    href="/chat"
-    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
-  >
-    Chats
-  </Link>
-
-  <Link
-    href="/productividad"
-    className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
-  >
-    Productividad
-  </Link>
-
-  <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
-    Ventas
-  </div>
-
-  <div className="p-3 hover:bg-zinc-800 rounded-lg cursor-pointer">
-    Reportes
-  </div>
-
-<Link
-  href="/usuarios"
-  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
->
-  Usuarios
-</Link>
-
-<Link
-  href="/configuracion/whatsapp"
-  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
->
-  Configuración WhatsApp
-</Link>
-
-<Link
-  href="/plantillas"
-  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
->
-  Plantillas
-</Link>
-
-<Link
-  href="/configuracion/planes"
-  className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer"
->
-  Suscripción
-</Link>
-
-{typeof window !== "undefined" &&
-  JSON.parse(localStorage.getItem("usuario") || "{}")?.email ===
-    "cristianluis_03@live.com" && (
-    <Link
-      href="/admin"
-      className="block p-3 hover:bg-zinc-800 rounded-lg cursor-pointer text-yellow-400 font-bold"
-    >
-      👑 Admin
+  <nav className="space-y-2">
+    <Link href="/dashboard" className="flex items-center gap-3 bg-yellow-500 text-black p-3 rounded-xl font-bold">
+      📊 Dashboard
     </Link>
-)}
 
-</div>
-        <div className="mt-10 bg-zinc-900 p-4 rounded-xl">
-          <p className="text-sm text-gray-400">Resumen hoy</p>
-          <p className="mt-2">Clientes: {clientes.length}</p>
-          <p>Seguimientos: {seguimientosPendientes.length}</p>
-          <p>
-            Adelantos:{" "}
-            {clientes.filter((c) => c.etapa === "Pagó Adelanto").length}
-          </p>
-          <p>
-            Entregados:{" "}
-            {clientes.filter((c) => c.etapa === "Entregado").length}
-          </p>
-        </div>
-      </aside>
+    <Link href="/chat" className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-800">
+      <span>💬 Conversaciones</span>
+      <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+        {clientes.length}
+      </span>
+    </Link>
+
+    <Link href="/mis-pendientes" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      🔥 Mis Pendientes
+    </Link>
+
+    <Link href="/seguimientos" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      ⏰ Seguimientos
+    </Link>
+
+    <Link href="/adelantos" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      💰 Adelantos
+    </Link>
+
+    <Link href="/productividad" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      📈 Productividad
+    </Link>
+
+    <Link href="/plantillas" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      📝 Plantillas
+    </Link>
+
+    <Link href="/usuarios" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      👥 Usuarios
+    </Link>
+
+    <Link href="/configuracion/whatsapp" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      ⚙️ WhatsApp
+    </Link>
+
+    <Link href="/configuracion/planes" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+      💳 Suscripción
+    </Link>
+
+    {typeof window !== "undefined" &&
+      JSON.parse(localStorage.getItem("usuario") || "{}")?.email ===
+        "cristianluis_03@live.com" && (
+        <Link href="/admin" className="flex items-center gap-3 p-3 rounded-xl text-yellow-400 font-bold hover:bg-slate-800">
+          👑 Admin
+        </Link>
+      )}
+  </nav>
+
+  <div className="mt-auto bg-[#111827] border border-slate-700 rounded-2xl p-4">
+    <p className="text-sm text-slate-400 mb-3">Conexión WhatsApp</p>
+
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center">
+        🟢
+      </div>
+      <div>
+        <p className="text-green-400 font-bold text-sm">Conectado</p>
+        <p className="text-xs text-slate-400">Cloud API activa</p>
+      </div>
+    </div>
+
+    <button className="w-full mt-4 border border-slate-600 rounded-xl py-2 text-sm hover:bg-slate-800">
+      Ver configuración
+    </button>
+  </div>
+
+  <button
+    onClick={() => {
+      localStorage.removeItem("usuario");
+      window.location.href = "/login";
+    }}
+    className="mt-4 text-left text-slate-400 hover:text-red-400 text-sm"
+  >
+    ↩ Cerrar sesión
+  </button>
+</aside>
 
       <main className="flex-1 p-8 overflow-x-auto">
         <div className="flex justify-between items-center">
