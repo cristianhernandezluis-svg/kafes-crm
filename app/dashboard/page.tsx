@@ -587,11 +587,11 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 </div>
 
 <div className="grid grid-cols-3 gap-6 mt-6">
-  <div className="col-span-2 bg-[#111827] border border-slate-800 rounded-2xl p-6">
-    <h3 className="text-xl font-bold text-white">📈 Entregados por día</h3>
-    <p className="text-slate-400 text-sm mb-6">Últimos registros del CRM</p>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <h3 className="text-lg font-bold text-white">📈 Entregados por día</h3>
+    <p className="text-slate-400 text-xs mb-4">Últimos registros del CRM</p>
 
-    <div className="h-72">
+    <div className="h-56">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={[
@@ -613,10 +613,10 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </div>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-6">
-    <h3 className="text-xl font-bold text-white mb-4">🥇 Leads por asesor</h3>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <h3 className="text-lg font-bold text-white mb-3">🥇 Leads por asesor</h3>
 
-    <div className="h-64">
+    <div className="h-44">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -639,8 +639,8 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
               }))}
             dataKey="value"
             nameKey="name"
-            innerRadius={55}
-            outerRadius={85}
+            innerRadius={45}
+            outerRadius={70}
             paddingAngle={4}
           >
             {["#22c55e", "#3b82f6", "#eab308", "#a855f7", "#ef4444"].map(
@@ -654,7 +654,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
       </ResponsiveContainer>
     </div>
 
-    <div className="space-y-2 mt-4">
+    <div className="space-y-1 mt-2">
       {Object.entries(
         clientes.reduce((acc: any, cliente) => {
           const asesor = cliente.asesor
@@ -669,7 +669,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
       )
         .slice(0, 5)
         .map(([asesor, total]: any, index) => (
-          <div key={asesor} className="flex justify-between text-sm">
+          <div key={asesor} className="flex justify-between text-xs">
             <span className="text-slate-300">
               {index + 1}. {asesor.charAt(0).toUpperCase() + asesor.slice(1)}
             </span>
@@ -678,89 +678,91 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
         ))}
     </div>
   </div>
-</div>
 
-<div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
-  <h3 className="text-xl font-bold text-white mb-4">
-    📊 Conversión por etapa
-  </h3>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <h3 className="text-lg font-bold text-white mb-3">
+      📊 Conversión por etapa
+    </h3>
 
-  <div className="space-y-4">
-    {estados.map((estado) => {
-      const total = clientes.length || 1;
-      const cantidad = clientes.filter((c) => c.etapa === estado).length;
-      const porcentaje = Math.round((cantidad / total) * 100);
+    <div className="space-y-3">
+      {estados.map((estado) => {
+        const total = clientes.length || 1;
+        const cantidad = clientes.filter((c) => c.etapa === estado).length;
+        const porcentaje = Math.round((cantidad / total) * 100);
 
-      return (
-        <div key={estado}>
-          <div className="flex justify-between text-sm mb-1">
-            <span className="text-slate-300">{estado}</span>
-            <span className="text-green-400 font-bold">
-              {cantidad} ({porcentaje}%)
-            </span>
+        return (
+          <div key={estado}>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-slate-300">{estado}</span>
+              <span className="text-green-400 font-bold">
+                {cantidad} ({porcentaje}%)
+              </span>
+            </div>
+
+            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 rounded-full"
+                style={{ width: `${porcentaje}%` }}
+              />
+            </div>
           </div>
-
-          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-green-500 rounded-full"
-              style={{ width: `${porcentaje}%` }}
-            />
-          </div>
-        </div>
-      );
-    })}
+        );
+      })}
+    </div>
   </div>
 </div>
 
-<div className="bg-[#111827] border border-slate-800 rounded-2xl p-6 mt-6">
+<div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 mt-6">
   <div className="flex justify-between items-center mb-4">
     <div>
-      <h3 className="text-xl font-bold text-white">
+      <h3 className="text-lg font-bold text-white">
         🚨 Clientes sin respuesta
       </h3>
-      <p className="text-slate-400 text-sm">
+      <p className="text-slate-400 text-xs">
         Clientes sin gestión reciente
       </p>
     </div>
 
-    <Link href="/mis-pendientes" className="text-green-400 text-sm font-bold">
+    <Link href="/mis-pendientes" className="text-green-400 text-xs font-bold">
       Ver todos
     </Link>
   </div>
 
-  <div className="grid grid-cols-3 gap-4">
+  <div className="grid grid-cols-3 gap-3">
     {clientes
       .filter((c) => !c.ultima_gestion)
       .slice(0, 6)
       .map((cliente) => (
         <div
           key={cliente.id}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-4"
+          className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3"
         >
-          <p className="font-bold text-white">
-            {cliente.nombre || "Sin nombre"}
-          </p>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center text-black font-black text-sm">
+              {(cliente.nombre || "S").charAt(0).toUpperCase()}
+            </div>
 
-          <p className="text-sm text-slate-400">
-            📱 {cliente.telefono}
-          </p>
-
-          <p className="text-sm text-red-400 mt-2">
-            Sin gestión registrada
-          </p>
+            <div>
+              <p className="font-bold text-white text-sm">
+                {cliente.nombre || "Sin nombre"}
+              </p>
+              <p className="text-xs text-slate-400">
+                Sin gestión registrada
+              </p>
+            </div>
+          </div>
 
           <a
             href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
             target="_blank"
-            className="block bg-green-600 text-white text-center mt-3 py-2 rounded-lg text-sm font-bold"
+            className="text-green-400 text-lg"
           >
-            Enviar WhatsApp
+            🟢
           </a>
         </div>
       ))}
   </div>
-</div>
-        {seguimientosPendientes.length > 0 && (
+</div>        {seguimientosPendientes.length > 0 && (
           <div className="mt-6 bg-orange-100 border border-orange-300 rounded-xl p-4">
             <p className="font-bold text-orange-700">
               🔥 Seguimientos pendientes: {seguimientosPendientes.length}
