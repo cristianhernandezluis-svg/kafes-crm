@@ -315,7 +315,7 @@ const detenerGrabacion = () => {
 </aside>
 
       <main className="flex-1 flex">
-        <section className="w-[380px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen">
+        <section className="w-[320px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen">
           <div className="p-5 border-b border-slate-800">
   <h2 className="text-2xl font-black text-white">💬 Conversaciones</h2>
   <p className="text-sm text-slate-400">
@@ -499,8 +499,8 @@ const detenerGrabacion = () => {
   )}
 
 <textarea
-  className="w-full bg-[#020617] border border-slate-700 text-white rounded-xl p-3"
-  rows={3}
+  className="w-full bg-[#020617] border border-slate-700 text-white rounded-xl p-3 h-20 resize-none"
+  rows={2}
   placeholder="Escribe un mensaje..."
   value={mensajeNuevo}
   onChange={(e) => setMensajeNuevo(e.target.value)}
