@@ -104,14 +104,15 @@ const clienteId = cliente.rows[0].id;
 await pool.query(
   `
   INSERT INTO conversaciones (
-    cliente_id,
-    telefono,
-    mensaje,
-    remitente,
-    tipo,
-    empresa_id
-  )
-  VALUES ($1, $2, $3, $4, 'text', 1)
+  cliente_id,
+  telefono,
+  mensaje,
+  remitente,
+  tipo,
+  empresa_id,
+  canal
+)
+VALUES ($1, $2, $3, $4, 'text', 1, 'qr')
   `,
   [clienteId, telefono, texto, telefono]
 );
