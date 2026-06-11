@@ -355,7 +355,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
   return (
     <div className="min-h-screen bg-[#0b1220] flex text-white">
-      <aside className="w-64 bg-[#08111f] text-white p-3 flex flex-col min-h-screen border-r border-slate-800">
+      <aside className="hidden lg:flex w-64 bg-[#08111f] text-white p-3 flex-col min-h-screen border-r border-slate-800">
   <div className="flex items-center gap-3 mb-8">
     <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
       ☕
@@ -449,10 +449,10 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
   </button>
 </aside>
 
-      <main className="flex-1 p-8 overflow-x-auto bg-[#0b1220]">
+      <main className="flex-1 p-3 md:p-8 overflow-x-auto bg-[#0b1220]">
         <div className="flex justify-between items-center">
   <div>
-    <h1 className="text-4xl font-black text-white">
+    <h1 className="text-2xl md:text-4xl font-black text-white">
       Hola Cristian 👋
     </h1>
 
@@ -461,7 +461,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </p>
   </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
             <button
               onClick={cargarClientes}
               className="bg-gray-800 text-white px-5 py-3 rounded-lg font-bold"
@@ -478,7 +478,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
           </div>
         </div>
 
-<div className="grid grid-cols-4 gap-6 mt-6">
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
 
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-red-500 transition-all">
 
@@ -586,7 +586,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
 
 </div>
 
-<div className="grid grid-cols-4 gap-4 mt-6">
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
     <h3 className="text-base font-bold text-white">📈 Entregados</h3>
     <p className="text-slate-400 text-xs mb-3">Últimos registros</p>
