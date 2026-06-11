@@ -381,7 +381,7 @@ const detenerGrabacion = () => {
 ))}
 </div>
 </section>
-        <section className="flex-1 flex flex-col h-screen bg-[#0b1220]">
+        <section className="flex-1 flex flex-col h-screen bg-[#0b1220] overflow-hidden">
           {!clienteActivo ? (
             <div className="flex-1 flex items-center justify-center text-slate-400">
               Selecciona un chat para responder.
@@ -410,7 +410,7 @@ const detenerGrabacion = () => {
   </div>
 </div>
 
-<div className="flex-1 overflow-y-auto p-6 space-y-3 bg-[#0b1220]">
+<div className="flex-1 overflow-y-auto p-6 space-y-3 bg-[#0b1220] min-h-0">
 {conversaciones.length === 0 ? (
   <p className="text-slate-400">No hay mensajes todavía.</p>
 ) : (
