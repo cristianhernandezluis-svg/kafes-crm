@@ -475,17 +475,10 @@ const detenerGrabacion = () => {
   value={mensajeNuevo}
   onChange={(e) => setMensajeNuevo(e.target.value)}
 />
-  <div className="flex gap-2 mt-3">
+  <div className="flex items-center gap-2 mt-3">
 
-  <button
-    onClick={() => setMostrarPlantillas(!mostrarPlantillas)}
-    className="bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-bold"
-  >
-    📝
-  </button>
-
-  <label className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl cursor-pointer font-bold">
-    📎
+  <label className="w-10 h-10 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full cursor-pointer text-white text-xl font-bold">
+    +
     <input
       type="file"
       className="hidden"
@@ -503,25 +496,25 @@ const detenerGrabacion = () => {
   </label>
 
   <button
+    onClick={() => setMostrarPlantillas(!mostrarPlantillas)}
+    className="w-10 h-10 flex items-center justify-center bg-yellow-500 hover:bg-yellow-400 rounded-full text-black"
+  >
+    📝
+  </button>
+
+  <button
     onClick={grabandoAudio ? detenerGrabacion : iniciarGrabacion}
-    className={`px-4 py-2 rounded-xl font-bold ${
+    className={`w-10 h-10 flex items-center justify-center rounded-full ${
       grabandoAudio
         ? "bg-red-600 text-white"
-        : "bg-blue-600 text-white"
+        : "bg-green-600 text-white"
     }`}
   >
     🎤
   </button>
 
-  <button
-    onClick={enviarMensaje}
-    disabled={enviando}
-    className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-xl font-bold transition disabled:bg-gray-400"
-  >
-    {enviando ? "Enviando..." : "➤ Enviar"}
-  </button>
-
 </div>
+
               </div>
             </>
           )}
