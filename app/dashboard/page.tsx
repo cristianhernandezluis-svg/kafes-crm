@@ -424,7 +424,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     <p className="text-sm text-slate-400 mb-3">Conexión WhatsApp</p>
 
     <div className="flex items-center gap-3">
-      <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center">
+      <div className="w-8 h-8 bg-green-600 rounded-xl flex items-center justify-center">
         🟢
       </div>
       <div>
@@ -730,7 +730,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     <div className="space-y-2">
       {clientes
         .filter((c) => !c.ultima_gestion)
-        .slice(0, 3)
+        .slice(0, 5)
         .map((cliente) => (
           <div
             key={cliente.id}
@@ -793,7 +793,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
                 <div className="space-y-3">
                   {clientes
   .filter((cliente) => cliente.etapa === estado)
-  .slice(0, 3)
+  .slice(0, 5)
   .map((cliente) => {
                       const seguimientoVencido =
                         cliente.proximo_seguimiento &&
@@ -803,56 +803,6 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
                         );
 
                       return (
-                        
-                          <div
-  key={cliente.id}
-  className={`p-3 rounded-xl border transition-all hover:border-green-500 ${
-    seguimientoVencido
-      ? "bg-red-950/60 border-red-500"
-      : "bg-[#0f172a] border-slate-800"
-  }`}
->
-  <div className="flex items-start justify-between gap-3">
-    <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center text-black font-black">
-        {(cliente.nombre || "S").charAt(0).toUpperCase()}
-      </div>
-
-      <div>
-        <p className="font-bold text-white text-sm">
-          {cliente.nombre || "Sin nombre"}
-        </p>
-
-        <p className="text-xs text-slate-400">
-          {cliente.observacion || "Sin último mensaje"}
-        </p>
-      </div>
-    </div>
-
-    <a
-      href={`https://wa.me/51${cliente.telefono.replace(/\s/g, "")}`}
-      target="_blank"
-      className="text-green-400 hover:text-green-300 text-sm"
-    >
-      🟢
-    </a>
-  </div>
-
-  <div className="flex items-center justify-between mt-3">
-    <span className="text-xs text-slate-500">
-      {cliente.ultima_gestion
-        ? new Date(cliente.ultima_gestion).toLocaleTimeString("es-PE", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "Sin gestión"}
-    </span>
-
-    <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-400">
-      {cliente.etapa}
-    </span>
-  </div>
-
 <div
   key={cliente.id}
   onClick={() => abrirConversacion(cliente)}
@@ -904,7 +854,7 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
     </span>
   </div>
 </div>
-</div>
+
 
                       );
                     })}
