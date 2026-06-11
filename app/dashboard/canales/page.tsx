@@ -8,7 +8,7 @@ export default function CanalesPage() {
 
   async function cargarQR() {
     try {
-      const res = await fetch("http://localhost:4001/qr");
+      const res = await fetch("/api/whatsapp-qr");
       const data = await res.json();
 
       setQr(data.qr);
