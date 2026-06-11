@@ -459,7 +459,7 @@ const detenerGrabacion = () => {
 
 </div>
 
-              <div className="bg-white border-t p-4">
+              <div className="bg-[#0f172a] border-t border-slate-800 p-4">
   <button
     onClick={() => setMostrarPlantillas(!mostrarPlantillas)}
     className="w-full bg-yellow-400 text-black py-3 rounded-lg mb-3 font-bold hover:bg-yellow-300"
@@ -499,7 +499,7 @@ const detenerGrabacion = () => {
   )}
 
 <textarea
-  className="w-full border rounded-lg p-3"
+  className="w-full bg-[#020617] border border-slate-700 text-white rounded-xl p-3"
   rows={3}
   placeholder="Escribe un mensaje..."
   value={mensajeNuevo}
@@ -549,7 +549,7 @@ const detenerGrabacion = () => {
 <button
   onClick={enviarMensaje}
   disabled={enviando}
-  className="w-full bg-green-600 text-white py-3 rounded-lg mt-3 font-bold disabled:bg-gray-400"
+  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl mt-3 font-bold transition disabled:bg-gray-400"
 >
   {enviando ? "Enviando..." : "Enviar WhatsApp"}
 </button>
