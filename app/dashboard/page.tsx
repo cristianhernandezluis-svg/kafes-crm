@@ -94,6 +94,11 @@ useEffect(() => {
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [mensajeNuevo, setMensajeNuevo] = useState("");
+const [editEtapa, setEditEtapa] = useState("");
+const [editAsesor, setEditAsesor] = useState("");
+const [editSeguimiento, setEditSeguimiento] = useState("");
+const [editObservacion, setEditObservacion] = useState("");
+const [guardandoGestion, setGuardandoGestion] = useState(false);
   const [enviando, setEnviando] = useState(false);
 
   const [clienteSeguimiento, setClienteSeguimiento] =
@@ -163,6 +168,14 @@ const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}`, {
 
   const abrirConversacion = async (cliente: Cliente) => {
     setClienteActivo(cliente);
+setEditEtapa(cliente.etapa || "Nuevo");
+setEditAsesor(cliente.asesor || "");
+setEditSeguimiento(
+  cliente.proximo_seguimiento
+    ? cliente.proximo_seguimiento.slice(0, 16)
+    : ""
+);
+setEditObservacion(cliente.observacion || "");
 
     try {
       const res = await fetch(`/api/conversaciones/${cliente.id}`, {
@@ -264,7 +277,46 @@ const guardarSeguimiento = async () => {
     alert("Selecciona fecha y hora");
     return;
   }
+const guardarGestionCliente = async () => {
+  if (!clienteActivo) return;
 
+  try {
+    setGuardandoGestion(true);
+
+    const res = await fetch(`/api/clientes/${clienteActivo.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        etapa: editEtapa,
+        asesor: editAsesor,
+        observacion: editObservacion,
+        proximo_seguimiento: editSeguimiento
+          ? new Date(editSeguimiento).toISOString()
+          : null,
+        ultima_gestion: new Date().toISOString(),
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert("No se pudo guardar la gestión");
+      return;
+    }
+
+    setClienteActivo(data.cliente);
+    await cargarClientes();
+
+    alert("Gestión guardada correctamente");
+  } catch (error) {
+    console.error("Error guardando gestión:", error);
+    alert("Error guardando gestión");
+  } finally {
+    setGuardandoGestion(false);
+  }
+};
   const nuevaCantidad =
     (clienteSeguimiento.cantidad_seguimientos || 0) + 1;
 
@@ -882,6 +934,76 @@ proximo_seguimiento: new Date(fechaSeguimiento).toISOString(),          observac
             <p className="text-sm">📱 {clienteActivo.telefono}</p>
             <p className="text-sm">📍 {clienteActivo.ciudad || "Sin ciudad"}</p>
           </div>
+
+<div className="px-5 pb-4 space-y-3">
+
+  <div>
+    <label className="text-sm font-bold">
+      Etapa
+    </label>
+
+    <select
+      className="w-full border rounded-lg p-2 mt-1"
+      value={editEtapa}
+      onChange={(e) => setEditEtapa(e.target.value)}
+    >
+      {estados.map((estado) => (
+        <option key={estado} value={estado}>
+          {estado}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  <div>
+    <label className="text-sm font-bold">
+      Asesor
+    </label>
+
+    <input
+      className="w-full border rounded-lg p-2 mt-1"
+      value={editAsesor}
+      onChange={(e) => setEditAsesor(e.target.value)}
+    />
+  </div>
+
+  <div>
+    <label className="text-sm font-bold">
+      Próximo seguimiento
+    </label>
+
+    <input
+      type="datetime-local"
+      className="w-full border rounded-lg p-2 mt-1"
+      value={editSeguimiento}
+      onChange={(e) => setEditSeguimiento(e.target.value)}
+    />
+  </div>
+
+  <div>
+    <label className="text-sm font-bold">
+      Observación
+    </label>
+
+    <textarea
+      className="w-full border rounded-lg p-2 mt-1"
+      rows={3}
+      value={editObservacion}
+      onChange={(e) => setEditObservacion(e.target.value)}
+    />
+  </div>
+
+  <button
+    onClick={guardarGestionCliente}
+    disabled={guardandoGestion}
+    className="w-full bg-yellow-500 text-black py-3 rounded-lg font-bold"
+  >
+    {guardandoGestion
+      ? "Guardando..."
+      : "💾 Guardar Gestión"}
+  </button>
+
+</div>
 
           <div className="space-y-3 flex-1 overflow-y-auto p-5">
             {conversaciones.length === 0 ? (
