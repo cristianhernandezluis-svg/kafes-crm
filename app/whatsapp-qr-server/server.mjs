@@ -71,6 +71,9 @@ async function iniciarWhatsApp() {
 
     if (!jid || jid === "status@broadcast") return;
 
+// Ignorar grupos de WhatsApp
+if (jid.endsWith("@g.us")) return;
+
     const telefono = jid.replace("@s.whatsapp.net", "").replace("@lid", "");
 
     const texto =
