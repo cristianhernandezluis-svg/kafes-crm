@@ -26,7 +26,7 @@ export async function PATCH(
         observacion = $4,
         proximo_seguimiento = $5,
         ultima_gestion = $6,
-        cantidad_seguimientos = $7
+        cantidad_seguimientos = COALESCE(cantidad_seguimientos, 0) + 1
       WHERE id = $8
       RETURNING *
       `,
@@ -37,7 +37,6 @@ export async function PATCH(
         body.observacion ?? "",
         body.proximo_seguimiento ?? null,
         body.ultima_gestion ?? new Date().toISOString(),
-        body.cantidad_seguimientos ?? 0,
         id,
       ]
     );

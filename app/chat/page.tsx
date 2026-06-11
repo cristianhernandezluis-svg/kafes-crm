@@ -486,6 +486,37 @@ const detenerGrabacion = () => {
 </div>
 
               <div className="bg-[#0f172a] border-t border-slate-800 p-4">
+<button
+  onClick={() => {
+    const fecha = prompt(
+      "Fecha seguimiento (2026-06-15 10:00)"
+    );
+
+    const observacion = prompt(
+      "Observación"
+    );
+
+    if (!fecha || !observacion || !clienteActivo)
+      return;
+
+    fetch(`/api/clientes/${clienteActivo.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        observacion,
+        proximo_seguimiento: fecha,
+        etapa: "Seguimiento",
+      }),
+    }).then(() => {
+      alert("Seguimiento programado");
+    });
+  }}
+  className="mb-3 bg-yellow-500 text-black px-4 py-2 rounded-xl font-bold"
+>
+  📅 Programar seguimiento
+</button>
 <textarea
   className="w-full bg-[#020617] border border-slate-700 text-white rounded-xl p-3 h-20 resize-none"
   rows={2}
