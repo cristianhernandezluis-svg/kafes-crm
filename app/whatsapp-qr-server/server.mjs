@@ -1,13 +1,15 @@
-require("dotenv").config({ path: ".env.local" });
-const { Pool } = require("pg");
-const express = require("express");
-const cors = require("cors");
-const qrcode = require("qrcode");
-const {
-  default: makeWASocket,
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import qrcode from "qrcode";
+import pg from "pg";
+
+import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
-} = require("@whiskeysockets/baileys");
+} from "@whiskeysockets/baileys";
+
+const { Pool } = pg;
 
 const app = express();
 app.use(cors());
@@ -26,7 +28,6 @@ async function iniciarWhatsApp() {
 
   sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true,
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -49,8 +50,11 @@ async function iniciarWhatsApp() {
     if (connection === "close") {
       estado = "desconectado";
 
-      const shouldReconnect =
-        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+      console.log("Conexión cerrada. Reintentando:", shouldReconnect);
 
       if (shouldReconnect) {
         iniciarWhatsApp();
@@ -60,35 +64,43 @@ async function iniciarWhatsApp() {
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
+
     if (!msg.message || msg.key.fromMe) return;
 
-    const telefono = msg.key.remoteJid.replace("@s.whatsapp.net", "");
+    const jid = msg.key.remoteJid;
+
+    if (!jid || jid === "status@broadcast") return;
+
+    const telefono = jid.replace("@s.whatsapp.net", "").replace("@lid", "");
+
     const texto =
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
       "";
 
+    if (!texto) return;
+
     console.log("Mensaje recibido:", telefono, texto);
 
-try {
-  await pool.query(
-    `
-    INSERT INTO conversaciones (
-      telefono,
-      mensaje,
-      remitente,
-      tipo,
-      empresa_id
-    )
-    VALUES ($1, $2, $3, 'text', 1)
-    `,
-    [telefono, texto, telefono]
-  );
+    try {
+      await pool.query(
+        `
+        INSERT INTO conversaciones (
+          telefono,
+          mensaje,
+          remitente,
+          tipo,
+          empresa_id
+        )
+        VALUES ($1, $2, $3, 'text', 1)
+        `,
+        [telefono, texto, telefono]
+      );
 
-  console.log("Mensaje guardado en PostgreSQL");
-} catch (error) {
-  console.error("Error guardando mensaje:", error);
-}
+      console.log("Mensaje guardado en PostgreSQL");
+    } catch (error) {
+      console.error("Error guardando mensaje:", error);
+    }
   });
 }
 
@@ -118,7 +130,9 @@ app.post("/send", async (req, res) => {
   }
 });
 
-app.listen(4001, async () => {
-  console.log("Servidor WhatsApp QR en puerto 4001");
+const PORT = process.env.PORT || 4001;
+
+app.listen(PORT, async () => {
+  console.log(`Servidor WhatsApp QR en puerto ${PORT}`);
   await iniciarWhatsApp();
 });
