@@ -272,7 +272,7 @@ const detenerGrabacion = () => {
     <VerificarSuscripcion />
 
     <div className="min-h-screen bg-[#0b1220] flex text-white">
-      <aside className="w-64 bg-[#08111f] text-white p-4 flex flex-col min-h-screen border-r border-slate-800">
+      <aside className="hidden lg:flex w-64 bg-[#08111f] text-white p-4 flex-col min-h-screen border-r border-slate-800">
   <div className="flex items-center gap-3 mb-8">
     <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
       ☕
@@ -315,7 +315,7 @@ const detenerGrabacion = () => {
 </aside>
 
       <main className="flex-1 flex">
-        <section className="w-[320px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen">
+        <section className="w-full md:w-[320px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen">
           <div className="p-5 border-b border-slate-800">
   <h2 className="text-2xl font-black text-white">💬 Conversaciones</h2>
   <p className="text-sm text-slate-400">
