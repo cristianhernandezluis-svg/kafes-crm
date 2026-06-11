@@ -46,6 +46,7 @@ export default function ChatsPage() {
   const [mensajeNuevo, setMensajeNuevo] = useState("");
 const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
+const [mostrarConversacion, setMostrarConversacion] = useState(false);
   const [enviando, setEnviando] = useState(false);
 const [enviandoArchivo, setEnviandoArchivo] = useState(false);
 
@@ -96,7 +97,8 @@ const cargarPlantillas = async () => {
 };
 
   const abrirConversacion = async (cliente: Cliente) => {
-    setClienteActivo(cliente);
+  setMostrarConversacion(true);
+  setClienteActivo(cliente);
 
 await fetch("/api/chats", {
   method: "PATCH",
@@ -315,7 +317,11 @@ const detenerGrabacion = () => {
 </aside>
 
       <main className="flex-1 flex">
-        <section className="w-full md:w-[320px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen">
+        <section
+  className={`${
+    mostrarConversacion ? "hidden md:block" : "block"
+  } w-full md:w-[320px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen`}
+>
           <div className="p-5 border-b border-slate-800">
   <h2 className="text-2xl font-black text-white">💬 Conversaciones</h2>
   <p className="text-sm text-slate-400">
@@ -381,7 +387,11 @@ const detenerGrabacion = () => {
 ))}
 </div>
 </section>
-        <section className="flex-1 flex flex-col h-screen bg-[#0b1220] overflow-hidden">
+        <section
+  className={`${
+    mostrarConversacion ? "flex" : "hidden md:flex"
+  } flex-1 flex-col h-screen bg-[#0b1220] overflow-hidden`}
+>
           {!clienteActivo ? (
             <div className="flex-1 flex items-center justify-center text-slate-400">
               Selecciona un chat para responder.
@@ -389,7 +399,15 @@ const detenerGrabacion = () => {
           ) : (
             <>
               <div className="bg-[#0f172a] p-5 border-b border-slate-800 flex items-center justify-between">
-  <div className="flex items-center gap-3">
+<div className="flex items-center gap-3">
+
+  <button
+    onClick={() => setMostrarConversacion(false)}
+    className="md:hidden text-white text-2xl"
+  >
+    ←
+  </button>
+
     <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-black text-lg">
       {(clienteActivo.nombre || "S").charAt(0).toUpperCase()}
     </div>
