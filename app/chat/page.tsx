@@ -333,13 +333,23 @@ const detenerGrabacion = () => {
     }`}
   >
                 <div className="flex justify-between gap-2">
+  <div className="flex items-center gap-3 min-w-0">
+
+  <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-black font-black">
+    {(cliente.nombre || "S").charAt(0).toUpperCase()}
+  </div>
+
   <div className="min-w-0">
     <p className="font-bold truncate text-white">
       {cliente.nombre || "Sin nombre"}
     </p>
 
-    <p className="text-sm">📱 {cliente.telefono}</p>
+    <p className="text-sm text-slate-400 truncate">
+      {cliente.ultimo_mensaje || cliente.telefono}
+    </p>
   </div>
+
+</div>
 
   <div className="text-right shrink-0">
     {cliente.ultimo_mensaje_fecha && (
@@ -367,14 +377,6 @@ const detenerGrabacion = () => {
     : cliente.ultimo_mensaje || "Sin mensajes"}
 </p>
 
-<p className="text-xs text-slate-400">Etapa: {cliente.etapa}</p>
-
-{cliente.asesor && (
-  <p className="text-xs text-slate-400">
-    Asesor: {cliente.asesor}
-  </p>
-)}
-
 </button>
 ))}
 </div>
@@ -387,14 +389,20 @@ const detenerGrabacion = () => {
           ) : (
             <>
               <div className="bg-[#0f172a] p-5 border-b border-slate-800 flex items-center justify-between">
-  <div>
-    <h2 className="text-xl font-bold text-white">
-      {clienteActivo.nombre}
-    </h2>
+  <div className="flex items-center gap-3">
+    <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-black text-lg">
+      {(clienteActivo.nombre || "S").charAt(0).toUpperCase()}
+    </div>
 
-    <p className="text-sm text-slate-400">
-      📱 {clienteActivo.telefono}
-    </p>
+    <div>
+      <h2 className="text-xl font-bold text-white">
+        {clienteActivo.nombre}
+      </h2>
+
+      <p className="text-sm text-slate-400">
+        📱 {clienteActivo.telefono}
+      </p>
+    </div>
   </div>
 
   <div className="text-green-400 text-sm font-bold">
@@ -402,7 +410,7 @@ const detenerGrabacion = () => {
   </div>
 </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-[#0b1220]">
+<div className="flex-1 overflow-y-auto p-6 space-y-3 bg-[#0b1220]">
 {conversaciones.length === 0 ? (
   <p className="text-slate-400">No hay mensajes todavía.</p>
 ) : (
@@ -460,6 +468,13 @@ const detenerGrabacion = () => {
 </div>
 
               <div className="bg-[#0f172a] border-t border-slate-800 p-4">
+<textarea
+  className="w-full bg-[#020617] border border-slate-700 text-white rounded-xl p-3 h-20 resize-none"
+  rows={2}
+  placeholder="Escribe un mensaje..."
+  value={mensajeNuevo}
+  onChange={(e) => setMensajeNuevo(e.target.value)}
+/>
   <div className="flex gap-2 mt-3">
 
   <button
