@@ -83,19 +83,38 @@ async function iniciarWhatsApp() {
     console.log("Mensaje recibido:", telefono, texto);
 
     try {
-      await pool.query(
-        `
-        INSERT INTO conversaciones (
-          telefono,
-          mensaje,
-          remitente,
-          tipo,
-          empresa_id
-        )
-        VALUES ($1, $2, $3, 'text', 1)
-        `,
-        [telefono, texto, telefono]
-      );
+      const cliente = await pool.query(
+  `
+  INSERT INTO clientes (
+    nombre,
+    telefono,
+    etapa,
+    empresa_id
+  )
+  VALUES ($1, $2, 'Nuevo', 1)
+  ON CONFLICT (telefono) DO UPDATE
+  SET ultima_gestion = NOW()
+  RETURNING id
+  `,
+  [telefono, telefono]
+);
+
+const clienteId = cliente.rows[0].id;
+
+await pool.query(
+  `
+  INSERT INTO conversaciones (
+    cliente_id,
+    telefono,
+    mensaje,
+    remitente,
+    tipo,
+    empresa_id
+  )
+  VALUES ($1, $2, $3, $4, 'text', 1)
+  `,
+  [clienteId, telefono, texto, telefono]
+);
 
       console.log("Mensaje guardado en PostgreSQL");
     } catch (error) {
