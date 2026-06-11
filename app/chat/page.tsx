@@ -460,99 +460,53 @@ const detenerGrabacion = () => {
 </div>
 
               <div className="bg-[#0f172a] border-t border-slate-800 p-4">
+  <div className="flex gap-2 mt-3">
+
   <button
     onClick={() => setMostrarPlantillas(!mostrarPlantillas)}
-    className="w-full bg-yellow-400 text-black py-3 rounded-lg mb-3 font-bold hover:bg-yellow-300"
+    className="bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-bold"
   >
-    📋 Usar plantilla
+    📝
   </button>
 
-  {mostrarPlantillas && (
-    <div className="border rounded-lg p-3 mb-3 bg-gray-50 max-h-48 overflow-y-auto space-y-2">
-      {plantillas.length === 0 ? (
-        <p className="text-sm text-slate-400">
-          No tienes plantillas creadas.
-        </p>
-      ) : (
-        plantillas.map((plantilla) => (
-          <button
-            key={plantilla.id}
-            onClick={() => {
-              const texto = plantilla.mensaje.replaceAll(
-                "{{nombre}}",
-                clienteActivo?.nombre || ""
-              );
+  <label className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl cursor-pointer font-bold">
+    📎
+    <input
+      type="file"
+      className="hidden"
+      accept="image/*,application/pdf,audio/*"
+      onChange={(e) => {
+        const archivo = e.target.files?.[0];
 
-              setMensajeNuevo(texto);
-              setMostrarPlantillas(false);
-            }}
-            className="w-full text-left bg-white border rounded-lg p-3 hover:bg-yellow-50"
-          >
-            <p className="font-bold">{plantilla.nombre}</p>
-            <p className="text-xs text-slate-400">
-              {plantilla.mensaje}
-            </p>
-          </button>
-        ))
-      )}
-    </div>
-  )}
+        if (archivo) {
+          enviarArchivo(archivo);
+        }
 
-<textarea
-  className="w-full bg-[#020617] border border-slate-700 text-white rounded-xl p-3 h-20 resize-none"
-  rows={2}
-  placeholder="Escribe un mensaje..."
-  value={mensajeNuevo}
-  onChange={(e) => setMensajeNuevo(e.target.value)}
-  onKeyDown={(e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      enviarMensaje();
-    }
-  }}
-/>
+        e.target.value = "";
+      }}
+    />
+  </label>
 
-<label className="block w-full bg-gray-200 text-gray-800 py-3 rounded-lg mt-3 font-bold text-center cursor-pointer hover:bg-gray-300">
-  {enviandoArchivo
-    ? "Enviando archivo..."
-    : "📎 Adjuntar imagen / PDF / audio"}
+  <button
+    onClick={grabandoAudio ? detenerGrabacion : iniciarGrabacion}
+    className={`px-4 py-2 rounded-xl font-bold ${
+      grabandoAudio
+        ? "bg-red-600 text-white"
+        : "bg-blue-600 text-white"
+    }`}
+  >
+    🎤
+  </button>
 
-  <input
-    type="file"
-    className="hidden"
-    accept="image/*,application/pdf,audio/*"
-    onChange={(e) => {
-      const archivo = e.target.files?.[0];
+  <button
+    onClick={enviarMensaje}
+    disabled={enviando}
+    className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-xl font-bold transition disabled:bg-gray-400"
+  >
+    {enviando ? "Enviando..." : "➤ Enviar"}
+  </button>
 
-      if (archivo) {
-        enviarArchivo(archivo);
-      }
-
-      e.target.value = "";
-    }}
-  />
-</label>
-
-<button
-  onClick={grabandoAudio ? detenerGrabacion : iniciarGrabacion}
-  className={`w-full py-3 rounded-lg mt-3 font-bold ${
-    grabandoAudio
-      ? "bg-red-600 text-white"
-      : "bg-blue-600 text-white"
-  }`}
->
-  {grabandoAudio
-    ? "⏹️ Detener y enviar audio"
-    : "🎙️ Grabar audio"}
-</button>
-
-<button
-  onClick={enviarMensaje}
-  disabled={enviando}
-  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl mt-3 font-bold transition disabled:bg-gray-400"
->
-  {enviando ? "Enviando..." : "Enviar WhatsApp"}
-</button>
+</div>
               </div>
             </>
           )}
