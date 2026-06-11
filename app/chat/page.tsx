@@ -409,11 +409,11 @@ const detenerGrabacion = () => {
   conversaciones.map((msg) => (
     <div
       key={msg.id}
-      className={`max-w-[70%] p-3 rounded-xl text-sm ${
-        msg.remitente === "cliente"
-          ? "bg-green-100 mr-auto"
-          : "bg-gray-200 ml-auto"
-      }`}
+      className={`max-w-[70%] p-3 rounded-2xl text-sm shadow ${
+  msg.remitente === "cliente"
+    ? "bg-[#1e293b] text-white mr-auto rounded-bl-sm"
+    : "bg-green-600 text-white ml-auto rounded-br-sm"
+}`}
     >
       {msg.tipo === "image" && msg.media_id ? (
         <img
@@ -447,7 +447,7 @@ const detenerGrabacion = () => {
         <p>{msg.mensaje}</p>
       )}
 
-      <p className="text-xs text-slate-400 mt-1">
+      <p className="text-xs text-slate-300 mt-1">
         {msg.remitente} ·{" "}
         {new Date(msg.created_at).toLocaleString("es-PE")}
       </p>
