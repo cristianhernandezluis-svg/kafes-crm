@@ -325,16 +325,16 @@ const detenerGrabacion = () => {
 
           <div className="overflow-y-auto h-[calc(100vh-90px)]">
   {clientes.map((cliente) => (
-              <button
-                key={cliente.id}
-                onClick={() => abrirConversacion(cliente)}
-                className={`w-full text-left p-4 border-b hover:bg-gray-100 ${
-                  clienteActivo?.id === cliente.id ? "bg-yellow-100" : ""
-                }`}
-              >
+  <button
+    key={cliente.id}
+    onClick={() => abrirConversacion(cliente)}
+    className={`w-full text-left p-4 border-b border-slate-800 hover:bg-slate-800 transition ${
+      clienteActivo?.id === cliente.id ? "bg-slate-800" : "bg-[#0f172a]"
+    }`}
+  >
                 <div className="flex justify-between gap-2">
   <div className="min-w-0">
-    <p className="font-bold truncate">
+    <p className="font-bold truncate text-white">
       {cliente.nombre || "Sin nombre"}
     </p>
 
@@ -343,7 +343,7 @@ const detenerGrabacion = () => {
 
   <div className="text-right shrink-0">
     {cliente.ultimo_mensaje_fecha && (
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-slate-400">
         {new Date(cliente.ultimo_mensaje_fecha).toLocaleTimeString("es-PE", {
           hour: "2-digit",
           minute: "2-digit",
@@ -359,7 +359,7 @@ const detenerGrabacion = () => {
   </div>
 </div>
 
-<p className="text-sm text-gray-600 truncate mt-1">
+<p className="text-sm text-slate-400 truncate mt-1">
   {cliente.ultimo_tipo === "image"
     ? "📷 Imagen"
     : cliente.ultimo_tipo === "document"
@@ -367,10 +367,10 @@ const detenerGrabacion = () => {
     : cliente.ultimo_mensaje || "Sin mensajes"}
 </p>
 
-<p className="text-xs text-gray-500">Etapa: {cliente.etapa}</p>
+<p className="text-xs text-slate-400">Etapa: {cliente.etapa}</p>
 
 {cliente.asesor && (
-  <p className="text-xs text-gray-500">
+  <p className="text-xs text-slate-400">
     Asesor: {cliente.asesor}
   </p>
 )}
@@ -379,24 +379,32 @@ const detenerGrabacion = () => {
 ))}
 </div>
 </section>
-        <section className="flex-1 flex flex-col h-screen">
+        <section className="flex-1 flex flex-col h-screen bg-[#0b1220]">
           {!clienteActivo ? (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-slate-400">
               Selecciona un chat para responder.
             </div>
           ) : (
             <>
-              <div className="bg-white p-5 border-b">
-                <h2 className="text-xl font-bold">{clienteActivo.nombre}</h2>
-                <p className="text-sm">📱 {clienteActivo.telefono}</p>
-                <p className="text-sm text-gray-500">
-                  📍 {clienteActivo.ciudad || "Sin ciudad"}
-                </p>
-              </div>
+              <div className="bg-[#0f172a] p-5 border-b border-slate-800 flex items-center justify-between">
+  <div>
+    <h2 className="text-xl font-bold text-white">
+      {clienteActivo.nombre}
+    </h2>
 
-              <div className="flex-1 overflow-y-auto p-5 space-y-3">
+    <p className="text-sm text-slate-400">
+      📱 {clienteActivo.telefono}
+    </p>
+  </div>
+
+  <div className="text-green-400 text-sm font-bold">
+    ● En línea
+  </div>
+</div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-[#0b1220]">
 {conversaciones.length === 0 ? (
-  <p className="text-gray-500">No hay mensajes todavía.</p>
+  <p className="text-slate-400">No hay mensajes todavía.</p>
 ) : (
   conversaciones.map((msg) => (
     <div
@@ -424,7 +432,7 @@ const detenerGrabacion = () => {
           className="bg-white border rounded-lg p-3 text-left hover:bg-gray-50"
         >
           <p className="font-bold">📄 Documento recibido</p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-slate-400">
             {msg.filename || "Abrir documento"}
           </p>
         </button>
@@ -439,7 +447,7 @@ const detenerGrabacion = () => {
         <p>{msg.mensaje}</p>
       )}
 
-      <p className="text-xs text-gray-500 mt-1">
+      <p className="text-xs text-slate-400 mt-1">
         {msg.remitente} ·{" "}
         {new Date(msg.created_at).toLocaleString("es-PE")}
       </p>
@@ -462,7 +470,7 @@ const detenerGrabacion = () => {
   {mostrarPlantillas && (
     <div className="border rounded-lg p-3 mb-3 bg-gray-50 max-h-48 overflow-y-auto space-y-2">
       {plantillas.length === 0 ? (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-400">
           No tienes plantillas creadas.
         </p>
       ) : (
@@ -481,7 +489,7 @@ const detenerGrabacion = () => {
             className="w-full text-left bg-white border rounded-lg p-3 hover:bg-yellow-50"
           >
             <p className="font-bold">{plantilla.nombre}</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-slate-400">
               {plantilla.mensaje}
             </p>
           </button>
