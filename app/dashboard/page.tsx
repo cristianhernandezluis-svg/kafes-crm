@@ -616,75 +616,9 @@ const noResponden = clientes.filter(
 
 </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <p className="text-slate-400 text-sm">
-      Leads nuevos
-    </p>
-
-    <h2 className="text-4xl font-black text-white mt-2">
-      {leadsNuevos}
-    </h2>
-
-    <p className="text-green-400 text-sm mt-2">
-      ↑ 12% vs ayer
-    </p>
-  </div>
-
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <p className="text-slate-400 text-sm">
-      En seguimiento
-    </p>
-
-    <h2 className="text-4xl font-black text-white mt-2">
-      {enSeguimiento}
-    </h2>
-
-    <p className="text-green-400 text-sm mt-2">
-      ↑ 8% vs ayer
-    </p>
-  </div>
-
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <p className="text-slate-400 text-sm">
-      Pagó adelanto
-    </p>
-
-    <h2 className="text-4xl font-black text-white mt-2">
-      {pagoAdelanto}
-    </h2>
-
-    <p className="text-green-400 text-sm mt-2">
-      ↑ 15% vs ayer
-    </p>
-  </div>
-
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <p className="text-slate-400 text-sm">
-      Ventas entregadas
-    </p>
-
-    <h2 className="text-4xl font-black text-white mt-2">
-      {ventasEntregadas}
-    </h2>
-
-    <p className="text-green-400 text-sm mt-2">
-      ↑ 10% vs ayer
-    </p>
-  </div>
-
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <p className="text-slate-400 text-sm">
-      No responden
-    </p>
-
     <h2 className="text-4xl font-black text-white mt-2">
       {noResponden}
     </h2>
-
-    <p className="text-red-400 text-sm mt-2">
-      ↓ 5% vs ayer
-    </p>
-  </div>
 
 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
