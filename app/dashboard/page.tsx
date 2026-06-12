@@ -1,10 +1,11 @@
 "use client";
 
 import {
-  AlertTriangle,
-  CalendarClock,
   Users,
+  Search,
   DollarSign,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -549,6 +550,73 @@ const noResponden = clientes.filter(
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mt-6">
 
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-slate-400 text-sm">Leads nuevos</p>
+        <h2 className="text-4xl font-black text-white mt-2">{leadsNuevos}</h2>
+        <p className="text-green-400 text-sm mt-2">↑ 12% vs ayer</p>
+      </div>
+      <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center">
+        <Users className="text-blue-400" size={28} />
+      </div>
+    </div>
+  </div>
+
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-slate-400 text-sm">En seguimiento</p>
+        <h2 className="text-4xl font-black text-white mt-2">{enSeguimiento}</h2>
+        <p className="text-green-400 text-sm mt-2">↑ 8% vs ayer</p>
+      </div>
+      <div className="w-14 h-14 rounded-full bg-yellow-500/20 flex items-center justify-center">
+        <Search className="text-yellow-400" size={28} />
+      </div>
+    </div>
+  </div>
+
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-slate-400 text-sm">Pagó adelanto</p>
+        <h2 className="text-4xl font-black text-white mt-2">{pagoAdelanto}</h2>
+        <p className="text-green-400 text-sm mt-2">↑ 15% vs ayer</p>
+      </div>
+      <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
+        <DollarSign className="text-green-400" size={28} />
+      </div>
+    </div>
+  </div>
+
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-slate-400 text-sm">Ventas entregadas</p>
+        <h2 className="text-4xl font-black text-white mt-2">{ventasEntregadas}</h2>
+        <p className="text-green-400 text-sm mt-2">↑ 10% vs ayer</p>
+      </div>
+      <div className="w-14 h-14 rounded-full bg-purple-500/20 flex items-center justify-center">
+        <CheckCircle className="text-purple-400" size={28} />
+      </div>
+    </div>
+  </div>
+
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-slate-400 text-sm">No responden</p>
+        <h2 className="text-4xl font-black text-white mt-2">{noResponden}</h2>
+        <p className="text-red-400 text-sm mt-2">↓ 5% vs ayer</p>
+      </div>
+      <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center">
+        <AlertCircle className="text-red-400" size={28} />
+      </div>
+    </div>
+  </div>
+
+</div>
+
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
     <p className="text-slate-400 text-sm">
       Leads nuevos
     </p>
@@ -617,8 +685,6 @@ const noResponden = clientes.filter(
       ↓ 5% vs ayer
     </p>
   </div>
-
-</div>
 
 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
