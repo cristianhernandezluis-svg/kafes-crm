@@ -526,110 +526,76 @@ const enviarMensaje = async () => {
           </div>
         </div>
 
-<div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mt-6">
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-red-500 transition-all">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <p className="text-slate-400 text-sm">
+      Leads nuevos
+    </p>
 
-    <div className="flex items-center gap-4">
+    <h2 className="text-4xl font-black text-white mt-2">
+      {leadsNuevos}
+    </h2>
 
-      <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center">
-        <AlertTriangle className="text-red-500" size={28} />
-      </div>
-
-      <div>
-        <p className="text-slate-400 text-sm">
-          Vencidos
-        </p>
-
-        <h2 className="text-4xl font-black text-white">
-          {seguimientosVencidos.length}
-        </h2>
-
-        <p className="text-red-400 text-sm">
-          Seguimientos atrasados
-        </p>
-      </div>
-
-    </div>
-
+    <p className="text-green-400 text-sm mt-2">
+      ↑ 12% vs ayer
+    </p>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-orange-500 transition-all">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <p className="text-slate-400 text-sm">
+      En seguimiento
+    </p>
 
-    <div className="flex items-center gap-4">
+    <h2 className="text-4xl font-black text-white mt-2">
+      {enSeguimiento}
+    </h2>
 
-      <div className="w-14 h-14 rounded-full bg-orange-500/20 flex items-center justify-center">
-        <CalendarClock className="text-orange-500" size={28} />
-      </div>
-
-      <div>
-        <p className="text-slate-400 text-sm">
-          Para hoy
-        </p>
-
-        <h2 className="text-4xl font-black text-white">
-          {seguimientosHoy.length}
-        </h2>
-
-        <p className="text-orange-400 text-sm">
-          Contactar hoy
-        </p>
-      </div>
-
-    </div>
-
+    <p className="text-green-400 text-sm mt-2">
+      ↑ 8% vs ayer
+    </p>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-blue-500 transition-all">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <p className="text-slate-400 text-sm">
+      Pagó adelanto
+    </p>
 
-    <div className="flex items-center gap-4">
+    <h2 className="text-4xl font-black text-white mt-2">
+      {pagoAdelanto}
+    </h2>
 
-      <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center">
-        <Users className="text-blue-500" size={28} />
-      </div>
-
-      <div>
-        <p className="text-slate-400 text-sm">
-          Clientes
-        </p>
-
-        <h2 className="text-4xl font-black text-white">
-          {clientes.length}
-        </h2>
-
-        <p className="text-green-400 text-sm">
-          CRM activo
-        </p>
-      </div>
-
-    </div>
-
+    <p className="text-green-400 text-sm mt-2">
+      ↑ 15% vs ayer
+    </p>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-green-500 transition-all">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <p className="text-slate-400 text-sm">
+      Ventas entregadas
+    </p>
 
-    <div className="flex items-center gap-4">
+    <h2 className="text-4xl font-black text-white mt-2">
+      {ventasEntregadas}
+    </h2>
 
-      <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
-        <DollarSign className="text-green-500" size={28} />
-      </div>
+    <p className="text-green-400 text-sm mt-2">
+      ↑ 10% vs ayer
+    </p>
+  </div>
 
-      <div>
-        <p className="text-slate-400 text-sm">
-          Adelantos
-        </p>
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+    <p className="text-slate-400 text-sm">
+      No responden
+    </p>
 
-        <h2 className="text-4xl font-black text-white">
-          {clientes.filter((c) => c.etapa === "Pagó Adelanto").length}
-        </h2>
+    <h2 className="text-4xl font-black text-white mt-2">
+      {noResponden}
+    </h2>
 
-        <p className="text-green-400 text-sm">
-          Pagos recibidos
-        </p>
-      </div>
-
-    </div>
-
+    <p className="text-red-400 text-sm mt-2">
+      ↓ 5% vs ayer
+    </p>
   </div>
 
 </div>
