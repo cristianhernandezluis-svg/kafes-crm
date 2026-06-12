@@ -58,6 +58,7 @@ type Conversacion = {
 export default function Home() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
+const [filtroFecha, setFiltroFecha] = useState("esta_semana");
 useEffect(() => {
   const verificar = async () => {
     const usuarioGuardado = localStorage.getItem("usuario");
@@ -620,8 +621,17 @@ const noResponden = clientes.filter(
 
 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
-    <h3 className="text-base font-bold text-white">📈 Entregados</h3>
-    <p className="text-slate-400 text-xs mb-3">Últimos registros</p>
+    <h3 className="text-base font-bold text-white">📈 📈 Ventas por día</h3>
+    <select
+  className="bg-[#0f172a] border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-2 mb-3 outline-none"
+>
+  <option>Hoy</option>
+  <option>Ayer</option>
+  <option>Esta semana</option>
+  <option>Últimos 7 días</option>
+  <option>Este mes</option>
+  <option>Últimos 30 días</option>
+</select>
 
     <div className="h-36">
       <ResponsiveContainer width="100%" height="100%">
@@ -646,7 +656,7 @@ const noResponden = clientes.filter(
   </div>
 
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
-    <h3 className="text-base font-bold text-white mb-2">🥇 Leads</h3>
+    <h3 className="text-base font-bold text-white mb-2">🥇 Leads por asesor</h3>
 
     <div className="h-28">
       <ResponsiveContainer width="100%" height="100%">
@@ -747,7 +757,7 @@ const noResponden = clientes.filter(
     <div className="flex justify-between items-center mb-3">
       <div>
         <h3 className="text-base font-bold text-white">
-          🚨 Sin respuesta
+          🚨 Clientes sin respuesta
         </h3>
         <p className="text-slate-400 text-xs">
           Sin gestión reciente
