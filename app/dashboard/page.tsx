@@ -26,11 +26,9 @@ const estados = [
   "Nuevo",
   "Interesado",
   "Seguimiento",
-  "Pendiente Adelanto",
   "Pagó Adelanto",
   "Enviado",
   "Entregado",
-  "No Responde",
 ];
 
 type Cliente = {
@@ -811,14 +809,14 @@ const noResponden = clientes.filter(
         {cargando ? (
           <p className="mt-8 text-gray-500">Cargando clientes...</p>
         ) : (
-          <div className="grid grid-cols-7 gap-4 mt-8 min-w-[1400px]">
+          <div className="grid grid-cols-6 gap-4 mt-8 min-w-[1300px]">
             {estados.map((estado) => (
               <div
                 key={estado}
                 className="bg-[#111827] border border-slate-800 rounded-2xl p-3 min-h-[420px]"
               >
-                <h3 className="font-bold mb-3">
-                  {estado}{" "}
+                <h3 className="font-bold mb-3 text-white text-sm uppercase">
+  {estado}
                   <span className="text-gray-400">
                     {clientes.filter((c) => c.etapa === estado).length}
                   </span>
