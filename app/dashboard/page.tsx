@@ -11,8 +11,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
-  LineChart,
-  Line,
+  AreaChart,
+Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -695,14 +695,28 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 
     <div className="h-52 mt-3">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart
-          data={ventasPorDia}
-        >
-          <XAxis dataKey="dia" stroke="#94a3b8" />
-          <YAxis stroke="#94a3b8" />
-          <Tooltip />
-          <Line type="monotone" dataKey="ventas" stroke="#22c55e" strokeWidth={3} />
-        </LineChart>
+        <AreaChart data={ventasPorDia}>
+  <defs>
+    <linearGradient id="ventasGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.6} />
+      <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05} />
+    </linearGradient>
+  </defs>
+
+  <XAxis dataKey="dia" stroke="#94a3b8" />
+  <YAxis stroke="#94a3b8" />
+  <Tooltip />
+
+  <Area
+    type="monotone"
+    dataKey="ventas"
+    stroke="#22c55e"
+    strokeWidth={3}
+    fill="url(#ventasGradient)"
+    dot={{ r: 4 }}
+    activeDot={{ r: 6 }}
+  />
+</AreaChart>
       </ResponsiveContainer>
     </div>
   </div>
