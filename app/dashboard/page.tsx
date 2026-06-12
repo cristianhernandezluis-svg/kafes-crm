@@ -10,9 +10,9 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import {
+  import {
   AreaChart,
-Area,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -20,6 +20,7 @@ Area,
   PieChart,
   Pie,
   Cell,
+  Label,
 } from "recharts";
 
 const estados = [
@@ -754,6 +755,12 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
             outerRadius={70}
             paddingAngle={4}
           >
+<Label
+  value={clientes.length}
+  position="center"
+  fill="#ffffff"
+/>
+
             {["#22c55e", "#3b82f6", "#eab308", "#14b8a6"].map(
               (color, index) => (
                 <Cell key={index} fill={color} />
