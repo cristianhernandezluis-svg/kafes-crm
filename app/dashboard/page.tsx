@@ -693,7 +693,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   <option value="ultimos_30_dias">Últimos 30 días</option>
 </select>
 
-    <div className="h-36">
+    <div className="h-52 mt-3">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={ventasPorDia}
@@ -707,7 +707,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
     </div>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
     <h3 className="text-base font-bold text-white mb-2">🥇 Leads por asesor</h3>
 
     <div className="h-28">
