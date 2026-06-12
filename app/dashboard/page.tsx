@@ -993,6 +993,28 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   Cerrar
 </button>
 
+<div className="border-b border-slate-800 p-6">
+  <div className="flex items-center gap-4">
+    <div className="w-14 h-14 rounded-full bg-yellow-500 flex items-center justify-center font-bold text-black">
+      {clienteActivo.nombre?.charAt(0)}
+    </div>
+
+    <div>
+      <h2 className="text-xl font-bold text-white">
+        {clienteActivo.nombre}
+      </h2>
+
+      <p className="text-slate-400 text-sm">
+        {clienteActivo.telefono}
+      </p>
+
+      <span className="inline-block mt-2 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">
+        {clienteActivo.etapa}
+      </span>
+    </div>
+  </div>
+</div>
+
           <div className="bg-gray-100 p-3 rounded-lg m-5">
             <p className="font-bold">{clienteActivo.nombre}</p>
             <p className="text-sm">📱 {clienteActivo.telefono}</p>
