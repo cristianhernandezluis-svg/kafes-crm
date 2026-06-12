@@ -340,10 +340,24 @@ const guardarGestionCliente = async () => {
       return;
     }
 
-    setClienteActivo(data.cliente);
-    await cargarClientes();
+    await fetch("/api/actividades", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    empresa_id: 1,
+    cliente_id: clienteActivo.id,
+    asesor: editAsesor || clienteActivo.asesor || "Sin asesor",
+    tipo: "gestion",
+    descripcion: editObservacion || "Gestión registrada",
+  }),
+});
 
-    alert("Gestión guardada correctamente");
+setClienteActivo(data.cliente);
+await cargarClientes();
+
+alert("Gestión guardada correctamente");
   } catch (error) {
     console.error("Error guardando gestión:", error);
     alert("Error guardando gestión");
