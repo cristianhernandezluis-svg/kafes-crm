@@ -722,9 +722,12 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   </div>
 
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <h3 className="text-base font-bold text-white mb-2">🥇 Leads por asesor</h3>
+  <h3 className="text-sm font-bold text-white mb-4">
+    Leads por asesor
+  </h3>
 
-    <div className="h-28">
+  <div className="grid grid-cols-2 gap-4 items-center">
+    <div className="h-40">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -740,18 +743,18 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
                 return acc;
               }, {})
             )
-              .slice(0, 3)
+              .slice(0, 4)
               .map(([asesor, total]: any) => ({
                 name: asesor.charAt(0).toUpperCase() + asesor.slice(1),
                 value: total,
               }))}
             dataKey="value"
             nameKey="name"
-            innerRadius={35}
-            outerRadius={55}
+            innerRadius={45}
+            outerRadius={70}
             paddingAngle={4}
           >
-            {["#22c55e", "#3b82f6", "#eab308", "#a855f7", "#ef4444"].map(
+            {["#22c55e", "#3b82f6", "#eab308", "#14b8a6"].map(
               (color, index) => (
                 <Cell key={index} fill={color} />
               )
@@ -762,7 +765,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
       </ResponsiveContainer>
     </div>
 
-    <div className="space-y-1 mt-2">
+    <div className="space-y-3">
       {Object.entries(
         clientes.reduce((acc: any, cliente) => {
           const asesor = cliente.asesor
@@ -777,8 +780,8 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
       )
         .slice(0, 4)
         .map(([asesor, total]: any, index) => (
-          <div key={asesor} className="flex justify-between text-[11px]">
-            <span className="text-slate-300 truncate">
+          <div key={asesor} className="flex justify-between text-xs">
+            <span className="text-slate-300">
               {index + 1}. {asesor.charAt(0).toUpperCase() + asesor.slice(1)}
             </span>
             <span className="text-green-400 font-bold">{total}</span>
@@ -786,6 +789,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
         ))}
     </div>
   </div>
+</div>
 
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
     <h3 className="text-base font-bold text-white mb-2">
