@@ -481,7 +481,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 
   return (
     <div className="min-h-screen bg-[#0b1220] flex text-white">
-      <aside className="hidden lg:flex w-64 bg-[#08111f] text-white p-3 flex-col min-h-screen border-r border-slate-800">
+      <aside className="hidden lg:flex w-56 bg-[#08111f] text-white p-3 flex-col min-h-screen border-r border-slate-800">
   <div className="flex items-center gap-3 mb-8">
     <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
       ☕
@@ -575,10 +575,10 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   </button>
 </aside>
 
-      <main className="flex-1 p-3 md:p-8 overflow-x-auto bg-[#0b1220]">
+      <main className="flex-1 p-3 md:p-6 overflow-x-auto bg-[#0b1220]">
         <div className="flex justify-between items-center">
   <div>
-    <h1 className="text-2xl md:text-4xl font-black text-white">
+    <h1 className="text-2xl md:text-3xl font-black text-white">
       Hola Cristian 👋
     </h1>
 
@@ -610,7 +610,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
     <div className="flex items-center justify-between">
       <div>
         <p className="text-slate-400 text-sm">Leads nuevos</p>
-        <h2 className="text-4xl font-black text-white mt-2">{leadsNuevos}</h2>
+        <h2 className="text-3xl font-black text-white mt-2">{leadsNuevos}</h2>
         <p className="text-green-400 text-sm mt-2">↑ 12% vs ayer</p>
       </div>
       <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center">
