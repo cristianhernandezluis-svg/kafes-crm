@@ -664,7 +664,7 @@ const noResponden = clientes.filter(
                 return acc;
               }, {})
             )
-              .slice(0, 5)
+              .slice(0, 3)
               .map(([asesor, total]: any) => ({
                 name: asesor.charAt(0).toUpperCase() + asesor.slice(1),
                 value: total,
@@ -762,7 +762,7 @@ const noResponden = clientes.filter(
     <div className="space-y-2">
       {clientes
         .filter((c) => !c.ultima_gestion)
-        .slice(0, 5)
+        .slice(0, 3)
         .map((cliente) => (
           <div
             key={cliente.id}
@@ -825,7 +825,7 @@ const noResponden = clientes.filter(
                 <div className="space-y-3">
                   {clientes
   .filter((cliente) => cliente.etapa === estado)
-  .slice(0, 5)
+  .slice(0, 3)
   .map((cliente) => {
                       const seguimientoVencido =
                         cliente.proximo_seguimiento &&
