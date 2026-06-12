@@ -985,16 +985,13 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
       </main>
 
       {clienteActivo && (
-        <div className="fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl z-50 flex flex-col">
-          <div className="flex justify-between items-center p-5 border-b">
-            <h2 className="text-xl font-bold">Conversación</h2>
-            <button
-              onClick={() => setClienteActivo(null)}
-              className="text-red-500 font-bold"
-            >
-              Cerrar
-            </button>
-          </div>
+  <div className="fixed right-0 top-0 h-full w-[460px] bg-[#0b1220] border-l border-slate-800 shadow-2xl z-50 flex flex-col text-white">
+          <button
+  onClick={() => setClienteActivo(null)}
+  className="text-slate-300 hover:text-red-400 font-bold"
+>
+  Cerrar
+</button>
 
           <div className="bg-gray-100 p-3 rounded-lg m-5">
             <p className="font-bold">{clienteActivo.nombre}</p>
