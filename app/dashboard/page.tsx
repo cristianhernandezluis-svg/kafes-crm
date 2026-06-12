@@ -401,6 +401,26 @@ const enviarMensaje = async () => {
     }
   };
 
+const leadsNuevos = clientes.filter(
+  (c) => c.etapa === "Nuevo"
+).length;
+
+const enSeguimiento = clientes.filter(
+  (c) => c.etapa === "Seguimiento"
+).length;
+
+const pagoAdelanto = clientes.filter(
+  (c) => c.etapa === "Pagó Adelanto"
+).length;
+
+const ventasEntregadas = clientes.filter(
+  (c) => c.etapa === "Entregado"
+).length;
+
+const noResponden = clientes.filter(
+  (c) => c.etapa === "No Responde"
+).length;
+
   return (
     <div className="min-h-screen bg-[#0b1220] flex text-white">
       <aside className="hidden lg:flex w-64 bg-[#08111f] text-white p-3 flex-col min-h-screen border-r border-slate-800">

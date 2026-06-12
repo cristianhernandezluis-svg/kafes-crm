@@ -27,7 +27,7 @@ export async function PATCH(
         proximo_seguimiento = $5,
         ultima_gestion = $6,
         cantidad_seguimientos = COALESCE(cantidad_seguimientos, 0) + 1
-      WHERE id = $8
+      WHERE id = $7
       RETURNING *
       `,
       [
