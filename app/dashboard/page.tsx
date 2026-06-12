@@ -617,7 +617,7 @@ const noResponden = clientes.filter(
 </div>
 
     <h2 className="text-4xl font-black text-white mt-2">
-      {noResponden}
+     
     </h2>
 
 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
