@@ -58,6 +58,7 @@ type Conversacion = {
 export default function Home() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
+const [filtroFechaVentas, setFiltroFechaVentas] = useState("esta_semana");
 const [filtroFecha, setFiltroFecha] = useState("esta_semana");
 useEffect(() => {
   const verificar = async () => {
@@ -421,6 +422,63 @@ const noResponden = clientes.filter(
   (c) => c.etapa === "No Responde"
 ).length;
 
+const obtenerVentasFiltradas = () => {
+  const hoy = new Date();
+
+  return clientes.filter((c) => {
+    if (c.etapa !== "Entregado") return false;
+
+    const fecha = new Date(c.created_at);
+
+    if (filtroFechaVentas === "hoy") {
+      return fecha.toDateString() === hoy.toDateString();
+    }
+
+    if (filtroFechaVentas === "ayer") {
+      const ayer = new Date();
+      ayer.setDate(hoy.getDate() - 1);
+      return fecha.toDateString() === ayer.toDateString();
+    }
+
+    if (filtroFechaVentas === "ultimos_7_dias") {
+      const inicio = new Date();
+      inicio.setDate(hoy.getDate() - 7);
+      return fecha >= inicio && fecha <= hoy;
+    }
+
+    if (filtroFechaVentas === "este_mes") {
+      return (
+        fecha.getMonth() === hoy.getMonth() &&
+        fecha.getFullYear() === hoy.getFullYear()
+      );
+    }
+
+    if (filtroFechaVentas === "ultimos_30_dias") {
+      const inicio = new Date();
+      inicio.setDate(hoy.getDate() - 30);
+      return fecha >= inicio && fecha <= hoy;
+    }
+
+    const inicioSemana = new Date();
+    inicioSemana.setDate(hoy.getDate() - 6);
+    return fecha >= inicioSemana && fecha <= hoy;
+  });
+};
+
+const ventasFiltradas = obtenerVentasFiltradas();
+
+const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
+  (dia, index) => ({
+    dia,
+    ventas: ventasFiltradas.filter((c) => {
+      const fecha = new Date(c.created_at);
+      const diaSemana = fecha.getDay();
+      const orden = diaSemana === 0 ? 6 : diaSemana - 1;
+      return orden === index;
+    }).length,
+  })
+);
+
   return (
     <div className="min-h-screen bg-[#0b1220] flex text-white">
       <aside className="hidden lg:flex w-64 bg-[#08111f] text-white p-3 flex-col min-h-screen border-r border-slate-800">
@@ -623,28 +681,22 @@ const noResponden = clientes.filter(
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
     <h3 className="text-base font-bold text-white">📈 📈 Ventas por día</h3>
     <select
+  value={filtroFechaVentas}
+  onChange={(e) => setFiltroFechaVentas(e.target.value)}
   className="bg-[#0f172a] border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-2 mb-3 outline-none"
 >
-  <option>Hoy</option>
-  <option>Ayer</option>
-  <option>Esta semana</option>
-  <option>Últimos 7 días</option>
-  <option>Este mes</option>
-  <option>Últimos 30 días</option>
+  <option value="hoy">Hoy</option>
+  <option value="ayer">Ayer</option>
+  <option value="esta_semana">Esta semana</option>
+  <option value="ultimos_7_dias">Últimos 7 días</option>
+  <option value="este_mes">Este mes</option>
+  <option value="ultimos_30_dias">Últimos 30 días</option>
 </select>
 
     <div className="h-36">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
-          data={[
-            { dia: "Lun", ventas: clientes.filter((c) => c.etapa === "Entregado").length },
-            { dia: "Mar", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 2 },
-            { dia: "Mié", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 1 },
-            { dia: "Jue", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 3 },
-            { dia: "Vie", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 5 },
-            { dia: "Sáb", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 2 },
-            { dia: "Dom", ventas: clientes.filter((c) => c.etapa === "Entregado").length + 4 },
-          ]}
+          data={ventasPorDia}
         >
           <XAxis dataKey="dia" stroke="#94a3b8" />
           <YAxis stroke="#94a3b8" />
