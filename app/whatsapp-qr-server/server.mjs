@@ -68,6 +68,7 @@ async function iniciarWhatsApp() {
     if (!msg.message || msg.key.fromMe) return;
 
     const jid = msg.key.remoteJid;
+const jidAlt = msg.key.remoteJidAlt;
 
 if (!jid || jid === "status@broadcast") return;
 
@@ -76,48 +77,27 @@ if (jid.endsWith("@g.us")) return;
 
 let telefono = "";
 
-// Contactos normales
-if (jid.endsWith("@s.whatsapp.net")) {
+if (jidAlt && jidAlt.endsWith("@s.whatsapp.net")) {
+  telefono = jidAlt.replace("@s.whatsapp.net", "");
+} else if (jid.endsWith("@s.whatsapp.net")) {
   telefono = jid.replace("@s.whatsapp.net", "");
-}
-
-// Algunos clientes usan @c.us
-else if (jid.endsWith("@c.us")) {
+} else if (jid.endsWith("@c.us")) {
   telefono = jid.replace("@c.us", "");
-}
-
-// Algunos mensajes traen participant
-else if (
+} else if (
   msg.key.participant &&
   msg.key.participant.endsWith("@s.whatsapp.net")
 ) {
-  telefono = msg.key.participant.replace(
-    "@s.whatsapp.net",
-    ""
-  );
-}
-
-// Si llega como @lid
-else if (jid.endsWith("@lid")) {
-  console.log(
-    "⚠️ WhatsApp envió un LID en vez del teléfono:",
-    jid
-  );
-
+  telefono = msg.key.participant.replace("@s.whatsapp.net", "");
+} else if (jid.endsWith("@lid")) {
+  console.log("⚠️ WhatsApp envió un LID en vez del teléfono:", jid);
   telefono = jid.replace("@lid", "");
-}
-
-// No reconocido
-else {
-  console.log(
-    "⚠️ No se pudo identificar el número:",
-    jid
-  );
-
+} else {
+  console.log("⚠️ No se pudo identificar el número:", jid);
   return;
 }
 
 console.log("JID RECIBIDO:", jid);
+console.log("JID ALT:", jidAlt);
 console.log("TELÉFONO DETECTADO:", telefono);
 
     const texto =
