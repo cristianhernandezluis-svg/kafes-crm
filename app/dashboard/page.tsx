@@ -1070,6 +1070,13 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 </div>
 
     <div className="p-5 space-y-5">
+{tabCliente === "informacion" && (
+<div className="bg-red-500 p-5 rounded-xl">
+  INFORMACION FUNCIONA
+</div>
+)}
+{tabCliente === "conversacion" && (
+  <>
 
       <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
         <div className="flex justify-between items-center mb-4">
@@ -1240,10 +1247,23 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
         </button>
       </div>
 
-    </div>
+        </>
+  )}
+
+  {tabCliente === "notas" && (
+  <div className="bg-blue-500 p-5 rounded-xl">
+    NOTAS FUNCIONA
   </div>
 )}
 
+{tabCliente === "actividades" && (
+  <div className="bg-green-500 p-5 rounded-xl">
+    ACTIVIDADES FUNCIONA
+  </div>
+)}
+</div>
+</div>
+)}
       {clienteSeguimiento && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl w-[430px] shadow-xl">
