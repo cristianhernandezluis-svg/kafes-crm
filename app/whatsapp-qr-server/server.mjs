@@ -69,12 +69,56 @@ async function iniciarWhatsApp() {
 
     const jid = msg.key.remoteJid;
 
-    if (!jid || jid === "status@broadcast") return;
+if (!jid || jid === "status@broadcast") return;
 
-// Ignorar grupos de WhatsApp
+// Ignorar grupos
 if (jid.endsWith("@g.us")) return;
 
-    const telefono = jid.replace("@s.whatsapp.net", "").replace("@lid", "");
+let telefono = "";
+
+// Contactos normales
+if (jid.endsWith("@s.whatsapp.net")) {
+  telefono = jid.replace("@s.whatsapp.net", "");
+}
+
+// Algunos clientes usan @c.us
+else if (jid.endsWith("@c.us")) {
+  telefono = jid.replace("@c.us", "");
+}
+
+// Algunos mensajes traen participant
+else if (
+  msg.key.participant &&
+  msg.key.participant.endsWith("@s.whatsapp.net")
+) {
+  telefono = msg.key.participant.replace(
+    "@s.whatsapp.net",
+    ""
+  );
+}
+
+// Si llega como @lid
+else if (jid.endsWith("@lid")) {
+  console.log(
+    "⚠️ WhatsApp envió un LID en vez del teléfono:",
+    jid
+  );
+
+  telefono = jid.replace("@lid", "");
+}
+
+// No reconocido
+else {
+  console.log(
+    "⚠️ No se pudo identificar el número:",
+    jid
+  );
+
+  return;
+}
+
+console.log("JID RECIBIDO:", jid);
+console.log("TELÉFONO DETECTADO:", telefono);
 
     const texto =
       msg.message.conversation ||
