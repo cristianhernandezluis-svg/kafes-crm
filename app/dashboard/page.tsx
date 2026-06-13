@@ -1080,9 +1080,12 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-white">Información del contacto</h3>
-        <button className="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-lg">
-            Editar información
-          </button>
+        <button
+  onClick={() => setTabCliente("acciones")}
+  className="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-lg"
+>
+  Editar información
+</button>
         </div>
 
         <div className="grid grid-cols-2 gap-4 text-sm">
