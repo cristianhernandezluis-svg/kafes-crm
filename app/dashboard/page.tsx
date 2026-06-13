@@ -985,156 +985,230 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
       </main>
 
       {clienteActivo && (
-  <div className="fixed right-0 top-0 h-full w-[460px] bg-[#0b1220] border-l border-slate-800 shadow-2xl z-50 flex flex-col text-white">
-          <button
-  onClick={() => setClienteActivo(null)}
-  className="text-slate-300 hover:text-red-400 font-bold"
->
-  Cerrar
-</button>
+  <div className="fixed right-0 top-0 h-full w-[520px] bg-[#0b1220] border-l border-slate-800 shadow-2xl z-50 flex flex-col text-white overflow-y-auto">
 
-<div className="border-b border-slate-800 p-6">
-  <div className="flex items-center gap-4">
-    <div className="w-14 h-14 rounded-full bg-yellow-500 flex items-center justify-center font-bold text-black">
-      {clienteActivo.nombre?.charAt(0)}
+    <div className="flex justify-between items-center px-5 py-4 border-b border-slate-800">
+      <h2 className="font-bold text-lg">Detalle del contacto</h2>
+
+      <button
+        onClick={() => setClienteActivo(null)}
+        className="text-slate-400 hover:text-red-400 font-bold"
+      >
+        Cerrar
+      </button>
     </div>
 
-    <div>
-      <h2 className="text-xl font-bold text-white">
-        {clienteActivo.nombre}
-      </h2>
+    <div className="p-5 border-b border-slate-800">
+      <div className="flex items-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-yellow-500 flex items-center justify-center font-black text-black text-xl">
+          {clienteActivo.nombre?.charAt(0)}
+        </div>
 
-      <p className="text-slate-400 text-sm">
-        {clienteActivo.telefono}
-      </p>
+        <div>
+          <h2 className="text-xl font-black text-white">
+            {clienteActivo.nombre}
+          </h2>
 
-      <span className="inline-block mt-2 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">
-        {clienteActivo.etapa}
-      </span>
+          <p className="text-slate-400 text-sm">
+            {clienteActivo.telefono}
+          </p>
+
+          <span className="inline-block mt-2 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">
+            {clienteActivo.etapa}
+          </span>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
-          <div className="bg-gray-100 p-3 rounded-lg m-5">
-            <p className="font-bold">{clienteActivo.nombre}</p>
-            <p className="text-sm">📱 {clienteActivo.telefono}</p>
-            <p className="text-sm">📍 {clienteActivo.ciudad || "Sin ciudad"}</p>
+    <div className="flex border-b border-slate-800 px-5">
+      <button className="py-4 px-3 text-green-400 border-b-2 border-green-400 text-sm font-bold">
+        Información
+      </button>
+      <button className="py-4 px-3 text-slate-400 text-sm">
+        Conversación
+      </button>
+      <button className="py-4 px-3 text-slate-400 text-sm">
+        Notas
+      </button>
+      <button className="py-4 px-3 text-slate-400 text-sm">
+        Actividades
+      </button>
+    </div>
+
+    <div className="p-5 space-y-5">
+
+      <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-white">Información del contacto</h3>
+          <button className="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-lg">
+            Editar información
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-slate-400">Teléfono</p>
+            <p className="text-white">{clienteActivo.telefono}</p>
           </div>
 
-<div className="px-5 pb-4 space-y-3">
-
-  <div>
-    <label className="text-sm font-bold">
-      Etapa
-    </label>
-
-    <select
-      className="w-full border rounded-lg p-2 mt-1"
-      value={editEtapa}
-      onChange={(e) => setEditEtapa(e.target.value)}
-    >
-      {estados.map((estado) => (
-        <option key={estado} value={estado}>
-          {estado}
-        </option>
-      ))}
-    </select>
-  </div>
-
-  <div>
-    <label className="text-sm font-bold">
-      Asesor
-    </label>
-
-    <input
-      className="w-full border rounded-lg p-2 mt-1"
-      value={editAsesor}
-      onChange={(e) => setEditAsesor(e.target.value)}
-    />
-  </div>
-
-  <div>
-    <label className="text-sm font-bold">
-      Próximo seguimiento
-    </label>
-
-    <input
-      type="datetime-local"
-      className="w-full border rounded-lg p-2 mt-1"
-      value={editSeguimiento}
-      onChange={(e) => setEditSeguimiento(e.target.value)}
-    />
-  </div>
-
-  <div>
-    <label className="text-sm font-bold">
-      Observación
-    </label>
-
-    <textarea
-      className="w-full border rounded-lg p-2 mt-1"
-      rows={3}
-      value={editObservacion}
-      onChange={(e) => setEditObservacion(e.target.value)}
-    />
-  </div>
-
-  <button
-    onClick={guardarGestionCliente}
-    disabled={guardandoGestion}
-    className="w-full bg-yellow-500 text-black py-3 rounded-lg font-bold"
-  >
-    {guardandoGestion
-      ? "Guardando..."
-      : "💾 Guardar Gestión"}
-  </button>
-
-</div>
-
-          <div className="space-y-3 flex-1 overflow-y-auto p-5">
-            {conversaciones.length === 0 ? (
-              <p className="text-gray-500 text-sm">
-                Aún no hay mensajes guardados para este cliente.
-              </p>
-            ) : (
-              conversaciones.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`p-3 rounded-lg text-sm ${
-                    msg.remitente === "cliente"
-                      ? "bg-green-100"
-                      : "bg-gray-200"
-                  }`}
-                >
-                  <p>{msg.mensaje}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {msg.remitente} ·{" "}
-                    {new Date(msg.created_at).toLocaleString()}
-                  </p>
-                </div>
-              ))
-            )}
+          <div>
+            <p className="text-slate-400">Ciudad</p>
+            <p className="text-white">{clienteActivo.ciudad || "Sin ciudad"}</p>
           </div>
 
-          <div className="border-t p-3">
-            <textarea
-              className="w-full border rounded-lg p-3"
-              rows={3}
-              placeholder="Escribe un mensaje..."
-              value={mensajeNuevo}
-              onChange={(e) => setMensajeNuevo(e.target.value)}
+          <div>
+            <p className="text-slate-400">Asesor</p>
+            <p className="text-white">{clienteActivo.asesor || "Sin asesor"}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-400">Etapa</p>
+            <p className="text-green-400">{clienteActivo.etapa}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+        <h3 className="font-bold text-white mb-3">Notas internas</h3>
+
+        <textarea
+          className="w-full bg-[#0f172a] border border-slate-700 rounded-xl p-3 text-sm text-white"
+          rows={4}
+          value={editObservacion}
+          onChange={(e) => setEditObservacion(e.target.value)}
+          placeholder="Agregar nota del cliente..."
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+          <h3 className="font-bold text-white mb-3">Actividad reciente</h3>
+
+          <div className="space-y-3 text-sm">
+            <div className="flex gap-3">
+              <span className="text-green-400">🟢</span>
+              <div>
+                <p className="text-white">Gestión registrada</p>
+                <p className="text-slate-400 text-xs">
+                  {clienteActivo.ultima_gestion
+                    ? new Date(clienteActivo.ultima_gestion).toLocaleString("es-PE")
+                    : "Sin gestión"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <span className="text-green-400">💬</span>
+              <div>
+                <p className="text-white">Conversación iniciada</p>
+                <p className="text-slate-400 text-xs">WhatsApp</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+          <h3 className="font-bold text-white mb-3">Acciones rápidas</h3>
+
+          <div className="space-y-3">
+            <button
+              onClick={enviarMensaje}
+              className="w-full bg-green-600 hover:bg-green-700 rounded-lg py-2 text-sm font-bold"
+            >
+              Enviar mensaje
+            </button>
+
+            <select
+              className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-sm"
+              value={editEtapa}
+              onChange={(e) => setEditEtapa(e.target.value)}
+            >
+              {estados.map((estado) => (
+                <option key={estado} value={estado}>
+                  {estado}
+                </option>
+              ))}
+            </select>
+
+            <input
+              className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-sm"
+              placeholder="Asesor"
+              value={editAsesor}
+              onChange={(e) => setEditAsesor(e.target.value)}
+            />
+
+            <input
+              type="datetime-local"
+              className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-sm"
+              value={editSeguimiento}
+              onChange={(e) => setEditSeguimiento(e.target.value)}
             />
 
             <button
-              onClick={enviarMensaje}
-              disabled={enviando}
-              className="w-full bg-green-600 text-white py-3 rounded-lg mt-3 font-bold disabled:bg-gray-400"
+              onClick={guardarGestionCliente}
+              disabled={guardandoGestion}
+              className="w-full bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg py-2 text-sm font-bold"
             >
-              {enviando ? "Enviando..." : "Enviar WhatsApp"}
+              {guardandoGestion ? "Guardando..." : "Guardar gestión"}
+            </button>
+
+            <button
+              onClick={() => setEditEtapa("No Responde")}
+              className="w-full bg-red-600 hover:bg-red-700 rounded-lg py-2 text-sm font-bold"
+            >
+              Marcar como no responde
             </button>
           </div>
         </div>
-      )}
+      </div>
+
+      <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+        <h3 className="font-bold text-white mb-3">Conversación</h3>
+
+        <div className="space-y-3 max-h-56 overflow-y-auto">
+          {conversaciones.length === 0 ? (
+            <p className="text-slate-400 text-sm">
+              Aún no hay mensajes guardados para este cliente.
+            </p>
+          ) : (
+            conversaciones.map((msg) => (
+              <div
+                key={msg.id}
+                className={`p-3 rounded-lg text-sm ${
+                  msg.remitente === "cliente"
+                    ? "bg-green-500/10 text-green-300"
+                    : "bg-slate-800 text-slate-300"
+                }`}
+              >
+                <p>{msg.mensaje}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {msg.remitente} · {new Date(msg.created_at).toLocaleString()}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+
+        <textarea
+          className="w-full bg-[#0f172a] border border-slate-700 rounded-xl p-3 text-sm text-white mt-4"
+          rows={3}
+          placeholder="Escribe un mensaje..."
+          value={mensajeNuevo}
+          onChange={(e) => setMensajeNuevo(e.target.value)}
+        />
+
+        <button
+          onClick={enviarMensaje}
+          disabled={enviando}
+          className="w-full bg-green-600 hover:bg-green-700 rounded-lg py-3 mt-3 font-bold"
+        >
+          {enviando ? "Enviando..." : "Enviar WhatsApp"}
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
 
       {clienteSeguimiento && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
