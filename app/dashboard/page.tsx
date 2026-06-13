@@ -323,22 +323,21 @@ const guardarGestionCliente = async () => {
     setGuardandoGestion(true);
 
     const res = await fetch(`/api/clientes/${clienteActivo.id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        etapa: editEtapa,
-        asesor: editAsesor,
-        observacion: editObservacion,
-        proximo_seguimiento: editSeguimiento
-          ? new Date(editSeguimiento).toISOString()
-          : null,
-        ultima_gestion: new Date().toISOString(),
-      }),
-    });
+  method: "PATCH",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    etapa: editEtapa,
+    asesor: editAsesor,
+    ciudad: editCiudad,
+    observacion: editObservacion,
+    proximo_seguimiento: editSeguimiento || null,
+    ultima_gestion: new Date().toISOString(),
+  }),
+});
 
-    const data = await res.json();
+const data = await res.json();
 
     if (!data.success) {
       alert("No se pudo guardar la gestión");
@@ -1082,13 +1081,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-white">Información del contacto</h3>
-<button
-  onClick={guardarGestionCliente}
-  disabled={guardandoGestion}
-  className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-bold"
->
-  Guardar cambios
-</button>        
+        
 <button
   onClick={() => setTabCliente("acciones")}
   className="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-lg"
