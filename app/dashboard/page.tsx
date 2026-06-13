@@ -98,6 +98,7 @@ useEffect(() => {
   const [mensajeNuevo, setMensajeNuevo] = useState("");
 const [editEtapa, setEditEtapa] = useState("");
 const [editAsesor, setEditAsesor] = useState("");
+const [editCiudad, setEditCiudad] = useState("");
 const [editSeguimiento, setEditSeguimiento] = useState("");
 const [editObservacion, setEditObservacion] = useState("");
 const [guardandoGestion, setGuardandoGestion] = useState(false);
@@ -170,7 +171,8 @@ const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}`, {
   };
 
   const abrirConversacion = async (cliente: Cliente) => {
-    setClienteActivo(cliente);
+setEditCiudad(cliente.ciudad || "");    
+setClienteActivo(cliente);
 setEditEtapa(cliente.etapa || "Nuevo");
 setEditAsesor(cliente.asesor || "");
 setEditSeguimiento(
@@ -1080,7 +1082,14 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-white">Información del contacto</h3>
-        <button
+<button
+  onClick={guardarGestionCliente}
+  disabled={guardandoGestion}
+  className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-bold"
+>
+  Guardar cambios
+</button>        
+<button
   onClick={() => setTabCliente("acciones")}
   className="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-lg"
 >
@@ -1096,17 +1105,34 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 
           <div>
             <p className="text-slate-400">Ciudad</p>
-            <p className="text-white">{clienteActivo.ciudad || "Sin ciudad"}</p>
+            <input
+  className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-sm text-white"
+  value={editCiudad}
+  onChange={(e) => setEditCiudad(e.target.value)}
+/>
           </div>
 
           <div>
             <p className="text-slate-400">Asesor</p>
-            <p className="text-white">{clienteActivo.asesor || "Sin asesor"}</p>
+            <input
+  className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-sm text-white"
+  value={editAsesor}
+  onChange={(e) => setEditAsesor(e.target.value)}
+/>
           </div>
 
           <div>
-            <p className="text-slate-400">Etapa</p>
-            <p className="text-green-400">{clienteActivo.etapa}</p>
+            <select
+  className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-sm text-white"
+  value={editEtapa}
+  onChange={(e) => setEditEtapa(e.target.value)}
+>
+  {estados.map((estado) => (
+    <option key={estado} value={estado}>
+      {estado}
+    </option>
+  ))}
+</select>
           </div>
         </div>
       </div>
