@@ -24,7 +24,7 @@ export async function PATCH(
         asesor = COALESCE($2, asesor),
         ciudad = COALESCE($3, ciudad),
         observacion = $4,
-        proximo_seguimiento = $5,
+        proximo_seguimiento = $5::timestamp,
         ultima_gestion = $6,
         cantidad_seguimientos = COALESCE(cantidad_seguimientos, 0) + 1
       WHERE id = $7
