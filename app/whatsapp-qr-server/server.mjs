@@ -112,18 +112,24 @@ console.log("TELÉFONO DETECTADO:", telefono);
     try {
       const cliente = await pool.query(
   `
-  INSERT INTO clientes (
-    nombre,
-    telefono,
-    etapa,
-    empresa_id
-  )
-  VALUES ($1, $2, 'Nuevo', 1)
-  ON CONFLICT (telefono) DO UPDATE
-  SET ultima_gestion = NOW()
-  RETURNING id
-  `,
-  [telefono, telefono]
+  const nombreCliente =
+  msg.pushName ||
+  telefono;
+
+const cliente = await pool.query(
+`
+INSERT INTO clientes (
+  nombre,
+  telefono,
+  etapa,
+  empresa_id
+)
+VALUES ($1, $2, 'Nuevo', 1)
+ON CONFLICT (telefono) DO UPDATE
+SET ultima_gestion = NOW()
+RETURNING id
+`,
+[nombreCliente, telefono]
 );
 
 const clienteId = cliente.rows[0].id;
