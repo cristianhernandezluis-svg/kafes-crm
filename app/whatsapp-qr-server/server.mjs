@@ -127,7 +127,7 @@ console.log("TELÉFONO DETECTADO:", telefono);
 
     if (!texto) return;
 
-    console.log("Mensaje recibido:", telefono, texto);
+    console.log(JSON.stringify(msg, null, 2));
 
     try {
       const cliente = await pool.query(
