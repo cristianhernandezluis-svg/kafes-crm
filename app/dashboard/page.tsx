@@ -102,6 +102,7 @@ const [editSeguimiento, setEditSeguimiento] = useState("");
 const [editObservacion, setEditObservacion] = useState("");
 const [guardandoGestion, setGuardandoGestion] = useState(false);
   const [enviando, setEnviando] = useState(false);
+const [tabCliente, setTabCliente] = useState("informacion");
 
   const [clienteSeguimiento, setClienteSeguimiento] =
     useState<Cliente | null>(null);
@@ -1021,19 +1022,52 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
     </div>
 
     <div className="flex border-b border-slate-800 px-5">
-      <button className="py-4 px-3 text-green-400 border-b-2 border-green-400 text-sm font-bold">
-        Información
-      </button>
-      <button className="py-4 px-3 text-slate-400 text-sm">
-        Conversación
-      </button>
-      <button className="py-4 px-3 text-slate-400 text-sm">
-        Notas
-      </button>
-      <button className="py-4 px-3 text-slate-400 text-sm">
-        Actividades
-      </button>
-    </div>
+
+  <button
+    onClick={() => setTabCliente("informacion")}
+    className={`py-4 px-3 text-sm font-bold ${
+      tabCliente === "informacion"
+        ? "text-green-400 border-b-2 border-green-400"
+        : "text-slate-400"
+    }`}
+  >
+    Información
+  </button>
+
+  <button
+    onClick={() => setTabCliente("conversacion")}
+    className={`py-4 px-3 text-sm font-bold ${
+      tabCliente === "conversacion"
+        ? "text-green-400 border-b-2 border-green-400"
+        : "text-slate-400"
+    }`}
+  >
+    Conversación
+  </button>
+
+  <button
+    onClick={() => setTabCliente("notas")}
+    className={`py-4 px-3 text-sm font-bold ${
+      tabCliente === "notas"
+        ? "text-green-400 border-b-2 border-green-400"
+        : "text-slate-400"
+    }`}
+  >
+    Notas
+  </button>
+
+  <button
+    onClick={() => setTabCliente("actividades")}
+    className={`py-4 px-3 text-sm font-bold ${
+      tabCliente === "actividades"
+        ? "text-green-400 border-b-2 border-green-400"
+        : "text-slate-400"
+    }`}
+  >
+    Actividades
+  </button>
+
+</div>
 
     <div className="p-5 space-y-5">
 
