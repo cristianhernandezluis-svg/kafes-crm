@@ -1071,17 +1071,16 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 
     <div className="p-5 space-y-5">
 {tabCliente === "informacion" && (
-<div className="bg-red-500 p-5 rounded-xl">
-  INFORMACION FUNCIONA
-</div>
-)}
-{tabCliente === "conversacion" && (
   <>
+  </>
+)}
 
-      <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-white">Información del contacto</h3>
-          <button className="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-lg">
+{tabCliente === "conversacion" && (
+  <>    
+<div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-bold text-white">Información del contacto</h3>
+        <button className="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-lg">
             Editar información
           </button>
         </div>
