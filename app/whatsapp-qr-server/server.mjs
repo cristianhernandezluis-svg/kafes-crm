@@ -110,45 +110,43 @@ console.log("TELÉFONO DETECTADO:", telefono);
     console.log(JSON.stringify(msg, null, 2));
 
     try {
-      const cliente = await pool.query(
-  `
   const nombreCliente =
-  msg.pushName ||
-  telefono;
+    msg.pushName ||
+    telefono;
 
-const cliente = await pool.query(
-`
-INSERT INTO clientes (
-  nombre,
-  telefono,
-  etapa,
-  empresa_id
-)
-VALUES ($1, $2, 'Nuevo', 1)
-ON CONFLICT (telefono) DO UPDATE
-SET ultima_gestion = NOW()
-RETURNING id
-`,
-[nombreCliente, telefono]
-);
+  const cliente = await pool.query(
+    `
+    INSERT INTO clientes (
+      nombre,
+      telefono,
+      etapa,
+      empresa_id
+    )
+    VALUES ($1, $2, 'Nuevo', 1)
+    ON CONFLICT (telefono) DO UPDATE
+    SET ultima_gestion = NOW()
+    RETURNING id
+    `,
+    [nombreCliente, telefono]
+  );
 
-const clienteId = cliente.rows[0].id;
+  const clienteId = cliente.rows[0].id;
 
-await pool.query(
-  `
-  INSERT INTO conversaciones (
-  cliente_id,
-  telefono,
-  mensaje,
-  remitente,
-  tipo,
-  empresa_id,
-  canal
-)
-VALUES ($1, $2, $3, $4, 'text', 1, 'qr')
-  `,
-  [clienteId, telefono, texto, telefono]
-);
+  await pool.query(
+    `
+    INSERT INTO conversaciones (
+      cliente_id,
+      telefono,
+      mensaje,
+      remitente,
+      tipo,
+      empresa_id,
+      canal
+    )
+    VALUES ($1, $2, $3, $4, 'text', 1, 'qr')
+    `,
+    [clienteId, telefono, texto, telefono]
+  );
 
       console.log("Mensaje guardado en PostgreSQL");
     } catch (error) {
