@@ -124,7 +124,9 @@ console.log("TELÉFONO DETECTADO:", telefono);
     )
     VALUES ($1, $2, 'Nuevo', 1)
     ON CONFLICT (telefono) DO UPDATE
-    SET ultima_gestion = NOW()
+SET
+  ultima_gestion = NOW(),
+  nombre = EXCLUDED.nombre
     RETURNING id
     `,
     [nombreCliente, telefono]
