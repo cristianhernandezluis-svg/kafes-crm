@@ -104,6 +104,7 @@ const [editObservacion, setEditObservacion] = useState("");
 const [guardandoGestion, setGuardandoGestion] = useState(false);
   const [enviando, setEnviando] = useState(false);
 const [tabCliente, setTabCliente] = useState("informacion");
+const [editandoInfo, setEditandoInfo] = useState(false);
 
   const [clienteSeguimiento, setClienteSeguimiento] =
     useState<Cliente | null>(null);
@@ -171,6 +172,7 @@ const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}`, {
   };
 
   const abrirConversacion = async (cliente: Cliente) => {
+setEditandoInfo(false);
 setEditCiudad(cliente.ciudad || "");    
 setClienteActivo(cliente);
 setEditEtapa(cliente.etapa || "Nuevo");
@@ -1083,10 +1085,10 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
         <h3 className="font-bold text-white">Información del contacto</h3>
         
 <button
-  onClick={() => setTabCliente("acciones")}
+  onClick={() => setEditandoInfo(!editandoInfo)}
   className="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-lg"
 >
-  Editar información
+  {editandoInfo ? "Cancelar" : "Editar información"}
 </button>
         </div>
 
@@ -1099,7 +1101,8 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
           <div>
             <p className="text-slate-400">Ciudad</p>
             <input
-  className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-sm text-white"
+  disabled={!editandoInfo}
+  className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-sm text-white disabled:opacity-60"
   value={editCiudad}
   onChange={(e) => setEditCiudad(e.target.value)}
 />
@@ -1108,6 +1111,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
           <div>
             <p className="text-slate-400">Asesor</p>
             <input
+disabled={!editandoInfo}
   className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-sm text-white"
   value={editAsesor}
   onChange={(e) => setEditAsesor(e.target.value)}
@@ -1208,7 +1212,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 
             <button
               onClick={guardarGestionCliente}
-              disabled={guardandoGestion}
+              disabled={guardandoGestion || !editandoInfo}
               className="w-full bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg py-2 text-sm font-bold"
             >
               {guardandoGestion ? "Guardando..." : "Guardar gestión"}
