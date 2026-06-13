@@ -42,15 +42,25 @@ export default function CanalesPage() {
           </strong>
         </p>
 
-        {qr ? (
-          <img
-            src={qr}
-            alt="QR WhatsApp"
-            className="w-72 h-72 mx-auto"
-          />
-        ) : (
-          <p>Esperando QR...</p>
-        )}
+        {estado === "conectado" ? (
+  <div className="text-center py-10">
+    <div className="text-green-600 text-5xl mb-4">
+      ✅
+    </div>
+
+    <p className="font-bold text-green-600">
+      WhatsApp conectado correctamente
+    </p>
+  </div>
+) : qr ? (
+  <img
+    src={qr}
+    alt="QR WhatsApp"
+    className="w-72 h-72 mx-auto"
+  />
+) : (
+  <p>Generando QR...</p>
+)}
 
         <p className="text-center mt-4 text-gray-500">
           Escanee con WhatsApp Business
