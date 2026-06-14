@@ -316,7 +316,7 @@ const detenerGrabacion = () => {
   </nav>
 </aside>
 
-      <main className="flex-1 flex">
+      <main className="flex-1 flex overflow-hidden">
         <section
   className={`${
     mostrarConversacion ? "hidden md:block" : "block"
@@ -390,186 +390,239 @@ const detenerGrabacion = () => {
         <section
   className={`${
     mostrarConversacion ? "flex" : "hidden md:flex"
-  } flex-1 flex-col h-screen bg-[#0b1220] overflow-hidden`}
+  } flex-1 bg-[#0b1220]`}
 >
           {!clienteActivo ? (
             <div className="flex-1 flex items-center justify-center text-slate-400">
               Selecciona un chat para responder.
             </div>
+         ) : (
+  <>
+    <div className="flex flex-1 overflow-hidden">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        <div className="bg-[#0f172a] p-5 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMostrarConversacion(false)}
+              className="md:hidden text-white text-2xl"
+            >
+              ←
+            </button>
+
+            <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-black text-lg">
+              {(clienteActivo.nombre || "S").charAt(0).toUpperCase()}
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                {clienteActivo.nombre}
+              </h2>
+
+              <p className="text-sm text-slate-400">
+                📱 {clienteActivo.telefono}
+              </p>
+            </div>
+          </div>
+
+          <div className="text-green-400 text-sm font-bold">
+            ● En línea
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-[#0b1220] min-h-0">
+          {conversaciones.length === 0 ? (
+            <p className="text-slate-400">No hay mensajes todavía.</p>
           ) : (
-            <>
-              <div className="bg-[#0f172a] p-5 border-b border-slate-800 flex items-center justify-between">
-<div className="flex items-center gap-3">
+            conversaciones.map((msg) => (
+              <div
+                key={msg.id}
+                className={`max-w-[70%] p-3 rounded-2xl text-sm shadow ${
+                  msg.remitente === "cliente"
+                    ? "bg-[#1e293b] text-white mr-auto rounded-bl-sm"
+                    : "bg-green-600 text-white ml-auto rounded-br-sm"
+                }`}
+              >
+                {msg.tipo === "image" && msg.media_id ? (
+                  <img
+                    src={`/api/whatsapp/media/${msg.media_id}`}
+                    alt="Imagen enviada por cliente"
+                    className="max-w-xs rounded-lg border cursor-pointer"
+                    onClick={() =>
+                      window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
+                    }
+                  />
+                ) : msg.tipo === "document" && msg.media_id ? (
+                  <button
+                    onClick={() =>
+                      window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
+                    }
+                    className="bg-white border rounded-lg p-3 text-left hover:bg-gray-50 text-black"
+                  >
+                    <p className="font-bold">📄 Documento recibido</p>
+                    <p className="text-xs text-slate-400">
+                      {msg.filename || "Abrir documento"}
+                    </p>
+                  </button>
+                ) : msg.tipo === "audio" && msg.media_id ? (
+                  <audio controls className="max-w-xs">
+                    <source
+                      src={`/api/whatsapp/media/${msg.media_id}`}
+                      type={msg.mime_type || "audio/ogg"}
+                    />
+                  </audio>
+                ) : (
+                  <p>{msg.mensaje}</p>
+                )}
 
-  <button
-    onClick={() => setMostrarConversacion(false)}
-    className="md:hidden text-white text-2xl"
-  >
-    ←
-  </button>
-
-    <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-black text-lg">
-      {(clienteActivo.nombre || "S").charAt(0).toUpperCase()}
-    </div>
-
-    <div>
-      <h2 className="text-xl font-bold text-white">
-        {clienteActivo.nombre}
-      </h2>
-
-      <p className="text-sm text-slate-400">
-        📱 {clienteActivo.telefono}
-      </p>
-    </div>
-  </div>
-
-  <div className="text-green-400 text-sm font-bold">
-    ● En línea
-  </div>
-</div>
-
-<div className="flex-1 overflow-y-auto p-6 space-y-3 bg-[#0b1220] min-h-0">
-{conversaciones.length === 0 ? (
-  <p className="text-slate-400">No hay mensajes todavía.</p>
-) : (
-  conversaciones.map((msg) => (
-    <div
-      key={msg.id}
-      className={`max-w-[70%] p-3 rounded-2xl text-sm shadow ${
-  msg.remitente === "cliente"
-    ? "bg-[#1e293b] text-white mr-auto rounded-bl-sm"
-    : "bg-green-600 text-white ml-auto rounded-br-sm"
-}`}
-    >
-      {msg.tipo === "image" && msg.media_id ? (
-        <img
-          src={`/api/whatsapp/media/${msg.media_id}`}
-          alt="Imagen enviada por cliente"
-          className="max-w-xs rounded-lg border cursor-pointer"
-          onClick={() =>
-            window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
-          }
-        />
-      ) : msg.tipo === "document" && msg.media_id ? (
-        <button
-          onClick={() =>
-            window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
-          }
-          className="bg-white border rounded-lg p-3 text-left hover:bg-gray-50"
-        >
-          <p className="font-bold">📄 Documento recibido</p>
-          <p className="text-xs text-slate-400">
-            {msg.filename || "Abrir documento"}
-          </p>
-        </button>
-      ) : msg.tipo === "audio" && msg.media_id ? (
-        <audio controls className="max-w-xs">
-          <source
-            src={`/api/whatsapp/media/${msg.media_id}`}
-            type={msg.mime_type || "audio/ogg"}
-          />
-        </audio>
-      ) : (
-        <p>{msg.mensaje}</p>
-      )}
-
-      <p className="text-xs text-slate-300 mt-1">
-        {msg.remitente} ·{" "}
-        {new Date(msg.created_at).toLocaleString("es-PE")}
-      </p>
-    </div>
-  ))
-)}
-
-<div ref={mensajesFinRef} />
-
-</div>
-
-              <div className="bg-[#0f172a] border-t border-slate-800 p-4">
-<button
-  onClick={() => {
-    const fecha = prompt(
-      "Fecha seguimiento (2026-06-15 10:00)"
-    );
-
-    const observacion = prompt(
-      "Observación"
-    );
-
-    if (!fecha || !observacion || !clienteActivo)
-      return;
-
-    fetch(`/api/clientes/${clienteActivo.id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        observacion,
-        proximo_seguimiento: fecha,
-        etapa: "Seguimiento",
-      }),
-    }).then(() => {
-      alert("Seguimiento programado");
-    });
-  }}
-  className="mb-3 bg-yellow-500 text-black px-4 py-2 rounded-xl font-bold"
->
-  📅 Programar seguimiento
-</button>
-<textarea
-  className="w-full bg-[#020617] border border-slate-700 text-white rounded-xl p-3 h-20 resize-none"
-  rows={2}
-  placeholder="Escribe un mensaje..."
-  value={mensajeNuevo}
-  onChange={(e) => setMensajeNuevo(e.target.value)}
-/>
-  <div className="flex items-center gap-2 mt-3">
-
-  <label className="w-10 h-10 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full cursor-pointer text-white text-xl font-bold">
-    +
-    <input
-      type="file"
-      className="hidden"
-      accept="image/*,application/pdf,audio/*"
-      onChange={(e) => {
-        const archivo = e.target.files?.[0];
-
-        if (archivo) {
-          enviarArchivo(archivo);
-        }
-
-        e.target.value = "";
-      }}
-    />
-  </label>
-
-  <button
-    onClick={() => setMostrarPlantillas(!mostrarPlantillas)}
-    className="w-10 h-10 flex items-center justify-center bg-yellow-500 hover:bg-yellow-400 rounded-full text-black"
-  >
-    📝
-  </button>
-
-  <button
-    onClick={grabandoAudio ? detenerGrabacion : iniciarGrabacion}
-    className={`w-10 h-10 flex items-center justify-center rounded-full ${
-      grabandoAudio
-        ? "bg-red-600 text-white"
-        : "bg-green-600 text-white"
-    }`}
-  >
-    🎤
-  </button>
-
-</div>
-
+                <p className="text-xs text-slate-300 mt-1">
+                  {msg.remitente} ·{" "}
+                  {new Date(msg.created_at).toLocaleString("es-PE")}
+                </p>
               </div>
-            </>
+            ))
           )}
+
+          <div ref={mensajesFinRef} />
+        </div>
+
+        <div className="bg-[#0f172a] border-t border-slate-800 p-4">
+          <button
+            onClick={() => {
+              const fecha = prompt("Fecha seguimiento (2026-06-15 10:00)");
+              const observacion = prompt("Observación");
+
+              if (!fecha || !observacion || !clienteActivo) return;
+
+              fetch(`/api/clientes/${clienteActivo.id}`, {
+                method: "PATCH",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  observacion,
+                  proximo_seguimiento: fecha,
+                  etapa: "Seguimiento",
+                }),
+              }).then(() => {
+                alert("Seguimiento programado");
+              });
+            }}
+            className="mb-3 bg-yellow-500 text-black px-4 py-2 rounded-xl font-bold"
+          >
+            📅 Programar seguimiento
+          </button>
+
+          <textarea
+            className="w-full bg-[#020617] border border-slate-700 text-white rounded-xl p-3 h-20 resize-none"
+            rows={2}
+            placeholder="Escribe un mensaje..."
+            value={mensajeNuevo}
+            onChange={(e) => setMensajeNuevo(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                enviarMensaje();
+              }
+            }}
+          />
+
+          <div className="flex items-center gap-2 mt-3">
+            <label className="w-10 h-10 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full cursor-pointer text-white text-xl font-bold">
+              +
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*,application/pdf,audio/*"
+                onChange={(e) => {
+                  const archivo = e.target.files?.[0];
+
+                  if (archivo) {
+                    enviarArchivo(archivo);
+                  }
+
+                  e.target.value = "";
+                }}
+              />
+            </label>
+
+            <button
+              onClick={() => setMostrarPlantillas(!mostrarPlantillas)}
+              className="w-10 h-10 flex items-center justify-center bg-yellow-500 hover:bg-yellow-400 rounded-full text-black"
+            >
+              📝
+            </button>
+
+            <button
+              onClick={grabandoAudio ? detenerGrabacion : iniciarGrabacion}
+              className={`w-10 h-10 flex items-center justify-center rounded-full ${
+                grabandoAudio
+                  ? "bg-red-600 text-white"
+                  : "bg-green-600 text-white"
+              }`}
+            >
+              🎤
+            </button>
+
+            <button
+              onClick={enviarMensaje}
+              disabled={enviando}
+              className="ml-auto bg-green-600 hover:bg-green-700 px-5 py-2 rounded-xl font-bold disabled:bg-slate-600"
+            >
+              {enviando ? "Enviando..." : "Enviar"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden xl:block w-[320px] bg-[#0f172a] border-l border-slate-800 overflow-y-auto">
+        <div className="p-6">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-20 h-20 rounded-full bg-yellow-500 flex items-center justify-center text-black text-3xl font-black">
+              {(clienteActivo.nombre || "S").charAt(0).toUpperCase()}
+            </div>
+
+            <h2 className="mt-4 text-xl font-bold text-white">
+              {clienteActivo.nombre}
+            </h2>
+
+            <p className="text-slate-400 text-sm">
+              {clienteActivo.telefono}
+            </p>
+
+            <span className="mt-3 bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full">
+              {clienteActivo.etapa}
+            </span>
+          </div>
+
+          <div className="mt-8 space-y-5 text-sm">
+            <div>
+              <p className="text-slate-500">Teléfono</p>
+              <p className="text-white">{clienteActivo.telefono}</p>
+            </div>
+
+            <div>
+              <p className="text-slate-500">Ciudad</p>
+              <p className="text-white">{clienteActivo.ciudad || "Sin ciudad"}</p>
+            </div>
+
+            <div>
+              <p className="text-slate-500">Asesor</p>
+              <p className="text-white">{clienteActivo.asesor || "Sin asesor"}</p>
+            </div>
+
+            <div>
+              <p className="text-slate-500">Etapa</p>
+              <p className="text-green-400">{clienteActivo.etapa}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </>
+)}
         </section>
       </main>
-        </div>
+    </div>
   </>
 );
 }
