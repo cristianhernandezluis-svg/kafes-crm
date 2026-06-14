@@ -1232,13 +1232,12 @@ disabled={!editandoInfo}
         <div className="flex justify-between items-center mb-3">
   <h3 className="font-bold text-white">Conversación</h3>
 
-  <a
-    href={`https://wa.me/${clienteActivo.telefono}`}
-    target="_blank"
-    className="text-xs bg-green-600 hover:bg-green-700 px-3 py-1 rounded-lg font-bold"
-  >
-    Ver conversación
-  </a>
+  <Link
+  href={`/chat?cliente_id=${clienteActivo.id}`}
+  className="text-xs bg-green-600 hover:bg-green-700 px-3 py-1 rounded-lg font-bold"
+>
+  Ver conversación
+</Link>
 </div>
 
         <div className="space-y-3 max-h-56 overflow-y-auto">
