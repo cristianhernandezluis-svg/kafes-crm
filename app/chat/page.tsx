@@ -564,12 +564,12 @@ const detenerGrabacion = () => {
             </button>
 
             <button
-              onClick={enviarMensaje}
-              disabled={enviando}
-              className="ml-auto bg-green-600 hover:bg-green-700 px-5 py-2 rounded-xl font-bold disabled:bg-slate-600"
-            >
-              {enviando ? "Enviando..." : "Enviar"}
-            </button>
+  onClick={enviarMensaje}
+  disabled={enviando}
+  className="ml-auto w-12 h-12 flex items-center justify-center bg-green-600 hover:bg-green-700 rounded-full text-white text-xl disabled:bg-slate-600"
+>
+  {enviando ? "..." : "➤"}
+</button>
           </div>
         </div>
       </div>
