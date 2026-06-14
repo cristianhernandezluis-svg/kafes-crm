@@ -1229,7 +1229,17 @@ disabled={!editandoInfo}
       </div>
 
       <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
-        <h3 className="font-bold text-white mb-3">Conversación</h3>
+        <div className="flex justify-between items-center mb-3">
+  <h3 className="font-bold text-white">Conversación</h3>
+
+  <a
+    href={`https://wa.me/${clienteActivo.telefono}`}
+    target="_blank"
+    className="text-xs bg-green-600 hover:bg-green-700 px-3 py-1 rounded-lg font-bold"
+  >
+    Ver conversación
+  </a>
+</div>
 
         <div className="space-y-3 max-h-56 overflow-y-auto">
           {conversaciones.length === 0 ? (
@@ -1261,6 +1271,12 @@ disabled={!editandoInfo}
           placeholder="Escribe un mensaje..."
           value={mensajeNuevo}
           onChange={(e) => setMensajeNuevo(e.target.value)}
+onKeyDown={(e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    enviarMensaje();
+  }
+}}
         />
 
         <button
