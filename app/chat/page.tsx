@@ -574,49 +574,98 @@ const detenerGrabacion = () => {
         </div>
       </div>
 
-      <div className="hidden xl:block w-[320px] bg-[#0f172a] border-l border-slate-800 overflow-y-auto">
-        <div className="p-6">
-          <div className="flex flex-col items-center text-center">
-            <div className="w-20 h-20 rounded-full bg-yellow-500 flex items-center justify-center text-black text-3xl font-black">
-              {(clienteActivo.nombre || "S").charAt(0).toUpperCase()}
-            </div>
+      <div className="block w-[360px] bg-[#0b1220] border-l border-slate-800 overflow-y-auto">
+  <div className="p-5 border-b border-slate-800">
+    <div className="flex items-center gap-4">
+      <div className="w-14 h-14 rounded-full bg-yellow-500 flex items-center justify-center text-black text-xl font-black">
+        {(clienteActivo.nombre || "S").charAt(0).toUpperCase()}
+      </div>
 
-            <h2 className="mt-4 text-xl font-bold text-white">
-              {clienteActivo.nombre}
-            </h2>
+      <div>
+        <h2 className="text-xl font-black text-white">
+          {clienteActivo.nombre}
+        </h2>
 
-            <p className="text-slate-400 text-sm">
-              {clienteActivo.telefono}
+        <p className="text-slate-400 text-sm">
+          {clienteActivo.telefono}
+        </p>
+
+        <span className="inline-block mt-2 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">
+          {clienteActivo.etapa}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div className="p-5 space-y-5">
+    <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+      <h3 className="font-bold text-white mb-4">
+        Información del contacto
+      </h3>
+
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <p className="text-slate-400">Teléfono</p>
+          <p className="text-white">{clienteActivo.telefono}</p>
+        </div>
+
+        <div>
+          <p className="text-slate-400">Ciudad</p>
+          <p className="text-white">
+            {clienteActivo.ciudad || "Sin ciudad"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-slate-400">Asesor</p>
+          <p className="text-white">
+            {clienteActivo.asesor || "Sin asesor"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-slate-400">Etapa</p>
+          <p className="text-green-400">
+            {clienteActivo.etapa}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+      <h3 className="font-bold text-white mb-3">
+        Notas internas
+      </h3>
+
+      <textarea
+        className="w-full bg-[#0f172a] border border-slate-700 rounded-xl p-3 text-sm text-white"
+        rows={4}
+        placeholder="Agregar nota del cliente..."
+      />
+    </div>
+
+    <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
+      <h3 className="font-bold text-white mb-3">
+        Actividad reciente
+      </h3>
+
+      <div className="space-y-3 text-sm">
+        <div className="flex gap-3">
+          <span className="text-green-400">🟢</span>
+          <div>
+            <p className="text-white">
+              Conversación iniciada
             </p>
-
-            <span className="mt-3 bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full">
-              {clienteActivo.etapa}
-            </span>
-          </div>
-
-          <div className="mt-8 space-y-5 text-sm">
-            <div>
-              <p className="text-slate-500">Teléfono</p>
-              <p className="text-white">{clienteActivo.telefono}</p>
-            </div>
-
-            <div>
-              <p className="text-slate-500">Ciudad</p>
-              <p className="text-white">{clienteActivo.ciudad || "Sin ciudad"}</p>
-            </div>
-
-            <div>
-              <p className="text-slate-500">Asesor</p>
-              <p className="text-white">{clienteActivo.asesor || "Sin asesor"}</p>
-            </div>
-
-            <div>
-              <p className="text-slate-500">Etapa</p>
-              <p className="text-green-400">{clienteActivo.etapa}</p>
-            </div>
+            <p className="text-slate-400 text-xs">
+              WhatsApp
+            </p>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
     </div>
   </>
 )}
