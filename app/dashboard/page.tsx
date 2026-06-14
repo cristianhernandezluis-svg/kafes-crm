@@ -1211,12 +1211,12 @@ disabled={!editandoInfo}
             />
 
             <button
-              onClick={guardarGestionCliente}
-              disabled={guardandoGestion || !editandoInfo}
-              className="w-full bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg py-2 text-sm font-bold"
-            >
-              {guardandoGestion ? "Guardando..." : "Guardar gestión"}
-            </button>
+  onClick={guardarGestionCliente}
+  disabled={guardandoGestion}
+  className="w-full bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg py-2 text-sm font-bold"
+>
+  {guardandoGestion ? "Guardando..." : "Guardar gestión"}
+</button>
 
             <button
               onClick={() => setEditEtapa("No Responde")}
