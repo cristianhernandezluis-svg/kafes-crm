@@ -238,28 +238,69 @@ app.post("/sync-contacts", async (req, res) => {
   }
 });
 
-app.post("/send", async (req, res) => {
+app.post("/sync-contacts", async (req, res) => {
   try {
-    const { telefono, mensaje } = req.body;
-
     if (!sock) {
-      return res.status(400).json({ error: "WhatsApp no iniciado" });
+      return res.status(400).json({
+        success: false,
+        error: "WhatsApp no iniciado",
+      });
     }
 
-    await sock.sendMessage(`${telefono}@s.whatsapp.net`, {
-      text: mensaje,
+    if (estado !== "conectado") {
+      return res.status(400).json({
+        success: false,
+        error: "WhatsApp no conectado",
+      });
+    }
+
+    const resultado = await pool.query(`
+      SELECT DISTINCT
+        telefono,
+        COALESCE(NULLIF(telefono, ''), telefono) AS nombre
+      FROM conversaciones
+      WHERE telefono IS NOT NULL
+        AND telefono <> ''
+        AND canal = 'qr'
+    `);
+
+    let contactosSincronizados = 0;
+
+    for (const row of resultado.rows) {
+      const telefono = String(row.telefono).replace(/\D/g, "");
+
+      if (!telefono) continue;
+
+      await pool.query(
+        `
+        INSERT INTO clientes (
+          nombre,
+          telefono,
+          etapa,
+          empresa_id,
+          canal
+        )
+        VALUES ($1, $2, 'Nuevo', 1, 'qr')
+        ON CONFLICT (telefono) DO UPDATE
+        SET
+          canal = 'qr'
+        `,
+        [row.nombre || telefono, telefono]
+      );
+
+      contactosSincronizados++;
+    }
+
+    return res.json({
+      success: true,
+      contactos_sincronizados: contactosSincronizados,
     });
-
-    res.json({ success: true });
   } catch (error) {
-    console.error("Error enviando mensaje:", error);
-    res.status(500).json({ error: "Error enviando mensaje" });
+    console.error("Error sincronizando contactos:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Error sincronizando contactos",
+    });
   }
-});
-
-const PORT = process.env.PORT || 4001;
-
-app.listen(PORT, async () => {
-  console.log(`Servidor WhatsApp QR en puerto ${PORT}`);
-  await iniciarWhatsApp();
 });
