@@ -182,78 +182,6 @@ app.post("/sync-contacts", async (req, res) => {
       });
     }
 
-    const chats = await sock.groupFetchAllParticipating().catch(() => ({}));
-
-    let contactosSincronizados = 0;
-
-    // Nota: Baileys no siempre expone toda la agenda del celular.
-    // Aquí sincronizamos contactos/chats detectables por la sesión QR.
-    const contactos = sock?.store?.contacts || {};
-
-    for (const jid of Object.keys(contactos)) {
-      if (!jid.endsWith("@s.whatsapp.net")) continue;
-
-      const telefono = jid.replace("@s.whatsapp.net", "");
-      const contacto = contactos[jid];
-
-      const nombre =
-        contacto.name ||
-        contacto.notify ||
-        contacto.verifiedName ||
-        telefono;
-
-      await pool.query(
-        `
-        INSERT INTO clientes (
-          nombre,
-          telefono,
-          etapa,
-          empresa_id,
-          canal
-        )
-        VALUES ($1, $2, 'Nuevo', 1, 'qr')
-        ON CONFLICT (telefono) DO UPDATE
-        SET
-          nombre = EXCLUDED.nombre,
-          canal = 'qr'
-        `,
-        [nombre, telefono]
-      );
-
-      contactosSincronizados++;
-    }
-
-    return res.json({
-      success: true,
-      contactos_sincronizados: contactosSincronizados,
-      grupos_detectados: Object.keys(chats).length,
-    });
-  } catch (error) {
-    console.error("Error sincronizando contactos:", error);
-
-    return res.status(500).json({
-      success: false,
-      error: "Error sincronizando contactos",
-    });
-  }
-});
-
-app.post("/sync-contacts", async (req, res) => {
-  try {
-    if (!sock) {
-      return res.status(400).json({
-        success: false,
-        error: "WhatsApp no iniciado",
-      });
-    }
-
-    if (estado !== "conectado") {
-      return res.status(400).json({
-        success: false,
-        error: "WhatsApp no conectado",
-      });
-    }
-
     const resultado = await pool.query(`
       SELECT DISTINCT
         telefono,
@@ -282,8 +210,7 @@ app.post("/sync-contacts", async (req, res) => {
         )
         VALUES ($1, $2, 'Nuevo', 1, 'qr')
         ON CONFLICT (telefono) DO UPDATE
-        SET
-          canal = 'qr'
+        SET canal = 'qr'
         `,
         [row.nombre || telefono, telefono]
       );
