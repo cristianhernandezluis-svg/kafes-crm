@@ -353,6 +353,28 @@ const detenerGrabacion = () => {
   <p className="text-sm text-slate-400">
     Atiende tus mensajes de WhatsApp.
   </p>
+<div className="flex items-center gap-2 mt-4">
+  <input
+    type="text"
+    placeholder="Buscar conversaciones..."
+    className="flex-1 bg-[#111827] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none"
+  />
+
+  <button className="w-10 h-10 bg-[#111827] border border-slate-700 rounded-lg">
+    ⚙️
+  </button>
+
+  <button className="w-10 h-10 bg-green-700 rounded-lg">
+    🔗
+  </button>
+</div>
+
+<div className="flex gap-5 mt-4 text-xs border-b border-slate-800 pb-3">
+  <button className="text-green-400 font-bold">Todas</button>
+  <button className="text-slate-400">No leídas</button>
+  <button className="text-slate-400">Asignadas</button>
+  <button className="text-slate-400">Archivadas</button>
+</div>
 </div>
 
           <div className="overflow-y-auto h-[calc(100vh-90px)]">
@@ -601,92 +623,132 @@ const detenerGrabacion = () => {
       </div>
 
       <div className="hidden xl:block w-[360px] bg-[#101820] border-l border-[#1f2a33] overflow-y-auto">
-  <div className="p-5 border-b border-slate-800">
-    <div className="flex items-center gap-4">
-      <div className="w-14 h-14 rounded-full bg-yellow-500 flex items-center justify-center text-black text-xl font-black">
+  <div className="p-4 border-b border-[#1f2a33] flex justify-between items-center">
+    <h3 className="font-bold text-white text-sm">
+      Detalles del contacto
+    </h3>
+    <button className="text-slate-400 hover:text-white">×</button>
+  </div>
+
+  <div className="p-5">
+    <div className="flex flex-col items-center text-center">
+      <div className="w-20 h-20 rounded-full bg-yellow-500 flex items-center justify-center text-black text-3xl font-black">
         {(clienteActivo.nombre || "S").charAt(0).toUpperCase()}
       </div>
 
-      <div>
-        <h2 className="text-xl font-black text-white">
-          {clienteActivo.nombre}
-        </h2>
+      <h2 className="mt-4 text-xl font-bold text-white">
+        {clienteActivo.nombre}
+      </h2>
 
-        <p className="text-slate-400 text-sm">
-          {clienteActivo.telefono}
-        </p>
+      <p className="text-slate-400 text-sm">
+        +51 {clienteActivo.telefono}
+      </p>
 
-        <span className="inline-block mt-2 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">
-          {clienteActivo.etapa}
-        </span>
-      </div>
+      <span className="mt-3 bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full">
+        {clienteActivo.etapa || "Cliente"}
+      </span>
     </div>
-  </div>
 
-  <div className="p-5 space-y-5">
-    <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
-      <h3 className="font-bold text-white mb-4">
-        Información del contacto
+    <div className="grid grid-cols-4 gap-3 mt-6 text-center">
+      <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+        <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
+          👤
+        </div>
+        <span className="text-[11px]">Perfil</span>
+      </button>
+
+      <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+        <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
+          🏷️
+        </div>
+        <span className="text-[11px]">Etiquetas</span>
+      </button>
+
+      <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+        <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
+          📝
+        </div>
+        <span className="text-[11px]">Notas</span>
+      </button>
+
+      <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+        <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
+          ⋯
+        </div>
+        <span className="text-[11px]">Más</span>
+      </button>
+    </div>
+
+    <div className="mt-6 border-t border-[#1f2a33] pt-5">
+      <h3 className="font-bold text-white text-sm mb-4">
+        Información
       </h3>
 
-      <div className="grid grid-cols-2 gap-4 text-sm">
+      <div className="space-y-4 text-sm">
         <div>
-          <p className="text-slate-400">Teléfono</p>
-          <p className="text-white">{clienteActivo.telefono}</p>
+          <p className="text-slate-500 text-xs">Teléfono</p>
+          <p className="text-white">+51 {clienteActivo.telefono}</p>
         </div>
 
         <div>
-          <p className="text-slate-400">Ciudad</p>
+          <p className="text-slate-500 text-xs">Ciudad</p>
           <p className="text-white">
             {clienteActivo.ciudad || "Sin ciudad"}
           </p>
         </div>
 
         <div>
-          <p className="text-slate-400">Asesor</p>
+          <p className="text-slate-500 text-xs">Asesor</p>
           <p className="text-white">
             {clienteActivo.asesor || "Sin asesor"}
           </p>
         </div>
 
         <div>
-          <p className="text-slate-400">Etapa</p>
-          <p className="text-green-400">
-            {clienteActivo.etapa}
-          </p>
+          <p className="text-slate-500 text-xs">Última actividad</p>
+          <p className="text-white">Hoy</p>
         </div>
       </div>
     </div>
 
-    <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
-      <h3 className="font-bold text-white mb-3">
-        Notas internas
+    <div className="mt-6 border-t border-[#1f2a33] pt-5">
+      <h3 className="font-bold text-white text-sm mb-3">
+        Etiquetas
+      </h3>
+
+      <div className="flex flex-wrap gap-2">
+        <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs">
+          Cliente
+        </span>
+
+        <span className="bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-full text-xs">
+          Interesado
+        </span>
+
+        <button className="w-7 h-7 rounded-full border border-slate-700 text-slate-400">
+          +
+        </button>
+      </div>
+    </div>
+
+    <div className="mt-6 border-t border-[#1f2a33] pt-5">
+      <h3 className="font-bold text-white text-sm mb-3">
+        Notas
       </h3>
 
       <textarea
         className="w-full bg-[#0f172a] border border-slate-700 rounded-xl p-3 text-sm text-white"
-        rows={4}
-        placeholder="Agregar nota del cliente..."
+        rows={3}
+        placeholder="Agregar nota..."
       />
-    </div>
 
-    <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4">
-      <h3 className="font-bold text-white mb-3">
-        Actividad reciente
-      </h3>
-
-      <div className="space-y-3 text-sm">
-        <div className="flex gap-3">
-          <span className="text-green-400">🟢</span>
-          <div>
-            <p className="text-white">
-              Conversación iniciada
-            </p>
-            <p className="text-slate-400 text-xs">
-              WhatsApp
-            </p>
-          </div>
-        </div>
+      <div className="mt-3 bg-[#0f172a] border border-slate-800 rounded-xl p-3">
+        <p className="text-white text-sm">
+          Cliente interesado en el producto.
+        </p>
+        <p className="text-slate-500 text-xs mt-2">
+          Hoy · Administrador
+        </p>
       </div>
     </div>
   </div>
