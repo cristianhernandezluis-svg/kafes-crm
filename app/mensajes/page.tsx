@@ -98,6 +98,18 @@ useEffect(() => {
   cargarClientes();
 }, []);
 
+useEffect(() => {
+  const intervalo = setInterval(() => {
+    cargarClientes();
+
+    if (clienteActivo) {
+      abrirConversacion(clienteActivo);
+    }
+  }, 5000);
+
+  return () => clearInterval(intervalo);
+}, [clienteActivo]);
+
 const clientesFiltrados = clientes.filter((c) =>
   `${c.nombre} ${c.telefono} ${c.etapa || ""}`
     .toLowerCase()
