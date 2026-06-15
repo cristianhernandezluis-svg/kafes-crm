@@ -10,7 +10,10 @@ type Cliente = {
   ciudad: string | null;
   etapa: string;
   asesor: string | null;
+
   ultimo_mensaje?: string | null;
+  ultimo_tipo?: string | null;
+  ultimo_mensaje_fecha?: string | null;
   no_leidos?: number;
 };
 
@@ -32,18 +35,16 @@ const [mensajeNuevo, setMensajeNuevo] = useState("");
 const [enviando, setEnviando] = useState(false);
 
   const cargarClientes = async () => {
-    const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+  const res = await fetch("/api/chats", {
+    cache: "no-store",
+  });
 
-    const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}`, {
-      cache: "no-store",
-    });
+  const data = await res.json();
 
-    const data = await res.json();
-
-    if (data.success) {
-      setClientes(data.clientes);
-    }
-  };
+  if (data.success) {
+    setClientes(data.chats);
+  }
+};
 
   const abrirConversacion = async (cliente: Cliente) => {
   setClienteActivo(cliente);
