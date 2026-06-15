@@ -274,7 +274,7 @@ const detenerGrabacion = () => {
     <VerificarSuscripcion />
 
     <div className="min-h-screen bg-[#0b1220] flex text-white">
-      <aside className="hidden lg:flex w-64 bg-[#08111f] text-white p-4 flex-col min-h-screen border-r border-slate-800">
+      <aside className="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col min-h-screen border-r border-[#1f2a33]">
   <div className="flex items-center gap-3 mb-8">
     <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
       ☕
@@ -320,7 +320,7 @@ const detenerGrabacion = () => {
         <section
   className={`${
     mostrarConversacion ? "hidden md:block" : "block"
-  } w-full md:w-[320px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen`}
+  } w-full md:w-[340px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen`}
 >
           <div className="p-5 border-b border-slate-800">
   <h2 className="text-2xl font-black text-white">💬 Conversaciones</h2>
@@ -390,7 +390,7 @@ const detenerGrabacion = () => {
         <section
   className={`${
     mostrarConversacion ? "flex" : "hidden md:flex"
-  } flex-1 bg-[#0b1220]`}
+  } flex-1 bg-[#101820]`}
 >
           {!clienteActivo ? (
             <div className="flex-1 flex items-center justify-center text-slate-400">
@@ -574,7 +574,7 @@ const detenerGrabacion = () => {
         </div>
       </div>
 
-      <div className="block w-[360px] bg-[#0b1220] border-l border-slate-800 overflow-y-auto">
+      <div className="hidden xl:block w-[360px] bg-[#101820] border-l border-[#1f2a33] overflow-y-auto">
   <div className="p-5 border-b border-slate-800">
     <div className="flex items-center gap-4">
       <div className="w-14 h-14 rounded-full bg-yellow-500 flex items-center justify-center text-black text-xl font-black">
