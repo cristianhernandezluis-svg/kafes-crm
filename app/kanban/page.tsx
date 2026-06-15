@@ -302,11 +302,11 @@ export default function KanbanPage() {
 
                           <div className="mt-4 grid grid-cols-2 gap-2">
                             <Link
-                              href={`/chat?telefono=${cliente.telefono}`}
-                              className="bg-green-600 text-center rounded-lg py-2 text-xs font-bold"
-                            >
-                              WhatsApp
-                            </Link>
+  href={`/chat?cliente_id=${cliente.id}`}
+  className="bg-green-600 text-center rounded-lg py-2 text-xs font-bold"
+>
+  WhatsApp
+</Link>
 
                             <select
                               value={cliente.etapa}
