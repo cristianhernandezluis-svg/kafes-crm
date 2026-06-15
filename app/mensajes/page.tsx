@@ -276,9 +276,9 @@ const clientesFiltrados = clientes.filter((c) =>
                       <div
                         key={msg.id}
                         className={`max-w-[60%] rounded-2xl p-4 ${
-                          msg.remitente === "cliente"
-                            ? "bg-slate-800 mr-auto rounded-bl-sm"
-                            : "bg-green-700 ml-auto rounded-br-sm"
+                          msg.remitente === "asesor" || msg.remitente === "yo"
+  ? "bg-green-700 ml-auto rounded-br-sm"
+  : "bg-slate-800 mr-auto rounded-bl-sm"
                         }`}
                       >
                         <p>{msg.mensaje}</p>
