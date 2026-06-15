@@ -486,87 +486,87 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 
   return (
     <div className="min-h-screen bg-[#0b1220] flex text-white">
-      <aside className="hidden lg:flex w-56 bg-[#08111f] text-white p-3 flex-col min-h-screen border-r border-slate-800">
-  <div className="flex items-center gap-3 mb-8">
-    <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
-      ☕
+      <aside className="hidden lg:flex w-60 bg-[#101820] text-white flex-col min-h-screen border-r border-[#1f2a33]">
+  <div className="flex items-center gap-3 px-4 py-4 border-b border-[#1f2a33]">
+    <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
+      K
     </div>
     <h1 className="text-xl font-black">
-      Kafes <span className="text-yellow-400">CRM</span>
+      Kafes <span className="text-green-400">CRM</span>
     </h1>
   </div>
 
-  <p className="text-xs text-slate-500 uppercase mb-3">Principal</p>
+  <div className="px-4 pt-5 pb-2">
+    <p className="text-[11px] text-slate-400 uppercase font-bold">
+      Principal
+    </p>
+  </div>
 
-  <nav className="space-y-2">
-    <Link href="/dashboard" className="flex items-center gap-3 bg-yellow-500 text-black p-3 rounded-xl font-bold">
+  <nav className="flex-1 px-2 space-y-1">
+    <Link href="/dashboard" className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm">
       📊 Dashboard
     </Link>
 
-    <Link href="/chat" className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-800">
-      <span>💬 Conversaciones</span>
-      <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+    <Link href="/chat" className="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+      <span className="flex items-center gap-3">💬 Conversaciones</span>
+      <span className="bg-green-500 text-white text-[11px] px-2 py-0.5 rounded-full">
         {clientes.length}
       </span>
     </Link>
 
-    <Link href="/mis-pendientes" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
-      🔥 Mis Pendientes
+    <Link href="/contactos" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+      👤 Contactos
     </Link>
 
-    <Link href="/seguimientos" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
-      ⏰ Seguimientos
+    <Link href="/kanban" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+      🧩 Kanban
     </Link>
 
-    <Link href="/adelantos" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
-      💰 Adelantos
+    <Link href="/mensajes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+      ✉️ Mensajes
     </Link>
 
-    <Link href="/productividad" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
-      📈 Productividad
+    <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+      📄 Plantillas
     </Link>
 
-    <Link href="/plantillas" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
-      📝 Plantillas
+    <Link href="/automatizaciones" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+      ⚙️ Automatizaciones
     </Link>
 
-    <Link href="/usuarios" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
-      👥 Usuarios
+    <Link href="/reportes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+      📊 Reportes
     </Link>
 
-    <Link href="/configuracion/whatsapp" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
-      ⚙️ WhatsApp
+    <Link href="/ajustes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+      ⚙️ Ajustes
     </Link>
-
-    <Link href="/configuracion/planes" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
-      💳 Suscripción
-    </Link>
-
-    {typeof window !== "undefined" &&
-      JSON.parse(localStorage.getItem("usuario") || "{}")?.email ===
-        "cristianluis_03@live.com" && (
-        <Link href="/admin" className="flex items-center gap-3 p-3 rounded-xl text-yellow-400 font-bold hover:bg-slate-800">
-          👑 Admin
-        </Link>
-      )}
   </nav>
 
-  <div className="mt-auto bg-[#111827] border border-slate-700 rounded-2xl p-">
-    <p className="text-sm text-slate-400 mb-3">Conexión WhatsApp</p>
+  <div className="p-3">
+    <div className="border border-[#26323d] rounded-xl p-4 bg-[#111c24]">
+      <p className="text-sm font-bold text-slate-300 mb-3">
+        Conexión WhatsApp
+      </p>
 
-    <div className="flex items-center gap-3">
-      <div className="w-8 h-8 bg-green-600 rounded-xl flex items-center justify-center">
-        🟢
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-xl">
+          🟢
+        </div>
+
+        <div>
+          <p className="text-green-400 font-bold text-sm">Conectado</p>
+          <p className="text-xs text-slate-400">Cloud API activa</p>
+        </div>
       </div>
-      <div>
-        <p className="text-green-400 font-bold text-sm">Conectado</p>
-        <p className="text-xs text-slate-400">Cloud API activa</p>
-      </div>
+
+      <Link
+        href="/configuracion/whatsapp"
+        className="block w-full text-center border border-slate-700 rounded-lg py-2 text-xs font-bold hover:bg-slate-800"
+      >
+        VER QR
+      </Link>
     </div>
-
-    <button className="w-full mt-4 border border-slate-600 rounded-xl py-2 text-sm hover:bg-slate-800">
-      Ver configuración
-    </button>
   </div>
 
   <button
@@ -574,13 +574,12 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
       localStorage.removeItem("usuario");
       window.location.href = "/login";
     }}
-    className="mt-4 text-left text-slate-400 hover:text-red-400 text-sm"
+    className="px-4 pb-4 text-left text-slate-400 hover:text-red-400 text-sm"
   >
     ↩ Cerrar sesión
   </button>
 </aside>
-
-      <main className="flex-1 p-3 md:p-6 overflow-x-auto bg-[#0b1220]">
+<main className="flex-1 p-3 md:p-6 overflow-x-auto bg-[#0b1220]">
         <div className="flex justify-between items-center">
   <div>
     <h1 className="text-2xl md:text-3xl font-black text-white">
