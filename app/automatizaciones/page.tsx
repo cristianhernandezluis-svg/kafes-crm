@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Automatizacion = {
@@ -105,10 +106,84 @@ export default function AutomatizacionesPage() {
 
   return (
     <div className="min-h-screen bg-[#08111f] text-white flex">
-      <main className="flex-1 p-6">
-        <div className="flex justify-between items-start mb-6">
-  <div>
-    <h1 className="text-3xl font-black flex items-center gap-3">
+<aside className="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col min-h-screen border-r border-[#1f2a33]">
+        <Link href="/dashboard" className="flex items-center gap-3 px-4 py-4 border-b border-[#1f2a33]">
+          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
+            K
+          </div>
+          <h1 className="text-xl font-black">
+            Kafes <span className="text-green-400">CRM</span>
+          </h1>
+        </Link>
+
+        <div className="px-4 pt-5 pb-2">
+          <p className="text-[11px] text-slate-400 uppercase font-bold">Principal</p>
+        </div>
+
+        <nav className="flex-1 px-2 space-y-1">
+          <Link href="/dashboard" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">📊 Dashboard</Link>
+          <Link href="/chat" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">💬 Conversaciones</Link>
+          <Link href="/contactos" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">👤 Contactos</Link>
+          <Link href="/kanban" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">🧩 Kanban</Link>
+          <Link href="/mensajes" className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm">✉️ Mensajes</Link>
+          <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">📄 Plantillas</Link>
+          <Link href="/automatizaciones" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">⚙️ Automatizaciones</Link>
+          <Link href="/reportes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">📊 Reportes</Link>
+          <Link href="/ajustes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">⚙️ Ajustes</Link>
+        </nav>
+
+        <div className="p-3">
+          <div className="border border-[#26323d] rounded-xl p-4 bg-[#111c24]">
+            <p className="text-sm font-bold text-slate-300 mb-3">Conexión WhatsApp</p>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">🟢</div>
+              <div>
+                <p className="text-green-400 font-bold text-sm">Conectado</p>
+                <p className="text-xs text-slate-400">QR activo</p>
+              </div>
+            </div>
+
+            <Link href="/dashboard/canales" className="block w-full text-center border border-slate-700 rounded-lg py-2 text-xs font-bold hover:bg-slate-800">
+              VER QR
+            </Link>
+          </div>
+        </div>
+      </aside>
+
+      <main className="flex-1 min-w-0">
+
+  <div className="h-12 bg-[#0b1218] border-b border-[#1f2a33] flex items-center justify-between px-5">
+    <h1 className="text-sm font-bold text-white">
+      Automatizaciones
+    </h1>
+
+    <div className="flex items-center gap-4 text-slate-300">
+      <button className="hover:text-white">🔍</button>
+      <button className="hover:text-white">🔔</button>
+
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-black font-black">
+          C
+        </div>
+
+        <div>
+          <p className="text-xs font-bold text-white">
+            Administrador
+          </p>
+
+          <p className="text-[10px] text-green-400">
+            ● En línea
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<div className="p-6">
+  <div className="flex justify-between items-start mb-6">
+    <div>
+      <h1 className="text-3xl font-black flex items-center gap-3">
       Automatizaciones
       <span className="text-xs bg-green-500 text-white px-3 py-1 rounded-full">
         {automatizaciones.length}
@@ -139,10 +214,10 @@ export default function AutomatizacionesPage() {
     >
       + Nueva automatización
     </button>
+    </div>
   </div>
-</div>
 
-<div className="flex gap-8 mb-4 text-sm">
+  <div className="flex gap-8 mb-4 text-sm">
   <button className="text-green-400 border-b-2 border-green-500 pb-2">
     Todas
   </button>
@@ -364,6 +439,7 @@ export default function AutomatizacionesPage() {
   </div>
 </section>
         </div>
+      </div>
       </main>
     </div>
   );
