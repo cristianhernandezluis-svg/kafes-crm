@@ -282,9 +282,9 @@ const clientesFiltrados = clientes.filter((c) =>
                         }`}
                       >
                         <p>{msg.mensaje}</p>
-                        <p className="text-xs text-slate-300 mt-2">
-                          {new Date(msg.created_at).toLocaleString("es-PE")}
-                        </p>
+                        <p className="text-xs text-yellow-300 mt-2">
+  {msg.remitente} · {new Date(msg.created_at).toLocaleString("es-PE")}
+</p>
                       </div>
                     ))
                   )}
