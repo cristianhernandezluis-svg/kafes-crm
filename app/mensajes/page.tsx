@@ -28,6 +28,8 @@ export default function MensajesPage() {
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [busqueda, setBusqueda] = useState("");
+const [mensajeNuevo, setMensajeNuevo] = useState("");
+const [enviando, setEnviando] = useState(false);
 
   const cargarClientes = async () => {
     const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
@@ -44,28 +46,63 @@ export default function MensajesPage() {
   };
 
   const abrirConversacion = async (cliente: Cliente) => {
-    setClienteActivo(cliente);
+  setClienteActivo(cliente);
 
-    const res = await fetch(`/api/conversaciones/${cliente.id}`, {
-      cache: "no-store",
+  const res = await fetch(`/api/conversaciones/${cliente.id}`, {
+    cache: "no-store",
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    setConversaciones(data.conversaciones);
+  }
+};
+
+const enviarMensaje = async () => {
+  if (!clienteActivo || !mensajeNuevo.trim()) return;
+
+  try {
+    setEnviando(true);
+
+    const res = await fetch("/api/whatsapp/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        cliente_id: clienteActivo.id,
+        telefono: clienteActivo.telefono,
+        mensaje: mensajeNuevo,
+      }),
     });
 
     const data = await res.json();
 
-    if (data.success) {
-      setConversaciones(data.conversaciones);
+    if (!data.success) {
+      alert("No se pudo enviar el mensaje");
+      return;
     }
-  };
 
-  useEffect(() => {
-    cargarClientes();
-  }, []);
+    setMensajeNuevo("");
+    await abrirConversacion(clienteActivo);
+  } catch (error) {
+    console.error("Error enviando mensaje:", error);
+    alert("Error enviando mensaje");
+  } finally {
+    setEnviando(false);
+  }
+};
 
-  const clientesFiltrados = clientes.filter((c) =>
-    `${c.nombre} ${c.telefono} ${c.etapa || ""}`
-      .toLowerCase()
-      .includes(busqueda.toLowerCase())
-  );
+useEffect(() => {
+  cargarClientes();
+}, []);
+
+const clientesFiltrados = clientes.filter((c) =>
+  `${c.nombre} ${c.telefono} ${c.etapa || ""}`
+    .toLowerCase()
+    .includes(busqueda.toLowerCase())
+);
 
   return (
     <div className="min-h-screen bg-[#08111f] text-white flex">
@@ -250,13 +287,24 @@ export default function MensajesPage() {
 
                   <div className="flex gap-3">
                     <input
-                      placeholder="Escribe un mensaje..."
-                      className="flex-1 bg-[#08111f] border border-slate-700 rounded-xl px-4 py-3 outline-none"
-                    />
+  placeholder="Escribe un mensaje..."
+  value={mensajeNuevo}
+  onChange={(e) => setMensajeNuevo(e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter") {
+      enviarMensaje();
+    }
+  }}
+  className="flex-1 bg-[#08111f] border border-slate-700 rounded-xl px-4 py-3 outline-none"
+/>
 
-                    <button className="w-12 h-12 rounded-full bg-green-600 font-black">
-                      ➤
-                    </button>
+                    <button
+  onClick={enviarMensaje}
+  disabled={enviando}
+  className="w-12 h-12 rounded-full bg-green-600 font-black disabled:bg-slate-600"
+>
+  {enviando ? "..." : "➤"}
+</button>
                   </div>
                 </div>
               </>
