@@ -211,13 +211,12 @@ export default function ContactosPage() {
                         Ver
                       </Link>
 
-                      <a
-                        href={`https://wa.me/51${cliente.telefono}`}
-                        target="_blank"
-                        className="bg-green-600 px-3 py-1 rounded-lg text-sm"
-                      >
-                        WhatsApp
-                      </a>
+                      <Link
+  href={`/chat?telefono=${cliente.telefono}`}
+  className="bg-green-600 px-3 py-1 rounded-lg text-sm"
+>
+  WhatsApp
+</Link>
                     </td>
                   </tr>
                 ))
