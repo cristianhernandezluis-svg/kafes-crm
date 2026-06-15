@@ -22,7 +22,8 @@ export default function AutomatizacionesPage() {
     nombre: "Bienvenida automática",
     descripcion: "Envía un mensaje cuando entra un nuevo contacto.",
     trigger_tipo: "nuevo_contacto",
-    mensaje: "Hola 👋 gracias por comunicarte con nosotros. En breve te responderemos.",
+    mensaje:
+      "Hola 👋 gracias por comunicarte con nosotros. En breve te responderemos.",
     espera_horas: 0,
   });
 
@@ -39,6 +40,7 @@ export default function AutomatizacionesPage() {
 
     if (data.success) {
       setAutomatizaciones(data.automatizaciones);
+
       if (!activa && data.automatizaciones.length > 0) {
         setActiva(data.automatizaciones[0]);
       }
@@ -68,10 +70,32 @@ export default function AutomatizacionesPage() {
         mensaje: "",
         espera_horas: 0,
       });
+
       await cargarAutomatizaciones();
       setActiva(data.automatizacion);
     } else {
       alert("Error creando automatización");
+    }
+  }
+
+  async function cambiarEstado(auto: Automatizacion) {
+    const res = await fetch(`/api/automatizaciones/${auto.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        activa: !auto.activa,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      await cargarAutomatizaciones();
+      setActiva(data.automatizacion);
+    } else {
+      alert("Error actualizando automatización");
     }
   }
 
@@ -90,6 +114,7 @@ export default function AutomatizacionesPage() {
                 {automatizaciones.length}
               </span>
             </h1>
+
             <p className="text-slate-400 mt-1">
               Crea flujos automáticos para optimizar tu comunicación y procesos.
             </p>
@@ -130,9 +155,11 @@ export default function AutomatizacionesPage() {
                   <div className="flex justify-between gap-3">
                     <div>
                       <h3 className="font-bold text-sm">{auto.nombre}</h3>
+
                       <p className="text-xs text-slate-400 mt-1">
                         {auto.descripcion}
                       </p>
+
                       <span
                         className={`text-xs mt-2 inline-block ${
                           auto.activa ? "text-green-400" : "text-yellow-400"
@@ -142,17 +169,22 @@ export default function AutomatizacionesPage() {
                       </span>
                     </div>
 
-                    <div
-                      className={`w-10 h-5 rounded-full p-1 ${
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cambiarEstado(auto);
+                      }}
+                      className={`w-10 h-5 rounded-full p-1 shrink-0 ${
                         auto.activa ? "bg-green-500" : "bg-slate-600"
                       }`}
                     >
                       <div
-                        className={`w-3 h-3 rounded-full bg-white ${
+                        className={`w-3 h-3 rounded-full bg-white transition-all ${
                           auto.activa ? "ml-5" : "ml-0"
                         }`}
                       />
-                    </div>
+                    </button>
                   </div>
                 </button>
               ))}
@@ -167,9 +199,7 @@ export default function AutomatizacionesPage() {
                 className="bg-[#08111f] border border-slate-700 rounded-xl px-4 py-3 outline-none"
                 placeholder="Nombre"
                 value={form.nombre}
-                onChange={(e) =>
-                  setForm({ ...form, nombre: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
               />
 
               <input
@@ -198,9 +228,7 @@ export default function AutomatizacionesPage() {
                 className="bg-[#08111f] border border-slate-700 rounded-xl px-4 py-3 outline-none min-h-[140px]"
                 placeholder="Mensaje automático"
                 value={form.mensaje}
-                onChange={(e) =>
-                  setForm({ ...form, mensaje: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, mensaje: e.target.value })}
               />
 
               <input
@@ -241,7 +269,11 @@ export default function AutomatizacionesPage() {
 
                 <div>
                   <p className="text-slate-400">Estado</p>
-                  <p className={activa.activa ? "text-green-400" : "text-yellow-400"}>
+                  <p
+                    className={
+                      activa.activa ? "text-green-400" : "text-yellow-400"
+                    }
+                  >
                     {activa.activa ? "Activa" : "Inactiva"}
                   </p>
                 </div>
