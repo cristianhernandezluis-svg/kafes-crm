@@ -44,6 +44,7 @@ export default function ChatsPage() {
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [mensajeNuevo, setMensajeNuevo] = useState("");
+const [busqueda, setBusqueda] = useState("");
 const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
 const [mostrarConversacion, setMostrarConversacion] = useState(false);
@@ -355,10 +356,12 @@ const detenerGrabacion = () => {
   </p>
 <div className="flex items-center gap-2 mt-4">
   <input
-    type="text"
-    placeholder="Buscar conversaciones..."
-    className="flex-1 bg-[#111827] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none"
-  />
+  type="text"
+  placeholder="Buscar conversaciones..."
+  value={busqueda}
+  onChange={(e) => setBusqueda(e.target.value)}
+  className="flex-1 bg-[#111827] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none"
+/>
 
   <button className="w-10 h-10 bg-[#111827] border border-slate-700 rounded-lg">
     ⚙️
@@ -378,7 +381,13 @@ const detenerGrabacion = () => {
 </div>
 
           <div className="overflow-y-auto h-[calc(100vh-90px)]">
-  {clientes.map((cliente) => (
+  {clientes
+  .filter((cliente) =>
+    `${cliente.nombre} ${cliente.telefono} ${cliente.ultimo_mensaje || ""}`
+      .toLowerCase()
+      .includes(busqueda.toLowerCase())
+  )
+  .map((cliente) => (
   <button
     key={cliente.id}
     onClick={() => abrirConversacion(cliente)}
