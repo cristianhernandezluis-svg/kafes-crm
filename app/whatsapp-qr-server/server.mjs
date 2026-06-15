@@ -128,7 +128,6 @@ VALUES ($1, $2, 'Nuevo', 1, 'qr')
 ON CONFLICT (telefono) DO UPDATE
 SET
   ultima_gestion = NOW(),
-  nombre = EXCLUDED.nombre,
   canal = 'qr'
 RETURNING id
     `,
