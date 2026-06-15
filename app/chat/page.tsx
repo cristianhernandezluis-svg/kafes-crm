@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import VerificarSuscripcion from "@/components/VerificarSuscripcion";
 
 type Cliente = {
@@ -41,8 +40,6 @@ type Plantilla = {
 };
 
 export default function ChatsPage() {
-const searchParams = useSearchParams();
-const clienteIdUrl = searchParams.get("cliente_id");
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
@@ -274,7 +271,12 @@ const detenerGrabacion = () => {
     return () => clearInterval(intervalo);
   }, [clienteActivo]);
 useEffect(() => {
-  if (!clienteIdUrl || clientes.length === 0 || clienteActivo) return;
+  if (clientes.length === 0 || clienteActivo) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const clienteIdUrl = params.get("cliente_id");
+
+  if (!clienteIdUrl) return;
 
   const clienteEncontrado = clientes.find(
     (cliente) => String(cliente.id) === String(clienteIdUrl)
@@ -283,7 +285,7 @@ useEffect(() => {
   if (clienteEncontrado) {
     abrirConversacion(clienteEncontrado);
   }
-}, [clienteIdUrl, clientes, clienteActivo]);
+}, [clientes, clienteActivo]);
 
   return (
   <>
