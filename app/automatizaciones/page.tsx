@@ -253,50 +253,82 @@ export default function AutomatizacionesPage() {
             </div>
           </section>
 
-          <section className="bg-[#0f172a] border border-slate-800 rounded-2xl p-5">
-            <h2 className="font-black mb-4">Detalles</h2>
+          <section className="bg-[#0f172a] border border-slate-800 rounded-2xl p-6">
+  <div className="flex justify-between items-center mb-6">
+    <h2 className="text-xl font-black">
+      {activa?.nombre || "Flujo"}
+    </h2>
 
-            {!activa ? (
-              <p className="text-slate-400 text-sm">
-                Selecciona una automatización.
-              </p>
-            ) : (
-              <div className="space-y-4 text-sm">
-                <div>
-                  <p className="text-slate-400">Nombre</p>
-                  <p className="font-bold">{activa.nombre}</p>
-                </div>
+    <div className="flex gap-2">
+      <button className="bg-slate-800 px-4 py-2 rounded-lg text-sm">
+        Probar flujo
+      </button>
 
-                <div>
-                  <p className="text-slate-400">Estado</p>
-                  <p
-                    className={
-                      activa.activa ? "text-green-400" : "text-yellow-400"
-                    }
-                  >
-                    {activa.activa ? "Activa" : "Inactiva"}
-                  </p>
-                </div>
+      <button className="bg-green-500 px-4 py-2 rounded-lg text-sm font-bold">
+        Guardar
+      </button>
+    </div>
+  </div>
 
-                <div>
-                  <p className="text-slate-400">Disparador</p>
-                  <p>{activa.trigger_tipo}</p>
-                </div>
+  <div className="flex flex-col items-center gap-6 py-8">
 
-                <div>
-                  <p className="text-slate-400">Espera</p>
-                  <p>{activa.espera_horas} horas</p>
-                </div>
+    <div className="w-[280px] border border-green-500 rounded-xl p-4 bg-green-500/10">
+      <p className="text-green-400 text-sm font-bold">
+        ⚡ Disparador
+      </p>
 
-                <div>
-                  <p className="text-slate-400">Mensaje</p>
-                  <p className="bg-[#08111f] border border-slate-800 rounded-xl p-3">
-                    {activa.mensaje}
-                  </p>
-                </div>
-              </div>
-            )}
-          </section>
+      <h3 className="font-bold mt-2">
+        Nuevo contacto
+      </h3>
+
+      <p className="text-xs text-slate-400 mt-1">
+        Cuando un cliente inicia conversación.
+      </p>
+    </div>
+
+    <div className="h-12 border-l border-slate-700"></div>
+
+    <div className="w-[280px] border border-yellow-500 rounded-xl p-4 bg-yellow-500/10">
+      <p className="text-yellow-400 text-sm font-bold">
+        🔍 Condición
+      </p>
+
+      <h3 className="font-bold mt-2">
+        Siempre
+      </h3>
+
+      <p className="text-xs text-slate-400 mt-1">
+        Ejecutar automáticamente.
+      </p>
+    </div>
+
+    <div className="h-12 border-l border-slate-700"></div>
+
+    <div className="w-[320px] border border-green-500 rounded-xl p-4 bg-slate-900">
+      <p className="text-green-400 text-sm font-bold">
+        💬 Enviar mensaje
+      </p>
+
+      <p className="text-sm mt-3">
+        {activa?.mensaje ||
+          "Hola 👋 gracias por comunicarte con nosotros."}
+      </p>
+    </div>
+
+    <div className="h-12 border-l border-slate-700"></div>
+
+    <div className="w-[280px] border border-blue-500 rounded-xl p-4 bg-blue-500/10">
+      <p className="text-blue-400 text-sm font-bold">
+        🏁 Finalizar
+      </p>
+
+      <p className="text-sm mt-2">
+        Fin del flujo
+      </p>
+    </div>
+
+  </div>
+</section>
         </div>
       </main>
     </div>
