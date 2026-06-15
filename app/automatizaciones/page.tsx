@@ -126,8 +126,14 @@ export default function AutomatizacionesPage() {
           <Link href="/contactos" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">👤 Contactos</Link>
           <Link href="/kanban" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">🧩 Kanban</Link>
           <Link href="/mensajes" className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm">✉️ Mensajes</Link>
-          <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">📄 Plantillas</Link>
-          <Link href="/automatizaciones" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">⚙️ Automatizaciones</Link>
+          <Link
+  href="/automatizaciones"
+  className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm"
+>📄 Plantillas</Link>
+          <Link
+  href="/automatizaciones"
+  className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm"
+>⚙️ Automatizaciones</Link>
           <Link href="/reportes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">📊 Reportes</Link>
           <Link href="/ajustes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">⚙️ Ajustes</Link>
         </nav>
@@ -237,7 +243,7 @@ export default function AutomatizacionesPage() {
   </button>
 </div>
 
-        <div className="grid grid-cols-[320px_1fr_300px] gap-4">
+        <div className="grid grid-cols-[320px_1fr_320px] gap-4">
           <section className="bg-[#0f172a] border border-slate-800 rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-slate-800">
               <h2 className="font-bold">Automatizaciones</h2>
