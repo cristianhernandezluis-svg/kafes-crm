@@ -45,6 +45,7 @@ export default function ChatsPage() {
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [mensajeNuevo, setMensajeNuevo] = useState("");
 const [busqueda, setBusqueda] = useState("");
+const [filtroChat, setFiltroChat] = useState("todas");
 const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
 const [mostrarConversacion, setMostrarConversacion] = useState(false);
@@ -351,42 +352,66 @@ const detenerGrabacion = () => {
 >
           <div className="p-5 border-b border-slate-800">
   <h2 className="text-2xl font-black text-white">💬 Conversaciones</h2>
+
   <p className="text-sm text-slate-400">
     Atiende tus mensajes de WhatsApp.
   </p>
-<div className="flex items-center gap-2 mt-4">
-  <input
-  type="text"
-  placeholder="Buscar conversaciones..."
-  value={busqueda}
-  onChange={(e) => setBusqueda(e.target.value)}
-  className="flex-1 bg-[#111827] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none"
-/>
 
-  <button className="w-10 h-10 bg-[#111827] border border-slate-700 rounded-lg">
-    ⚙️
-  </button>
+  <div className="flex items-center gap-2 mt-4">
+    <input
+      type="text"
+      placeholder="Buscar conversaciones..."
+      value={busqueda}
+      onChange={(e) => setBusqueda(e.target.value)}
+      className="flex-1 bg-[#111827] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none"
+    />
 
-  <button className="w-10 h-10 bg-green-700 rounded-lg">
-    🔗
-  </button>
-</div>
+    <button className="w-10 h-10 bg-[#111827] border border-slate-700 rounded-lg">
+      ⚙️
+    </button>
 
-<div className="flex gap-5 mt-4 text-xs border-b border-slate-800 pb-3">
-  <button className="text-green-400 font-bold">Todas</button>
-  <button className="text-slate-400">No leídas</button>
-  <button className="text-slate-400">Asignadas</button>
-  <button className="text-slate-400">Archivadas</button>
-</div>
+    <button className="w-10 h-10 bg-green-700 rounded-lg">
+      🔗
+    </button>
+  </div>
+
+  <div className="flex gap-5 mt-4 text-xs border-b border-slate-800 pb-3">
+    {[
+      { id: "todas", label: "Todas" },
+      { id: "no_leidas", label: "No leídas" },
+      { id: "asignadas", label: "Asignadas" },
+      { id: "sin_asignar", label: "Sin asignar" },
+    ].map((filtro) => (
+      <button
+        key={filtro.id}
+        onClick={() => setFiltroChat(filtro.id)}
+        className={
+          filtroChat === filtro.id
+            ? "text-green-400 font-bold"
+            : "text-slate-400 hover:text-white"
+        }
+      >
+        {filtro.label}
+      </button>
+    ))}
+  </div>
 </div>
 
           <div className="overflow-y-auto h-[calc(100vh-90px)]">
   {clientes
-  .filter((cliente) =>
-    `${cliente.nombre} ${cliente.telefono} ${cliente.ultimo_mensaje || ""}`
+  .filter((cliente) => {
+    const coincideBusqueda = `${cliente.nombre} ${cliente.telefono} ${cliente.ultimo_mensaje || ""}`
       .toLowerCase()
-      .includes(busqueda.toLowerCase())
-  )
+      .includes(busqueda.toLowerCase());
+
+    const coincideFiltro =
+      filtroChat === "todas" ||
+      (filtroChat === "no_leidas" && (cliente.no_leidos || 0) > 0) ||
+      (filtroChat === "asignadas" && !!cliente.asesor) ||
+      (filtroChat === "sin_asignar" && !cliente.asesor);
+
+    return coincideBusqueda && coincideFiltro;
+  })
   .map((cliente) => (
   <button
     key={cliente.id}
@@ -441,10 +466,11 @@ const detenerGrabacion = () => {
 </p>
 
 </button>
-))}
+  ))}
 </div>
 </section>
-        <section
+
+<section
   className={`${
     mostrarConversacion ? "flex" : "hidden md:flex"
   } flex-1 bg-[#101820]`}
