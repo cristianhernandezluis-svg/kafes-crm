@@ -317,10 +317,36 @@ const detenerGrabacion = () => {
 </aside>
 
       <main className="flex-1 flex overflow-hidden">
+<div className="hidden md:flex fixed top-0 left-[220px] right-0 h-12 bg-[#0b1218] border-b border-[#1f2a33] z-40 items-center justify-between px-5">
+  <h1 className="text-sm font-bold text-white">
+    Conversaciones - WhatsApp Manager
+  </h1>
+
+  <div className="flex items-center gap-4 text-slate-300">
+    <button className="hover:text-white">🔍</button>
+
+    <div className="relative">
+      <button className="hover:text-white">🔔</button>
+      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
+        3
+      </span>
+    </div>
+
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-black font-black">
+        C
+      </div>
+      <div>
+        <p className="text-xs font-bold text-white">Administrador</p>
+        <p className="text-[10px] text-green-400">● En línea</p>
+      </div>
+    </div>
+  </div>
+</div>
         <section
   className={`${
     mostrarConversacion ? "hidden md:block" : "block"
-  } w-full md:w-[340px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen`}
+  } w-full md:w-[340px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen pt-12`}
 >
           <div className="p-5 border-b border-slate-800">
   <h2 className="text-2xl font-black text-white">💬 Conversaciones</h2>
@@ -399,7 +425,7 @@ const detenerGrabacion = () => {
          ) : (
   <>
     <div className="flex flex-1 overflow-hidden">
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden pt-12">
         <div className="bg-[#0f172a] p-5 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
