@@ -231,3 +231,28 @@ app.post("/sync-contacts", async (req, res) => {
     });
   }
 });
+app.post("/send", async (req, res) => {
+  try {
+    const { telefono, mensaje } = req.body;
+
+    if (!sock) {
+      return res.status(400).json({ error: "WhatsApp no iniciado" });
+    }
+
+    await sock.sendMessage(`${telefono}@s.whatsapp.net`, {
+      text: mensaje,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error enviando mensaje:", error);
+    res.status(500).json({ error: "Error enviando mensaje" });
+  }
+});
+
+const PORT = process.env.PORT || 4001;
+
+app.listen(PORT, async () => {
+  console.log(`Servidor WhatsApp QR en puerto ${PORT}`);
+  await iniciarWhatsApp();
+});
