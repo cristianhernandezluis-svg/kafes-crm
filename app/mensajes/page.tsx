@@ -184,7 +184,7 @@ const clientesFiltrados = clientes.filter((c) =>
           </div>
         </div>
 
-        <div className="grid grid-cols-[320px_1fr_320px] h-[calc(100vh-48px)]">
+        <div className="grid grid-cols-[320px_1fr_320px] h-[calc(100vh-48px)] overflow-hidden">
           <section className="border-r border-slate-800 bg-[#0f172a] overflow-y-auto">
             <div className="p-4 border-b border-slate-800">
               <h2 className="text-2xl font-black">
@@ -242,7 +242,7 @@ const clientesFiltrados = clientes.filter((c) =>
             </div>
           </section>
 
-          <section className="bg-[#08111f] flex flex-col">
+          <section className="bg-[#08111f] flex flex-col min-h-0 overflow-hidden">
             {clienteActivo ? (
               <>
                 <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-[#0f172a]">
@@ -266,7 +266,7 @@ const clientesFiltrados = clientes.filter((c) =>
                   </div>
                 </div>
 
-                <div className="flex-1 p-6 overflow-y-auto space-y-4">
+                <div className="flex-1 min-h-0 p-6 overflow-y-auto space-y-4">
                   {conversaciones.length === 0 ? (
                     <p className="text-slate-400 text-center">
                       No hay mensajes para este contacto
