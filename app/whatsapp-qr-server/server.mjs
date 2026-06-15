@@ -65,7 +65,7 @@ async function iniciarWhatsApp() {
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
 
-    if (!msg.message || msg.key.fromMe) return;
+    if (!msg.message) return;
 
     const jid = msg.key.remoteJid;
 const jidAlt = msg.key.remoteJidAlt;
@@ -114,6 +114,7 @@ console.log("TELÉFONO DETECTADO:", telefono);
     msg.pushName ||
     telefono;
 
+const remitente = msg.key.fromMe ? "asesor" : telefono;
   const cliente = await pool.query(
     `
     INSERT INTO clientes (
@@ -149,7 +150,7 @@ RETURNING id
     )
     VALUES ($1, $2, $3, $4, 'text', 1, 'qr')
     `,
-    [clienteId, telefono, texto, telefono]
+    [clienteId, telefono, texto, remitente]
   );
 
       console.log("Mensaje guardado en PostgreSQL");
