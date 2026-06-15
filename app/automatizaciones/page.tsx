@@ -107,26 +107,60 @@ export default function AutomatizacionesPage() {
     <div className="min-h-screen bg-[#08111f] text-white flex">
       <main className="flex-1 p-6">
         <div className="flex justify-between items-start mb-6">
-          <div>
-            <h1 className="text-3xl font-black flex items-center gap-3">
-              Automatizaciones
-              <span className="text-xs bg-green-500 text-white px-3 py-1 rounded-full">
-                {automatizaciones.length}
-              </span>
-            </h1>
+  <div>
+    <h1 className="text-3xl font-black flex items-center gap-3">
+      Automatizaciones
+      <span className="text-xs bg-green-500 text-white px-3 py-1 rounded-full">
+        {automatizaciones.length}
+      </span>
+    </h1>
 
-            <p className="text-slate-400 mt-1">
-              Crea flujos automáticos para optimizar tu comunicación y procesos.
-            </p>
-          </div>
+    <p className="text-slate-400 mt-1">
+      Crea flujos automáticos para optimizar tu comunicación y procesos.
+    </p>
+  </div>
 
-          <button
-            onClick={crearAutomatizacion}
-            className="bg-green-500 hover:bg-green-600 px-5 py-3 rounded-xl font-bold"
-          >
-            + Nueva automatización
-          </button>
-        </div>
+  <div className="flex items-center gap-3">
+    <div className="relative">
+      <span className="absolute left-4 top-3 text-slate-400">🔍</span>
+      <input
+        className="bg-[#0f172a] border border-slate-800 rounded-xl pl-11 pr-4 py-3 outline-none w-[280px] text-sm"
+        placeholder="Buscar automatizaciones..."
+      />
+    </div>
+
+    <button className="bg-[#0f172a] border border-slate-800 px-4 py-3 rounded-xl text-sm">
+      ⚗️ Filtros
+    </button>
+
+    <button
+      onClick={crearAutomatizacion}
+      className="bg-green-500 hover:bg-green-600 px-5 py-3 rounded-xl font-bold"
+    >
+      + Nueva automatización
+    </button>
+  </div>
+</div>
+
+<div className="flex gap-8 mb-4 text-sm">
+  <button className="text-green-400 border-b-2 border-green-500 pb-2">
+    Todas
+  </button>
+
+  <button className="text-slate-400 pb-2">
+    Activas
+    <span className="ml-2 bg-slate-800 px-2 py-0.5 rounded-full">
+      {automatizaciones.filter((a) => a.activa).length}
+    </span>
+  </button>
+
+  <button className="text-slate-400 pb-2">
+    Inactivas
+    <span className="ml-2 bg-slate-800 px-2 py-0.5 rounded-full">
+      {automatizaciones.filter((a) => !a.activa).length}
+    </span>
+  </button>
+</div>
 
         <div className="grid grid-cols-[320px_1fr_300px] gap-4">
           <section className="bg-[#0f172a] border border-slate-800 rounded-2xl overflow-hidden">
