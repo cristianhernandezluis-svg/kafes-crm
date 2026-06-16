@@ -132,13 +132,17 @@ export default function AutomatizacionesPage() {
   ✉️ Mensajes
 </Link>
           <Link
-  href="/automatizaciones"
-  className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm"
->📄 Plantillas</Link>
+  href="/plantillas"
+  className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm"
+>
+  📄 Plantillas
+</Link>
           <Link
   href="/automatizaciones"
   className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm"
->⚙️ Automatizaciones</Link>
+>
+  ⚙️ Automatizaciones
+</Link>
           <Link href="/reportes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">📊 Reportes</Link>
           <Link href="/ajustes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">⚙️ Ajustes</Link>
         </nav>
