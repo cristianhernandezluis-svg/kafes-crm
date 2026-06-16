@@ -681,18 +681,21 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   </div>
 </Link>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+  <Link href="/ventas-entregadas" className="block">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 hover:border-purple-500 cursor-pointer transition">
     <div className="flex items-center justify-between">
       <div>
         <p className="text-slate-400 text-sm">Ventas entregadas</p>
         <h2 className="text-4xl font-black text-white mt-2">{ventasEntregadas}</h2>
         <p className="text-green-400 text-sm mt-2">↑ 10% vs ayer</p>
       </div>
+
       <div className="w-14 h-14 rounded-full bg-purple-500/20 flex items-center justify-center">
         <CheckCircle className="text-purple-400" size={28} />
       </div>
     </div>
   </div>
+</Link>
 
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
     <div className="flex items-center justify-between">
