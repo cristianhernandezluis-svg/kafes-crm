@@ -486,7 +486,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 
   return (
     <div className="min-h-screen bg-[#0b1220] flex text-white">
-      <aside className="hidden lg:flex w-60 bg-[#101820] text-white flex-col min-h-screen border-r border-[#1f2a33]">
+      <aside className="hidden lg:flex w-60 bg-[#101820] text-white flex-col h-screen sticky top-0 border-r border-[#1f2a33]">
   <div className="flex items-center gap-3 px-4 py-4 border-b border-[#1f2a33]">
     <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
       K
@@ -579,7 +579,8 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
     ↩ Cerrar sesión
   </button>
 </aside>
-<main className="flex-1 p-3 md:p-6 overflow-x-auto bg-[#0b1220]">
+<main className="flex-1 min-w-0 h-screen overflow-hidden bg-[#0b1220]">
+<div className="h-screen overflow-y-auto p-3 md:p-6">
         <div className="flex justify-between items-center">
   <div>
     <h1 className="text-2xl md:text-3xl font-black text-white">
@@ -985,6 +986,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
             ))}
           </div>
         )}
+            </div>
       </main>
 
       {clienteActivo && (
