@@ -131,29 +131,31 @@ export async function POST(req: Request) {
       whatsappMessageId = data.messages?.[0]?.id || null;
     }
 
-    await pool.query(
-      `
-      INSERT INTO conversaciones (
-        empresa_id,
-        cliente_id,
-        telefono,
-        whatsapp_message_id,
-        mensaje,
-        remitente,
-        tipo
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `,
-      [
-        empresaId,
-        cliente_id,
-        telefonoFinal,
-        whatsappMessageId,
-        mensaje,
-        "asesor",
-        "text",
-      ]
-    );
+    if (canal !== "qr") {
+  await pool.query(
+    `
+    INSERT INTO conversaciones (
+      empresa_id,
+      cliente_id,
+      telefono,
+      whatsapp_message_id,
+      mensaje,
+      remitente,
+      tipo
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `,
+    [
+      empresaId,
+      cliente_id,
+      telefonoFinal,
+      whatsappMessageId,
+      mensaje,
+      "asesor",
+      "text",
+    ]
+  );
+}
 
     return NextResponse.json({
       success: true,
