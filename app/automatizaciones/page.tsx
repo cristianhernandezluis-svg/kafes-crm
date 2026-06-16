@@ -125,7 +125,12 @@ export default function AutomatizacionesPage() {
           <Link href="/chat" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">💬 Conversaciones</Link>
           <Link href="/contactos" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">👤 Contactos</Link>
           <Link href="/kanban" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">🧩 Kanban</Link>
-          <Link href="/mensajes" className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm">✉️ Mensajes</Link>
+          <Link
+  href="/mensajes"
+  className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm"
+>
+  ✉️ Mensajes
+</Link>
           <Link
   href="/automatizaciones"
   className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm"
