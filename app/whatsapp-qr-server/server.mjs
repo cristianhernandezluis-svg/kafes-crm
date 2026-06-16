@@ -172,7 +172,7 @@ VALUES ($1, $2, 'Nuevo', 1, 'qr')
 ON CONFLICT (telefono) DO UPDATE
 SET
   nombre = CASE
-    WHEN EXCLUDED.nombre <> clientes.telefono
+    WHEN $3 = false AND EXCLUDED.nombre <> clientes.telefono
     THEN EXCLUDED.nombre
     ELSE clientes.nombre
   END,
@@ -180,7 +180,7 @@ SET
   canal = 'qr'
 RETURNING id
     `,
-    [nombreCliente, telefono]
+    [nombreCliente, telefono, esMio]
   );
 
   const clienteId = cliente.rows[0].id;
