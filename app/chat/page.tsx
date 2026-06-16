@@ -292,7 +292,7 @@ useEffect(() => {
     <VerificarSuscripcion />
 
     <div className="min-h-screen bg-[#0b1220] flex text-white">
-      <aside className="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col min-h-screen border-r border-[#1f2a33]">
+      <aside className="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col h-screen sticky top-0 border-r border-[#1f2a33]">
   <div className="flex items-center gap-3 mb-8">
     <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
       ☕
@@ -334,7 +334,7 @@ useEffect(() => {
   </nav>
 </aside>
 
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 min-w-0 h-screen overflow-hidden flex">
 <div className="hidden md:flex fixed top-0 left-[220px] right-0 h-12 bg-[#0b1218] border-b border-[#1f2a33] z-40 items-center justify-between px-5">
   <h1 className="text-sm font-bold text-white">
     Conversaciones - WhatsApp Manager
@@ -364,7 +364,7 @@ useEffect(() => {
         <section
   className={`${
     mostrarConversacion ? "hidden md:block" : "block"
-  } w-full md:w-[340px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen pt-12`}
+  } w-full md:w-[340px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen pt-12 shrink-0`}
 >
           <div className="p-5 border-b border-slate-800">
   <h2 className="text-2xl font-black text-white">💬 Conversaciones</h2>
@@ -673,7 +673,7 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="hidden xl:block w-[360px] bg-[#101820] border-l border-[#1f2a33] overflow-y-auto">
+      <div className="hidden xl:block w-[360px] bg-[#101820] border-l border-[#1f2a33] overflow-y-auto h-screen pt-12 shrink-0">
   <div className="p-4 border-b border-[#1f2a33] flex justify-between items-center">
     <h3 className="font-bold text-white text-sm">
       Detalles del contacto
