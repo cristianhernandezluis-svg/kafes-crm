@@ -56,13 +56,14 @@ const [grabandoAudio, setGrabandoAudio] = useState(false);
 const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 const audioChunksRef = useRef<Blob[]>([]);
 const mensajesFinRef = useRef<HTMLDivElement | null>(null);
+
 const bajarAlFinal = () => {
   setTimeout(() => {
     mensajesFinRef.current?.scrollIntoView({
-      behavior: "smooth",
+      behavior: "auto",
       block: "end",
     });
-  }, 100);
+  }, 300);
 };
 const cargarClientes = async () => {
   const res = await fetch("/api/chats", {
@@ -120,7 +121,13 @@ cargarClientes();
 
     if (data.success) {
   setConversaciones(data.conversaciones);
-  bajarAlFinal();
+
+  setTimeout(() => {
+    mensajesFinRef.current?.scrollIntoView({
+      behavior: "auto",
+      block: "end",
+    });
+  }, 500);
 }
   };
 
