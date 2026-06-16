@@ -697,19 +697,23 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   </div>
 </Link>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
+  <Link href="/no-responden" className="block">
+  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 hover:border-red-500 cursor-pointer transition">
     <div className="flex items-center justify-between">
       <div>
         <p className="text-slate-400 text-sm">No responden</p>
-        <h2 className="text-4xl font-black text-white mt-2">{noResponden}</h2>
+        <h2 className="text-4xl font-black text-white mt-2">
+          {noResponden}
+        </h2>
         <p className="text-red-400 text-sm mt-2">↓ 5% vs ayer</p>
       </div>
+
       <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center">
         <AlertCircle className="text-red-400" size={28} />
       </div>
     </div>
   </div>
-</div>
+</Link>
     <h2 className="text-4xl font-black text-white mt-2">
      
     </h2>
@@ -1017,8 +1021,9 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
               </div>
             ))}
           </div>
-        )}
-            </div>
+                )}
+          </div>
+        </div>
       </main>
 
       {clienteActivo && (
