@@ -106,7 +106,7 @@ export default function AutomatizacionesPage() {
 
   return (
     <div className="min-h-screen bg-[#08111f] text-white flex">
-<aside className="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col min-h-screen border-r border-[#1f2a33]">
+<aside className="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col h-screen sticky top-0 border-r border-[#1f2a33]">
         <Link href="/dashboard" className="flex items-center gap-3 px-4 py-4 border-b border-[#1f2a33]">
           <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
             K
@@ -166,9 +166,9 @@ export default function AutomatizacionesPage() {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0 h-screen overflow-hidden">
 
-  <div className="h-12 bg-[#0b1218] border-b border-[#1f2a33] flex items-center justify-between px-5">
+  <div className="h-12 bg-[#0b1218] border-b border-[#1f2a33] flex items-center justify-between px-5 shrink-0">
     <h1 className="text-sm font-bold text-white">
       Automatizaciones
     </h1>
@@ -195,7 +195,7 @@ export default function AutomatizacionesPage() {
     </div>
   </div>
 
-<div className="p-6">
+<div className="h-[calc(100vh-48px)] overflow-y-auto p-6">
   <div className="flex justify-between items-start mb-6">
     <div>
       <h1 className="text-3xl font-black flex items-center gap-3">
