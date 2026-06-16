@@ -40,21 +40,108 @@ sock.ev.on("messaging-history.set", async ({ messages }) => {
       if (!msg.message) continue;
 
       const jid = msg.key.remoteJid;
+      const jidAlt = msg.key.remoteJidAlt;
+
       if (!jid || jid === "status@broadcast") continue;
       if (jid.endsWith("@g.us")) continue;
 
-      const telefono = jid.replace("@s.whatsapp.net", "");
+      let telefono = "";
+
+      if (jidAlt && jidAlt.endsWith("@s.whatsapp.net")) {
+        telefono = jidAlt.replace("@s.whatsapp.net", "");
+      } else if (jid.endsWith("@s.whatsapp.net")) {
+        telefono = jid.replace("@s.whatsapp.net", "");
+      } else if (jid.endsWith("@c.us")) {
+        telefono = jid.replace("@c.us", "");
+      } else if (
+        msg.key.participant &&
+        msg.key.participant.endsWith("@s.whatsapp.net")
+      ) {
+        telefono = msg.key.participant.replace("@s.whatsapp.net", "");
+      } else if (jid.endsWith("@lid")) {
+        telefono = jid.replace("@lid", "");
+      } else {
+        continue;
+      }
+
+      const contenido =
+        msg.message.ephemeralMessage?.message ||
+        msg.message.viewOnceMessage?.message ||
+        msg.message.documentWithCaptionMessage?.message ||
+        msg.message;
 
       const texto =
-        msg.message.conversation ||
-        msg.message.extendedTextMessage?.text ||
+        contenido.conversation ||
+        contenido.extendedTextMessage?.text ||
+        contenido.imageMessage?.caption ||
+        contenido.videoMessage?.caption ||
+        contenido.documentMessage?.caption ||
+        contenido.buttonsResponseMessage?.selectedDisplayText ||
+        contenido.listResponseMessage?.title ||
+        contenido.templateButtonReplyMessage?.selectedDisplayText ||
         "";
 
       if (!texto) continue;
 
-      console.log("Historial:", telefono, texto);
+      const esMio = msg.key.fromMe === true;
+
+      let nombreCliente = telefono;
+
+      if (!esMio && msg.pushName) {
+        nombreCliente = msg.pushName;
+      }
+
+      const remitente = esMio ? "asesor" : "cliente";
+
+      const fechaMensaje = msg.messageTimestamp
+        ? new Date(Number(msg.messageTimestamp) * 1000)
+        : new Date();
+
+      const cliente = await pool.query(
+        `
+        INSERT INTO clientes (
+          nombre,
+          telefono,
+          etapa,
+          empresa_id,
+          canal
+        )
+        VALUES ($1, $2, 'Nuevo', 1, 'qr')
+        ON CONFLICT (telefono) DO UPDATE
+        SET
+          nombre = CASE
+            WHEN $3 = false AND EXCLUDED.nombre <> clientes.telefono
+            THEN EXCLUDED.nombre
+            ELSE clientes.nombre
+          END,
+          canal = 'qr'
+        RETURNING id
+        `,
+        [nombreCliente, telefono, esMio]
+      );
+
+      const clienteId = cliente.rows[0].id;
+
+      await pool.query(
+        `
+        INSERT INTO conversaciones (
+          cliente_id,
+          telefono,
+          mensaje,
+          remitente,
+          tipo,
+          empresa_id,
+          canal,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4, 'text', 1, 'qr', $5)
+        `,
+        [clienteId, telefono, texto, remitente, fechaMensaje]
+      );
+
+      console.log("Historial guardado:", telefono, texto);
     } catch (err) {
-      console.log(err);
+      console.error("Error guardando historial:", err);
     }
   }
 });
