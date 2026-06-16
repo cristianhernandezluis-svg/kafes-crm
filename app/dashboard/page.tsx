@@ -633,19 +633,20 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
         </div>
 
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mt-6">
-
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-slate-400 text-sm">Leads nuevos</p>
-        <h2 className="text-3xl font-black text-white mt-2">{leadsNuevos}</h2>
-        <p className="text-green-400 text-sm mt-2">↑ 12% vs ayer</p>
-      </div>
-      <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center">
-        <Users className="text-blue-400" size={28} />
+  <Link href="/leads-nuevos">
+    <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 hover:border-green-500 cursor-pointer transition">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-slate-400 text-sm">Leads nuevos</p>
+          <h2 className="text-3xl font-black text-white mt-2">{leadsNuevos}</h2>
+          <p className="text-green-400 text-sm mt-2">↑ 12% vs ayer</p>
+        </div>
+        <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center">
+          <Users className="text-blue-400" size={28} />
+        </div>
       </div>
     </div>
-  </div>
+  </Link>
 
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
     <div className="flex items-center justify-between">
@@ -698,9 +699,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
       </div>
     </div>
   </div>
-
 </div>
-
     <h2 className="text-4xl font-black text-white mt-2">
      
     </h2>
