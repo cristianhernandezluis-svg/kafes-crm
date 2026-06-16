@@ -32,6 +32,33 @@ async function iniciarWhatsApp() {
 
   sock.ev.on("creds.update", saveCreds);
 
+sock.ev.on("messaging-history.set", async ({ messages }) => {
+  console.log("Historial recibido:", messages.length);
+
+  for (const msg of messages) {
+    try {
+      if (!msg.message) continue;
+
+      const jid = msg.key.remoteJid;
+      if (!jid || jid === "status@broadcast") continue;
+      if (jid.endsWith("@g.us")) continue;
+
+      const telefono = jid.replace("@s.whatsapp.net", "");
+
+      const texto =
+        msg.message.conversation ||
+        msg.message.extendedTextMessage?.text ||
+        "";
+
+      if (!texto) continue;
+
+      console.log("Historial:", telefono, texto);
+    } catch (err) {
+      console.log(err);
+    }
+  }
+});
+
   sock.ev.on("connection.update", async (update) => {
     const { connection, qr, lastDisconnect } = update;
 
@@ -100,21 +127,38 @@ console.log("JID RECIBIDO:", jid);
 console.log("JID ALT:", jidAlt);
 console.log("TELÉFONO DETECTADO:", telefono);
 
-    const texto =
-      msg.message.conversation ||
-      msg.message.extendedTextMessage?.text ||
-      "";
+    const contenido =
+  msg.message.ephemeralMessage?.message ||
+  msg.message.viewOnceMessage?.message ||
+  msg.message.documentWithCaptionMessage?.message ||
+  msg.message;
 
-    if (!texto) return;
+const texto =
+  contenido.conversation ||
+  contenido.extendedTextMessage?.text ||
+  contenido.imageMessage?.caption ||
+  contenido.videoMessage?.caption ||
+  contenido.documentMessage?.caption ||
+  contenido.buttonsResponseMessage?.selectedDisplayText ||
+  contenido.listResponseMessage?.title ||
+  contenido.templateButtonReplyMessage?.selectedDisplayText ||
+  "";
+
+if (!texto) {
+  console.log("Mensaje sin texto reconocido:", JSON.stringify(msg.message, null, 2));
+  return;
+}
 
     console.log(JSON.stringify(msg, null, 2));
 
     try {
-  const nombreCliente =
-    msg.pushName ||
-    telefono;
+  const esMio = msg.key.fromMe === true;
 
-const remitente = msg.key.fromMe ? "asesor" : telefono;
+const nombreCliente = !esMio && msg.pushName
+  ? msg.pushName
+  : telefono;
+
+const remitente = esMio ? "asesor" : "cliente";
   const cliente = await pool.query(
     `
     INSERT INTO clientes (
@@ -127,6 +171,11 @@ const remitente = msg.key.fromMe ? "asesor" : telefono;
 VALUES ($1, $2, 'Nuevo', 1, 'qr')
 ON CONFLICT (telefono) DO UPDATE
 SET
+  nombre = CASE
+    WHEN EXCLUDED.nombre <> clientes.telefono
+    THEN EXCLUDED.nombre
+    ELSE clientes.nombre
+  END,
   ultima_gestion = NOW(),
   canal = 'qr'
 RETURNING id
@@ -240,10 +289,37 @@ app.post("/send", async (req, res) => {
     }
 
     await sock.sendMessage(`${telefono}@s.whatsapp.net`, {
-      text: mensaje,
-    });
+  text: mensaje,
+});
 
-    res.json({ success: true });
+const cliente = await pool.query(
+  `
+  SELECT id FROM clientes
+  WHERE telefono = $1
+  LIMIT 1
+  `,
+  [telefono]
+);
+
+if (cliente.rows.length > 0) {
+  await pool.query(
+    `
+    INSERT INTO conversaciones (
+      cliente_id,
+      telefono,
+      mensaje,
+      remitente,
+      tipo,
+      empresa_id,
+      canal
+    )
+    VALUES ($1, $2, $3, 'asesor', 'text', 1, 'qr')
+    `,
+    [cliente.rows[0].id, telefono, mensaje]
+  );
+}
+
+res.json({ success: true });
   } catch (error) {
     console.error("Error enviando mensaje:", error);
     res.status(500).json({ error: "Error enviando mensaje" });
