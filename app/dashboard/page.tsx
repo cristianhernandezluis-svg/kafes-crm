@@ -522,10 +522,6 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
       🧩 Kanban
     </Link>
 
-    <Link href="/mensajes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ✉️ Mensajes
-    </Link>
-
     <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
       📄 Plantillas
     </Link>
