@@ -580,7 +580,30 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   </button>
 </aside>
 <main className="flex-1 min-w-0 h-screen overflow-hidden bg-[#0b1220]">
-<div className="h-screen overflow-y-auto p-3 md:p-6">
+  <div className="h-12 bg-[#0b1218] border-b border-[#1f2a33] flex items-center justify-between px-5 shrink-0">
+    <h1 className="text-sm font-bold text-white">Dashboard</h1>
+
+    <div className="flex items-center gap-4 text-slate-300">
+      <button className="hover:text-white">🔍</button>
+      <button className="hover:text-white">🔔</button>
+
+      <Link
+        href="/administracion"
+        className="flex items-center gap-2 hover:bg-slate-800 px-2 py-1 rounded-lg"
+      >
+        <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-black font-black">
+          C
+        </div>
+
+        <div>
+          <p className="text-xs font-bold text-white">Administrador</p>
+          <p className="text-[10px] text-green-400">● En línea</p>
+        </div>
+      </Link>
+    </div>
+  </div>
+
+  <div className="h-[calc(100vh-48px)] overflow-y-auto p-3 md:p-6">
         <div className="flex justify-between items-center">
   <div>
     <h1 className="text-2xl md:text-3xl font-black text-white">
