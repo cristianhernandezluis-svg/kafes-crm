@@ -714,9 +714,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
     </div>
   </div>
 </Link>
-    <h2 className="text-4xl font-black text-white mt-2">
-     
-    </h2>
+</div>
 
 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
   <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
@@ -1023,7 +1021,6 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
           </div>
                 )}
           </div>
-        </div>
       </main>
 
       {clienteActivo && (
