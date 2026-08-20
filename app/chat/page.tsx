@@ -11,6 +11,10 @@ type Cliente = {
   ciudad: string | null;
   etapa: string;
   asesor: string | null;
+  score?: number;
+  temperatura?: string;
+  bot_activo?: boolean;
+  requiere_closer?: boolean;
   created_at: string;
   ultimo_mensaje?: string | null;
   ultimo_tipo?: string | null;
@@ -760,6 +764,14 @@ useEffect(() => {
           <p className="text-white">
             {clienteActivo.asesor || "Sin asesor"}
           </p>
+        </div>
+
+        <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3 space-y-2">
+          <p className="text-xs font-bold text-white">Calificacion del bot</p>
+          <p className="text-xs text-slate-300">Score: <span className="text-white font-bold">{clienteActivo.score ?? 0}/100</span></p>
+          <p className="text-xs text-slate-300">Temperatura: <span className="text-white font-bold">{clienteActivo.temperatura || "frio"}</span></p>
+          <p className="text-xs text-slate-300">Bot: <span className="text-white font-bold">{clienteActivo.bot_activo === false ? "Pausado" : "Activo"}</span></p>
+          <p className="text-xs text-slate-300">Closer: <span className="text-white font-bold">{clienteActivo.requiere_closer ? "Requiere closer" : "Aun no"}</span></p>
         </div>
 
         <div>

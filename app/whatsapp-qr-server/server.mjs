@@ -7,6 +7,7 @@ import pg from "pg";
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
+  fetchLatestWaWebVersion,
 } from "@whiskeysockets/baileys";
 
 const { Pool } = pg;
@@ -19,15 +20,49 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+async function prepararColumnasBot() {
+  await pool.query(`
+    ALTER TABLE clientes
+      ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio',
+      ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true,
+      ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb;
+  `);
+}
+
 let sock;
 let qrActual = null;
 let estado = "desconectado";
 
+function normalizarTexto(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+
+function calificarMensajeCliente(texto){const t=normalizarTexto(texto);const senales=[];if(/\b(precio|cuanto|costo|vale)\b/.test(t))senales.push('precio');if(/\b(envio|envios|delivery|entrega|entregas|llega|llegan|agencia|agencias|shalom|olva)\b/.test(t))senales.push('envio');if(/\b(ciudad|distrito|provincia|departamento|direccion|soy de|vivo en)\b/.test(t))senales.push('ubicacion');if(/\b(garantia)\b/.test(t))senales.push('garantia');if(/\b(yape|plin|transferencia|transferir|deposito|depositar|pago|pagos|pagar)\b/.test(t))senales.push('pago');if(/\b(quiero|compro|comprar|separar|separame|reservar|pedido|quiero uno)\b/.test(t))senales.push('intencion_compra');if(/\b(hoy|ahora|ya mismo)\b/.test(t))senales.push('urgencia');return {senales};}
+
+const PESOS_SENALES={precio:5,envio:10,ubicacion:10,garantia:5,pago:30,intencion_compra:60,urgencia:10};
+
+async function actualizarCalificacionCliente(clienteId,texto){
+ const detectado=calificarMensajeCliente(texto);
+ const r=await pool.query(`SELECT COALESCE(bot_senales,'[]'::jsonb) AS bot_senales,COALESCE(bot_activo,true) AS bot_activo FROM clientes WHERE id=$1 LIMIT 1`,[clienteId]);
+ if(!r.rows[0]||r.rows[0].bot_activo===false)return null;
+ const anteriores=Array.isArray(r.rows[0].bot_senales)?r.rows[0].bot_senales:[];
+ const senales=[...new Set([...anteriores,...detectado.senales])];
+ const score=Math.min(100,senales.reduce((t,x)=>t+(PESOS_SENALES[x]||0),0));
+ const temperatura=score>=60?'caliente':score>=25?'tibio':'frio';
+ const requiereCloser=score>=60;
+ await pool.query("UPDATE clientes SET bot_senales=$1::jsonb,score=$2,temperatura=$3,requiere_closer=$4,bot_activo=CASE WHEN $4 THEN false ELSE bot_activo END,etapa=CASE WHEN $4 THEN $6 ELSE etapa END WHERE id=$5",[JSON.stringify(senales),score,temperatura,requiereCloser,clienteId,"Calificado"]);
+ return {senales,score,temperatura,requiereCloser};
+}
+
 async function iniciarWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
 
+  const { version } = await fetchLatestWaWebVersion();
+  console.log("Version WhatsApp Web:", version);
+
   sock = makeWASocket({
     auth: state,
+    version,
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -289,6 +324,11 @@ RETURNING id
   );
 
       console.log("Mensaje guardado en PostgreSQL");
+
+      if (!esMio) {
+        const calificacion = await actualizarCalificacionCliente(clienteId, texto);
+        console.log("CALIFICACION BOT:", calificacion);
+      }
     } catch (error) {
       console.error("Error guardando mensaje:", error);
     }
@@ -417,5 +457,6 @@ const PORT = process.env.PORT || 4001;
 
 app.listen(PORT, async () => {
   console.log(`Servidor WhatsApp QR en puerto ${PORT}`);
+  await prepararColumnasBot();
   await iniciarWhatsApp();
 });

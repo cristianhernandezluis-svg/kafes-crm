@@ -10,6 +10,14 @@ async function prepararColumnas() {
     ALTER TABLE conversaciones
     ADD COLUMN IF NOT EXISTS leido BOOLEAN DEFAULT false;
   `);
+
+  await pool.query(`
+    ALTER TABLE clientes
+      ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio',
+      ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true,
+      ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false;
+  `);
 }
 
 export async function GET() {
@@ -24,6 +32,10 @@ export async function GET() {
         c.ciudad,
         c.etapa,
         c.asesor,
+        c.score,
+        c.temperatura,
+        c.bot_activo,
+        c.requiere_closer,
         c.created_at,
 
         ult.mensaje AS ultimo_mensaje,

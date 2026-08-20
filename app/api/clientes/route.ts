@@ -30,6 +30,26 @@ async function prepararColumnasClientes() {
     ALTER TABLE clientes
     ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
   `);
+
+  await pool.query(`
+    ALTER TABLE clientes
+    ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0;
+  `);
+
+  await pool.query(`
+    ALTER TABLE clientes
+    ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio';
+  `);
+
+  await pool.query(`
+    ALTER TABLE clientes
+    ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true;
+  `);
+
+  await pool.query(`
+    ALTER TABLE clientes
+    ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false;
+  `);
 }
 
 export async function GET(request: Request) {

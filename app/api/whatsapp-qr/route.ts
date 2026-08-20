@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
+const qrUrl = process.env.WHATSAPP_QR_URL || (process.env.NODE_ENV === "production" ? "http://n8n_kafes-whatsapp-qr:4001" : "http://localhost:4001");
+
 export async function GET() {
   try {
-    const res = await fetch("http://n8n_kafes-whatsapp-qr:4001/qr", {
+    const res = await fetch(`${qrUrl}/qr`, {
       cache: "no-store",
     });
 
@@ -26,7 +28,7 @@ export async function GET() {
 export async function POST() {
   try {
     const res = await fetch(
-      "http://n8n_kafes-whatsapp-qr:4001/sync-contacts",
+      `${qrUrl}/sync-contacts`,
       {
         method: "POST",
         cache: "no-store",
