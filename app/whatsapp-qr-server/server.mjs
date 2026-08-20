@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import qrcode from "qrcode";
 import pg from "pg";
+import { decidirRespuestaBot } from "./bot/cerebro.mjs";
+import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -27,7 +29,7 @@ async function prepararColumnasBot() {
       ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio',
       ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true,
       ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb;
+      ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb;
   `);
 }
 
@@ -328,6 +330,30 @@ RETURNING id
       if (!esMio) {
         const calificacion = await actualizarCalificacionCliente(clienteId, texto);
         console.log("CALIFICACION BOT:", calificacion);
+
+        if (calificacion && !calificacion.requiereCloser) {
+          const memoria = await obtenerMemoriaBot(pool, clienteId);
+          const respuestaBot = decidirRespuestaBot({ texto, calificacion, memoria });
+
+          if (respuestaBot?.handoff) {
+            await pool.query("UPDATE clientes SET score=100,temperatura='caliente',requiere_closer=true,bot_activo=false,etapa='Calificado' WHERE id=$1",[clienteId]);
+            console.log('HANDOFF A CLOSER:', clienteId);
+          }
+
+          if (respuestaBot?.memoria) {
+            await guardarMemoriaBot(pool, clienteId, respuestaBot.memoria);
+          }
+
+          if (respuestaBot?.mensaje) {
+            const jidRespuesta = msg.key.remoteJidAlt || `${telefono}@s.whatsapp.net`;
+
+            await sock.sendMessage(jidRespuesta, {
+              text: respuestaBot.mensaje,
+            });
+
+            console.log("BOT RESPONDIO:", respuestaBot);
+          }
+        }
       }
     } catch (error) {
       console.error("Error guardando mensaje:", error);

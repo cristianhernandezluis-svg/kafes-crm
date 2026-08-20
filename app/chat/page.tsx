@@ -15,12 +15,21 @@ type Cliente = {
   temperatura?: string;
   bot_activo?: boolean;
   requiere_closer?: boolean;
+  bot_producto?: string | null;
+  bot_paso?: string | null;
+  bot_contexto?: { uso?: string; ciudad?: string } | null;
   created_at: string;
   ultimo_mensaje?: string | null;
   ultimo_tipo?: string | null;
   ultimo_mensaje_fecha?: string | null;
   no_leidos?: number;
 };
+
+function nombreProductoBot(slug?: string | null) {
+  if (slug === "sierra-bomvink-8") return "Sierra BOMVINK 8 pulgadas";
+  if (slug === "soporte-telescopico-xtd") return "Soporte Telescopico XTD";
+  return slug || "Sin identificar";
+}
 
 type Conversacion = {
   id: number;
@@ -456,8 +465,10 @@ useEffect(() => {
 
   <div className="min-w-0">
     <p className="font-bold truncate text-white">
-      {cliente.nombre || "Sin nombre"}
+      {cliente.temperatura === "caliente" ? `🔥 ${cliente.nombre || "Sin nombre"}` : (cliente.nombre || "Sin nombre")}
     </p>
+
+    {cliente.temperatura === "caliente" && <p className="text-xs font-bold text-orange-400 truncate">CALIENTE · {nombreProductoBot(cliente.bot_producto)} · {cliente.bot_contexto?.ciudad || cliente.ciudad || "Sin ciudad"}</p>}
 
     <p className="text-sm text-slate-400 truncate">
       {cliente.ultimo_mensaje || cliente.telefono}
@@ -768,6 +779,9 @@ useEffect(() => {
 
         <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3 space-y-2">
           <p className="text-xs font-bold text-white">Calificacion del bot</p>
+          <p className="text-xs text-slate-300">Producto: <span className="text-white font-bold">{nombreProductoBot(clienteActivo.bot_producto)}</span></p>
+          <p className="text-xs text-slate-300">Uso: <span className="text-white font-bold">{clienteActivo.bot_contexto?.uso || "Sin identificar"}</span></p>
+          <p className="text-xs text-slate-300">Ciudad detectada: <span className="text-white font-bold">{clienteActivo.bot_contexto?.ciudad || "Sin identificar"}</span></p>
           <p className="text-xs text-slate-300">Score: <span className="text-white font-bold">{clienteActivo.score ?? 0}/100</span></p>
           <p className="text-xs text-slate-300">Temperatura: <span className="text-white font-bold">{clienteActivo.temperatura || "frio"}</span></p>
           <p className="text-xs text-slate-300">Bot: <span className="text-white font-bold">{clienteActivo.bot_activo === false ? "Pausado" : "Activo"}</span></p>

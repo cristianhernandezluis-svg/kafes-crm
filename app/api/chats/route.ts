@@ -16,7 +16,7 @@ async function prepararColumnas() {
       ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0,
       ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio',
       ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true,
-      ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false;
+      ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb;
   `);
 }
 
@@ -36,6 +36,9 @@ export async function GET() {
         c.temperatura,
         c.bot_activo,
         c.requiere_closer,
+        c.bot_producto,
+        c.bot_paso,
+        c.bot_contexto,
         c.created_at,
 
         ult.mensaje AS ultimo_mensaje,
