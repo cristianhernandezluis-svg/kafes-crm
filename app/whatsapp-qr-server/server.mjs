@@ -5,6 +5,7 @@ import qrcode from "qrcode";
 import pg from "pg";
 import { decidirRespuestaBot } from "./bot/cerebro.mjs";
 import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
+import { obtenerHistorialReciente } from "./bot/historial.mjs";
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -50,8 +51,8 @@ async function actualizarCalificacionCliente(clienteId,texto){
  const anteriores=Array.isArray(r.rows[0].bot_senales)?r.rows[0].bot_senales:[];
  const senales=[...new Set([...anteriores,...detectado.senales])];
  const score=Math.min(100,senales.reduce((t,x)=>t+(PESOS_SENALES[x]||0),0));
- const temperatura=score>=60?'caliente':score>=25?'tibio':'frio';
- const requiereCloser=score>=60;
+ const temperatura=score>=80?'caliente':score>=25?'tibio':'frio';
+const requiereCloser=false;
  await pool.query("UPDATE clientes SET bot_senales=$1::jsonb,score=$2,temperatura=$3,requiere_closer=$4,bot_activo=CASE WHEN $4 THEN false ELSE bot_activo END,etapa=CASE WHEN $4 THEN $6 ELSE etapa END WHERE id=$5",[JSON.stringify(senales),score,temperatura,requiereCloser,clienteId,"Calificado"]);
  return {senales,score,temperatura,requiereCloser};
 }
@@ -213,10 +214,23 @@ sock.ev.on("messaging-history.set", async ({ messages }) => {
     }
   });
 
-  sock.ev.on("messages.upsert", async ({ messages }) => {
+  const inicioBotUnix = Math.floor(Date.now() / 1000);
+
+sock.ev.on("messages.upsert", async ({ messages, type }) => {
+  if (type !== "notify") {
+    console.log("HISTORIAL IGNORADO:", type);
+    return;
+  }
     const msg = messages[0];
 
-    if (!msg.message) return;
+const timestampMensaje = Number(msg.messageTimestamp || 0);
+
+if (timestampMensaje < inicioBotUnix) {
+  console.log("MENSAJE ANTIGUO IGNORADO:", timestampMensaje);
+  return;
+}
+
+if (!msg.message) return;
 
     const jid = msg.key.remoteJid;
 const jidAlt = msg.key.remoteJidAlt;
@@ -309,23 +323,42 @@ RETURNING id
 
   const clienteId = cliente.rows[0].id;
 
-  await pool.query(
-    `
-    INSERT INTO conversaciones (
-      cliente_id,
-      telefono,
-      mensaje,
-      remitente,
-      tipo,
-      empresa_id,
-      canal
-    )
-    VALUES ($1, $2, $3, $4, 'text', 1, 'qr')
-    `,
-    [clienteId, telefono, texto, remitente]
-  );
+  const mensajeGuardado = await pool.query(
+  `
+  INSERT INTO conversaciones (
+    cliente_id,
+    telefono,
+    whatsapp_message_id,
+    mensaje,
+    remitente,
+    tipo,
+    empresa_id,
+    canal
+  )
+  VALUES ($1, $2, $3, $4, $5, 'text', 1, 'qr')
+  ON CONFLICT (whatsapp_message_id)
+  WHERE whatsapp_message_id IS NOT NULL
+  DO NOTHING
+  RETURNING id
+  `,
+  [
+    clienteId,
+    telefono,
+    msg.key.id || null,
+    texto,
+    remitente,
+  ]
+);
 
-      console.log("Mensaje guardado en PostgreSQL");
+if (mensajeGuardado.rowCount === 0) {
+  console.log(
+    "MENSAJE DUPLICADO IGNORADO:",
+    msg.key.id
+  );
+  return;
+}
+
+console.log("Mensaje guardado en PostgreSQL");
 
       if (!esMio) {
         const calificacion = await actualizarCalificacionCliente(clienteId, texto);
@@ -333,12 +366,46 @@ RETURNING id
 
         if (calificacion && !calificacion.requiereCloser) {
           const memoria = await obtenerMemoriaBot(pool, clienteId);
-          const respuestaBot = decidirRespuestaBot({ texto, calificacion, memoria });
+const historial = await obtenerHistorialReciente(pool, clienteId, mensajeGuardado.rows[0].id);
+const respuestaBot = await decidirRespuestaBot({ texto, calificacion, memoria, historial });
 
           if (respuestaBot?.handoff) {
-            await pool.query("UPDATE clientes SET score=100,temperatura='caliente',requiere_closer=true,bot_activo=false,etapa='Calificado' WHERE id=$1",[clienteId]);
-            console.log('HANDOFF A CLOSER:', clienteId);
-          }
+  const asesorResult = await pool.query(
+    `
+    SELECT u.nombre
+    FROM usuarios u
+    JOIN clientes c ON c.empresa_id = u.empresa_id
+    WHERE c.id = $1
+      AND u.rol = 'asesor'
+    ORDER BY u.id ASC
+    LIMIT 1
+    `,
+    [clienteId]
+  );
+
+  const asesor = asesorResult.rows[0]?.nombre || null;
+
+  await pool.query(
+    `
+    UPDATE clientes
+    SET score = 100,
+        temperatura = 'caliente',
+        requiere_closer = true,
+        bot_activo = false,
+        etapa = 'Calificado',
+        asesor = COALESCE($2, asesor)
+    WHERE id = $1
+    `,
+    [clienteId, asesor]
+  );
+
+  console.log(
+    "HANDOFF A CLOSER:",
+    clienteId,
+    "ASESOR:",
+    asesor || "SIN ASESOR"
+  );
+}
 
           if (respuestaBot?.memoria) {
             await guardarMemoriaBot(pool, clienteId, respuestaBot.memoria);
@@ -347,11 +414,38 @@ RETURNING id
           if (respuestaBot?.mensaje) {
             const jidRespuesta = msg.key.remoteJidAlt || `${telefono}@s.whatsapp.net`;
 
-            await sock.sendMessage(jidRespuesta, {
-              text: respuestaBot.mensaje,
-            });
+            const enviadoBot = await sock.sendMessage(jidRespuesta, {
+  text: respuestaBot.mensaje,
+});
 
-            console.log("BOT RESPONDIO:", respuestaBot);
+await pool.query(
+  `
+  INSERT INTO conversaciones (
+    cliente_id,
+    telefono,
+    whatsapp_message_id,
+    mensaje,
+    remitente,
+    tipo,
+    empresa_id,
+    canal
+  )
+  VALUES ($1, $2, $3, $4, 'bot', 'text', 1, 'qr')
+  ON CONFLICT (whatsapp_message_id)
+  WHERE whatsapp_message_id IS NOT NULL
+  DO UPDATE SET
+    mensaje = EXCLUDED.mensaje,
+    remitente = 'bot'
+  `,
+  [
+    clienteId,
+    telefono,
+    enviadoBot?.key?.id || null,
+    respuestaBot.mensaje,
+  ]
+);
+
+console.log("BOT RESPONDIO:", respuestaBot);
           }
         }
       }
