@@ -445,7 +445,15 @@ await pool.query(
   ]
 );
 
-console.log("BOT RESPONDIO:", respuestaBot);
+console.log("BOT RESPONDIO:", {
+  tipo: respuestaBot?.tipo,
+  producto: respuestaBot?.producto,
+  intencion: respuestaBot?.intencion,
+  objecion: respuestaBot?.objecion,
+  nivelInteres: respuestaBot?.nivelInteres,
+  accion: respuestaBot?.accion,
+  handoff: respuestaBot?.handoff,
+});
           }
         }
       }
