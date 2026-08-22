@@ -3,6 +3,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { PROMPT_VENDEDOR } from "./prompt.mjs";
 import { AnalisisVenta } from "./esquema.mjs";
 import { PRODUCTOS } from "./catalogo.mjs";
+import { obtenerPoliticasComerciales } from "./politicas.mjs";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -39,6 +40,9 @@ export async function consultarIA(input) {
   const contexto = `
 CATALOGO REAL:
 ${JSON.stringify(prepararCatalogo(), null, 2)}
+
+POLITICAS COMERCIALES REALES:
+${JSON.stringify(obtenerPoliticasComerciales(), null, 2)}
 
 MEMORIA DEL CLIENTE:
 ${JSON.stringify(memoria, null, 2)}
