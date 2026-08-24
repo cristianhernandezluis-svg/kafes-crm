@@ -17,6 +17,7 @@ type Cliente = {
 const etapas = [
   "Nuevo",
   "Interesado",
+  "Calificado",
   "Seguimiento",
   "Pagó Adelanto",
   "Enviado",
