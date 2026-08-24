@@ -32,7 +32,7 @@ export default function ContactosPage() {
         return;
       }
 
-      const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}`, {
+      const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}&incluir_contactos=1`, {
         cache: "no-store",
       });
 

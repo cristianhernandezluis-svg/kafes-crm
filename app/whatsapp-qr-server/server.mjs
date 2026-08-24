@@ -78,12 +78,99 @@ async function iniciarWhatsApp() {
   sock = makeWASocket({
     auth: state,
     version,
+    syncFullHistory: true,
   });
 
   sock.ev.on("creds.update", saveCreds);
 
-sock.ev.on("messaging-history.set", async ({ messages }) => {
-  console.log("Historial recibido:", messages.length);
+sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages = [], lidPnMappings = [] }) => {
+  console.log("Sincronizacion WhatsApp:", { contacts: contacts.length, chats: chats.length, messages: messages.length });
+
+  const telefonoPorLid = new Map(
+    lidPnMappings.filter((m) => m?.lid && m?.pn).map((m) => [m.lid, m.pn])
+  );
+
+  for (const contact of contacts) {
+    try {
+      const jidContacto = contact.phoneNumber || contact.id || "";
+      if (!jidContacto || jidContacto.endsWith("@g.us") || jidContacto === "status@broadcast") continue;
+
+      let telefonoContacto = "";
+      if (jidContacto.endsWith("@s.whatsapp.net")) telefonoContacto = jidContacto.replace("@s.whatsapp.net", "");
+      else if (jidContacto.endsWith("@c.us")) telefonoContacto = jidContacto.replace("@c.us", "");
+      else if (/^\d+$/.test(jidContacto)) telefonoContacto = jidContacto;
+      else if (jidContacto.endsWith("@lid")) {
+        const pnMapeado = telefonoPorLid.get(jidContacto);
+        if (pnMapeado?.endsWith("@s.whatsapp.net")) telefonoContacto = pnMapeado.replace("@s.whatsapp.net", "");
+        else if (pnMapeado?.endsWith("@c.us")) telefonoContacto = pnMapeado.replace("@c.us", "");
+        else if (/^\d+$/.test(pnMapeado || "")) telefonoContacto = pnMapeado;
+        else continue;
+      }
+      else continue;
+
+      const nombreContacto = contact.name || contact.notify || contact.verifiedName || telefonoContacto;
+
+      const clienteContacto = await pool.query(
+        `INSERT INTO clientes (nombre, telefono, etapa, empresa_id, canal)
+         VALUES ($1, $2, 'Nuevo', $3, 'qr')
+         ON CONFLICT (empresa_id, telefono) DO UPDATE
+         SET nombre = CASE WHEN EXCLUDED.nombre <> clientes.telefono THEN EXCLUDED.nombre ELSE clientes.nombre END,
+             canal = 'qr'
+         RETURNING id`,
+        [nombreContacto, telefonoContacto, empresaQrId]
+      );
+
+      await pool.query(
+        `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+         VALUES ($1, $2, $3, 'contacto', NOW())
+         ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+        [empresaQrId, clienteContacto.rows[0].id, whatsappQrId]
+      );
+    } catch (err) {
+      console.error("Error importando contacto WhatsApp:", err);
+    }
+  }
+
+  for (const chat of chats) {
+    try {
+      const jidChat = chat.pnJid || chat.id || "";
+      if (!jidChat || jidChat.endsWith("@g.us") || jidChat === "status@broadcast") continue;
+
+      let telefonoChat = "";
+      if (jidChat.endsWith("@s.whatsapp.net")) telefonoChat = jidChat.replace("@s.whatsapp.net", "");
+      else if (jidChat.endsWith("@c.us")) telefonoChat = jidChat.replace("@c.us", "");
+      else if (/^\d+$/.test(jidChat)) telefonoChat = jidChat;
+      else if (jidChat.endsWith("@lid")) {
+        const pnMapeado = telefonoPorLid.get(jidChat);
+        if (pnMapeado?.endsWith("@s.whatsapp.net")) telefonoChat = pnMapeado.replace("@s.whatsapp.net", "");
+        else if (pnMapeado?.endsWith("@c.us")) telefonoChat = pnMapeado.replace("@c.us", "");
+        else if (/^\d+$/.test(pnMapeado || "")) telefonoChat = pnMapeado;
+        else continue;
+      }
+      else continue;
+
+      const nombreChat = chat.name || chat.displayName || chat.username || telefonoChat;
+
+      const clienteChat = await pool.query(
+        `INSERT INTO clientes (nombre, telefono, etapa, empresa_id, canal)
+         VALUES ($1, $2, 'Nuevo', $3, 'qr')
+         ON CONFLICT (empresa_id, telefono) DO UPDATE
+         SET nombre = CASE WHEN EXCLUDED.nombre <> clientes.telefono THEN EXCLUDED.nombre ELSE clientes.nombre END,
+             canal = 'qr'
+         RETURNING id`,
+        [nombreChat, telefonoChat, empresaQrId]
+      );
+
+      await pool.query(
+        `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+         VALUES ($1, $2, $3, 'chat', NOW())
+         ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+        [empresaQrId, clienteChat.rows[0].id, whatsappQrId]
+      );
+    } catch (err) {
+      console.error("Error importando chat WhatsApp:", err);
+    }
+  }
 
   for (const msg of messages) {
     try {
@@ -109,7 +196,11 @@ sock.ev.on("messaging-history.set", async ({ messages }) => {
       ) {
         telefono = msg.key.participant.replace("@s.whatsapp.net", "");
       } else if (jid.endsWith("@lid")) {
-        telefono = jid.replace("@lid", "");
+        const pnMapeado = telefonoPorLid.get(jid);
+        if (pnMapeado?.endsWith("@s.whatsapp.net")) telefono = pnMapeado.replace("@s.whatsapp.net", "");
+        else if (pnMapeado?.endsWith("@c.us")) telefono = pnMapeado.replace("@c.us", "");
+        else if (/^\d+$/.test(pnMapeado || "")) telefono = pnMapeado;
+        else continue;
       } else {
         continue;
       }
@@ -172,11 +263,26 @@ sock.ev.on("messaging-history.set", async ({ messages }) => {
 
       const clienteId = cliente.rows[0].id;
 
+  await pool.query(
+    `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+     VALUES ($1, $2, $3, 'mensaje', NOW())
+     ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+    [empresaQrId, clienteId, whatsappQrId]
+  );
+
+      await pool.query(
+        `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+         VALUES ($1, $2, $3, 'historial', NOW())
+         ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+        [empresaQrId, clienteId, whatsappQrId]
+      );
+
       await pool.query(
         `
         INSERT INTO conversaciones (
           cliente_id,
           telefono,
+          whatsapp_message_id,
           mensaje,
           remitente,
           tipo,
@@ -185,9 +291,12 @@ sock.ev.on("messaging-history.set", async ({ messages }) => {
           canal,
           created_at
         )
-        VALUES ($1, $2, $3, $4, 'text', $5, $6, 'qr', $7)
+        VALUES ($1, $2, $3, $4, $5, 'text', $6, $7, 'qr', $8)
+        ON CONFLICT (whatsapp_message_id)
+        WHERE whatsapp_message_id IS NOT NULL
+        DO NOTHING
         `,
-        [clienteId, telefono, texto, remitente, empresaQrId, whatsappQrId, fechaMensaje]
+        [clienteId, telefono, msg.key.id || null, texto, remitente, empresaQrId, whatsappQrId, fechaMensaje]
       );
 
       console.log("Historial guardado:", telefono, texto);
@@ -335,6 +444,13 @@ RETURNING id
   );
 
   const clienteId = cliente.rows[0].id;
+
+  await pool.query(
+    `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+     VALUES ($1, $2, $3, 'mensaje', NOW())
+     ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+    [empresaQrId, clienteId, whatsappQrId]
+  );
 
   const mensajeGuardado = await pool.query(
   `

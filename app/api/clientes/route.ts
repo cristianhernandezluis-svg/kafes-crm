@@ -59,6 +59,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const empresaId = searchParams.get("empresa_id");
     const whatsappQrId = searchParams.get("whatsapp_qr_id");
+    const incluirContactos = searchParams.get("incluir_contactos") === "1";
 
     if (!empresaId) {
       return NextResponse.json({
@@ -85,10 +86,14 @@ export async function GET(request: Request) {
         created_at
       FROM clientes
       WHERE empresa_id = $1
-        AND ($2::integer IS NULL OR EXISTS (SELECT 1 FROM conversaciones conv WHERE conv.cliente_id = clientes.id AND conv.whatsapp_qr_id = $2::integer))
+        AND (
+          $2::integer IS NULL
+          OR ($3::boolean = true AND EXISTS (SELECT 1 FROM clientes_whatsapp_qr rel WHERE rel.cliente_id = clientes.id AND rel.empresa_id = $1 AND rel.whatsapp_qr_id = $2::integer))
+          OR ($3::boolean = false AND EXISTS (SELECT 1 FROM conversaciones conv WHERE conv.cliente_id = clientes.id AND conv.empresa_id = $1 AND conv.whatsapp_qr_id = $2::integer))
+        )
       ORDER BY created_at DESC;
       `,
-      [empresaId, whatsappQrId || null]
+      [empresaId, whatsappQrId || null, incluirContactos]
     );
 
     return NextResponse.json({
