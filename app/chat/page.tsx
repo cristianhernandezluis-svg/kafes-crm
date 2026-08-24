@@ -54,6 +54,7 @@ type Plantilla = {
 
 export default function ChatsPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [whatsappQrId, setWhatsappQrId] = useState<number | null>(null);
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [mensajeNuevo, setMensajeNuevo] = useState("");
@@ -79,7 +80,22 @@ const bajarAlFinal = () => {
   }, 300);
 };
 const cargarClientes = async () => {
-  const res = await fetch("/api/chats", {
+  const usuarioGuardado = localStorage.getItem("usuario");
+  if (!usuarioGuardado) return;
+
+  const usuario = JSON.parse(usuarioGuardado);
+  const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
+  const qrData = await qrRes.json();
+  const qrId = qrData.whatsapp_qr_id;
+
+  if (!qrId) {
+    setWhatsappQrId(null);
+    setClientes([]);
+    return;
+  }
+
+  setWhatsappQrId(Number(qrId));
+  const res = await fetch(`/api/chats?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${qrId}`, {
     cache: "no-store",
   });
 
@@ -113,6 +129,7 @@ const cargarPlantillas = async () => {
 };
 
   const abrirConversacion = async (cliente: Cliente) => {
+  if (!whatsappQrId) return;
   setMostrarConversacion(true);
   setClienteActivo(cliente);
 
@@ -121,12 +138,13 @@ await fetch("/api/chats", {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
     cliente_id: cliente.id,
+    whatsapp_qr_id: whatsappQrId,
   }),
 });
 
 cargarClientes();
 
-    const res = await fetch(`/api/conversaciones/${cliente.id}`, {
+    const res = await fetch(`/api/conversaciones/${cliente.id}?whatsapp_qr_id=${whatsappQrId}`, {
       cache: "no-store",
     });
 

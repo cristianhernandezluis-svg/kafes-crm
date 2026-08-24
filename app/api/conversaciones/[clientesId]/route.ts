@@ -12,6 +12,11 @@ export async function GET(
   try {
     const { clientesId } = await context.params;
 
+    const { searchParams } = new URL(request.url);
+    const whatsappQrId = searchParams.get("whatsapp_qr_id");
+
+    if (!whatsappQrId) return NextResponse.json({ success: true, conversaciones: [] });
+
     const result = await pool.query(
       `
       SELECT
@@ -27,9 +32,10 @@ export async function GET(
         filename
       FROM conversaciones
       WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
       ORDER BY created_at ASC
       `,
-      [clientesId]
+      [clientesId, whatsappQrId]
     );
 
     return NextResponse.json({

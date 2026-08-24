@@ -20,9 +20,15 @@ async function prepararColumnas() {
   `);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await prepararColumnas();
+
+    const { searchParams } = new URL(request.url);
+    const empresaId = searchParams.get("empresa_id");
+    const whatsappQrId = searchParams.get("whatsapp_qr_id");
+
+    if (!empresaId || !whatsappQrId) return NextResponse.json({ success: true, chats: [] });
 
     const result = await pool.query(`
       SELECT
@@ -53,6 +59,7 @@ export async function GET() {
         SELECT mensaje, tipo, created_at
         FROM conversaciones
         WHERE cliente_id = c.id
+          AND whatsapp_qr_id = $2
         ORDER BY created_at DESC
         LIMIT 1
       ) ult ON true
@@ -61,14 +68,24 @@ export async function GET() {
         SELECT COUNT(*) AS total
         FROM conversaciones
         WHERE cliente_id = c.id
+          AND whatsapp_qr_id = $2
           AND remitente = 'cliente'
           AND COALESCE(leido, false) = false
       ) no_leidos ON true
 
+      WHERE c.empresa_id = $1
+        AND EXISTS (
+          SELECT 1
+          FROM conversaciones conv
+          WHERE conv.cliente_id = c.id
+            AND conv.empresa_id = $1
+            AND conv.whatsapp_qr_id = $2
+        )
+
       ORDER BY
         ult.created_at DESC NULLS LAST,
         c.created_at DESC;
-    `);
+    `, [empresaId, whatsappQrId]);
 
     return NextResponse.json({
       success: true,
@@ -87,11 +104,11 @@ export async function PATCH(req: Request) {
   try {
     await prepararColumnas();
 
-    const { cliente_id } = await req.json();
+    const { cliente_id, whatsapp_qr_id } = await req.json();
 
-    if (!cliente_id) {
+    if (!cliente_id || !whatsapp_qr_id) {
       return NextResponse.json(
-        { success: false, error: "Falta cliente_id" },
+        { success: false, error: "Falta cliente_id o whatsapp_qr_id" },
         { status: 400 }
       );
     }
@@ -101,9 +118,10 @@ export async function PATCH(req: Request) {
       UPDATE conversaciones
       SET leido = true
       WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
         AND remitente = 'cliente'
       `,
-      [cliente_id]
+      [cliente_id, whatsapp_qr_id]
     );
 
     return NextResponse.json({ success: true });
