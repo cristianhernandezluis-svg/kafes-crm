@@ -80,6 +80,7 @@ async function iniciarWhatsApp() {
     auth: state,
     version,
     syncFullHistory: true,
+    shouldSyncHistoryMessage: () => true,
   });
 
   sock.ev.on("creds.update", saveCreds);
