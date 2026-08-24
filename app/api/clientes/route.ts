@@ -58,6 +58,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const empresaId = searchParams.get("empresa_id");
+    const whatsappQrId = searchParams.get("whatsapp_qr_id");
 
     if (!empresaId) {
       return NextResponse.json({
@@ -84,9 +85,10 @@ export async function GET(request: Request) {
         created_at
       FROM clientes
       WHERE empresa_id = $1
+        AND ($2::integer IS NULL OR EXISTS (SELECT 1 FROM conversaciones conv WHERE conv.cliente_id = clientes.id AND conv.whatsapp_qr_id = $2::integer))
       ORDER BY created_at DESC;
       `,
-      [empresaId]
+      [empresaId, whatsappQrId || null]
     );
 
     return NextResponse.json({

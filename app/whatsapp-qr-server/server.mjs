@@ -486,6 +486,8 @@ app.get("/qr", (req, res) => {
   res.json({
     estado,
     qr: qrActual,
+    whatsapp_qr_id: whatsappQrId,
+    empresa_id: empresaQrId,
   });
 });
 
