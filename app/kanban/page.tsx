@@ -31,7 +31,17 @@ export default function KanbanPage() {
   const cargarClientes = async () => {
     const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
 
-    const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}`, {
+    const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
+    const qrData = await qrRes.json();
+    const whatsappQrId = qrData.whatsapp_qr_id;
+
+    if (!whatsappQrId) {
+      setClientes([]);
+      setCargando(false);
+      return;
+    }
+
+    const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}`, {
       cache: "no-store",
     });
 
