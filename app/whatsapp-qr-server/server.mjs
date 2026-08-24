@@ -37,6 +37,18 @@ async function prepararColumnasBot() {
 let sock;
 let qrActual = null;
 let estado = "desconectado";
+let whatsappQrId = null;
+let empresaQrId = null;
+
+async function cargarIntegracionQr() {
+  const key = process.env.WHATSAPP_SESSION_KEY;
+  if (!key) throw new Error("WHATSAPP_SESSION_KEY no configurado");
+  const r = await pool.query("SELECT id, empresa_id FROM integraciones_whatsapp_qr WHERE session_key=$1 LIMIT 1", [key]);
+  if (!r.rows[0]) throw new Error("Integracion QR no encontrada");
+  whatsappQrId = r.rows[0].id;
+  empresaQrId = r.rows[0].empresa_id;
+  console.log("Integracion QR cargada:", { whatsappQrId, empresaQrId });
+}
 
 function normalizarTexto(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
 
@@ -144,8 +156,8 @@ sock.ev.on("messaging-history.set", async ({ messages }) => {
           empresa_id,
           canal
         )
-        VALUES ($1, $2, 'Nuevo', 1, 'qr')
-        ON CONFLICT (telefono) DO UPDATE
+        VALUES ($1, $2, 'Nuevo', $4, 'qr')
+        ON CONFLICT (empresa_id, telefono) DO UPDATE
         SET
           nombre = CASE
             WHEN $3 = false AND EXCLUDED.nombre <> clientes.telefono
@@ -155,7 +167,7 @@ sock.ev.on("messaging-history.set", async ({ messages }) => {
           canal = 'qr'
         RETURNING id
         `,
-        [nombreCliente, telefono, esMio]
+        [nombreCliente, telefono, esMio, empresaQrId]
       );
 
       const clienteId = cliente.rows[0].id;
@@ -169,12 +181,13 @@ sock.ev.on("messaging-history.set", async ({ messages }) => {
           remitente,
           tipo,
           empresa_id,
+          whatsapp_qr_id,
           canal,
           created_at
         )
-        VALUES ($1, $2, $3, $4, 'text', 1, 'qr', $5)
+        VALUES ($1, $2, $3, $4, 'text', $5, $6, 'qr', $7)
         `,
-        [clienteId, telefono, texto, remitente, fechaMensaje]
+        [clienteId, telefono, texto, remitente, empresaQrId, whatsappQrId, fechaMensaje]
       );
 
       console.log("Historial guardado:", telefono, texto);
@@ -306,8 +319,8 @@ const remitente = esMio ? "asesor" : "cliente";
   empresa_id,
   canal
 )
-VALUES ($1, $2, 'Nuevo', 1, 'qr')
-ON CONFLICT (telefono) DO UPDATE
+VALUES ($1, $2, 'Nuevo', $4, 'qr')
+ON CONFLICT (empresa_id, telefono) DO UPDATE
 SET
   nombre = CASE
     WHEN $3 = false AND EXCLUDED.nombre <> clientes.telefono
@@ -318,7 +331,7 @@ SET
   canal = 'qr'
 RETURNING id
     `,
-    [nombreCliente, telefono, esMio]
+    [nombreCliente, telefono, esMio, empresaQrId]
   );
 
   const clienteId = cliente.rows[0].id;
@@ -333,9 +346,10 @@ RETURNING id
     remitente,
     tipo,
     empresa_id,
+    whatsapp_qr_id,
     canal
   )
-  VALUES ($1, $2, $3, $4, $5, 'text', 1, 'qr')
+  VALUES ($1, $2, $3, $4, $5, 'text', $6, $7, 'qr')
   ON CONFLICT (whatsapp_message_id)
   WHERE whatsapp_message_id IS NOT NULL
   DO NOTHING
@@ -347,6 +361,8 @@ RETURNING id
     msg.key.id || null,
     texto,
     remitente,
+    empresaQrId,
+    whatsappQrId,
   ]
 );
 
@@ -428,9 +444,10 @@ await pool.query(
     remitente,
     tipo,
     empresa_id,
+    whatsapp_qr_id,
     canal
   )
-  VALUES ($1, $2, $3, $4, 'bot', 'text', 1, 'qr')
+  VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'qr')
   ON CONFLICT (whatsapp_message_id)
   WHERE whatsapp_message_id IS NOT NULL
   DO UPDATE SET
@@ -442,6 +459,8 @@ await pool.query(
     telefono,
     enviadoBot?.key?.id || null,
     respuestaBot.mensaje,
+    empresaQrId,
+    whatsappQrId,
   ]
 );
 
@@ -512,11 +531,11 @@ app.post("/sync-contacts", async (req, res) => {
           empresa_id,
           canal
         )
-        VALUES ($1, $2, 'Nuevo', 1, 'qr')
-        ON CONFLICT (telefono) DO UPDATE
+        VALUES ($1, $2, 'Nuevo', $3, 'qr')
+        ON CONFLICT (empresa_id, telefono) DO UPDATE
         SET canal = 'qr'
         `,
-        [row.nombre || telefono, telefono]
+        [row.nombre || telefono, telefono, empresaQrId]
       );
 
       contactosSincronizados++;
@@ -551,9 +570,10 @@ const cliente = await pool.query(
   `
   SELECT id FROM clientes
   WHERE telefono = $1
+    AND empresa_id = $2
   LIMIT 1
   `,
-  [telefono]
+  [telefono, empresaQrId]
 );
 
 if (cliente.rows.length > 0) {
@@ -566,11 +586,12 @@ if (cliente.rows.length > 0) {
       remitente,
       tipo,
       empresa_id,
+      whatsapp_qr_id,
       canal
     )
-    VALUES ($1, $2, $3, 'asesor', 'text', 1, 'qr')
+    VALUES ($1, $2, $3, 'asesor', 'text', $4, $5, 'qr')
     `,
-    [cliente.rows[0].id, telefono, mensaje]
+    [cliente.rows[0].id, telefono, mensaje, empresaQrId, whatsappQrId]
   );
 }
 
@@ -586,5 +607,6 @@ const PORT = process.env.PORT || 4001;
 app.listen(PORT, async () => {
   console.log(`Servidor WhatsApp QR en puerto ${PORT}`);
   await prepararColumnasBot();
+  await cargarIntegracionQr();
   await iniciarWhatsApp();
 });
