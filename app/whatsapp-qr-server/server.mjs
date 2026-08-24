@@ -39,6 +39,7 @@ let qrActual = null;
 let estado = "desconectado";
 let whatsappQrId = null;
 let empresaQrId = null;
+const telefonoPorLidHistorial = new Map();
 
 async function cargarIntegracionQr() {
   const key = process.env.WHATSAPP_SESSION_KEY;
@@ -86,9 +87,10 @@ async function iniciarWhatsApp() {
 sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages = [], lidPnMappings = [] }) => {
   console.log("Sincronizacion WhatsApp:", { contacts: contacts.length, chats: chats.length, messages: messages.length });
 
-  const telefonoPorLid = new Map(
-    lidPnMappings.filter((m) => m?.lid && m?.pn).map((m) => [m.lid, m.pn])
-  );
+  for (const m of lidPnMappings) {
+    if (m?.lid && m?.pn) telefonoPorLidHistorial.set(m.lid, m.pn);
+  }
+  const telefonoPorLid = telefonoPorLidHistorial;
 
   for (const contact of contacts) {
     try {
@@ -222,7 +224,19 @@ sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages
         contenido.templateButtonReplyMessage?.selectedDisplayText ||
         "";
 
-      if (!texto) continue;
+      let tipoMensaje = 'text';
+      let textoGuardado = texto;
+
+      if (!textoGuardado) {
+        if (contenido.audioMessage) { tipoMensaje = 'audio'; textoGuardado = '[Audio]'; }
+        else if (contenido.imageMessage) { tipoMensaje = 'image'; textoGuardado = '[Imagen]'; }
+        else if (contenido.videoMessage) { tipoMensaje = 'video'; textoGuardado = '[Video]'; }
+        else if (contenido.documentMessage) { tipoMensaje = 'document'; textoGuardado = '[Documento]'; }
+        else if (contenido.stickerMessage) { tipoMensaje = 'sticker'; textoGuardado = '[Sticker]'; }
+        else if (contenido.locationMessage) { tipoMensaje = 'location'; textoGuardado = '[Ubicacion]'; }
+        else if (contenido.contactMessage || contenido.contactsArrayMessage) { tipoMensaje = 'contact'; textoGuardado = '[Contacto]'; }
+        else continue;
+      }
 
       const esMio = msg.key.fromMe === true;
 
@@ -263,12 +277,6 @@ sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages
 
       const clienteId = cliente.rows[0].id;
 
-  await pool.query(
-    `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
-     VALUES ($1, $2, $3, 'mensaje', NOW())
-     ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
-    [empresaQrId, clienteId, whatsappQrId]
-  );
 
       await pool.query(
         `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
@@ -291,15 +299,15 @@ sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages
           canal,
           created_at
         )
-        VALUES ($1, $2, $3, $4, $5, 'text', $6, $7, 'qr', $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'qr', $9)
         ON CONFLICT (whatsapp_message_id)
         WHERE whatsapp_message_id IS NOT NULL
         DO NOTHING
         `,
-        [clienteId, telefono, msg.key.id || null, texto, remitente, empresaQrId, whatsappQrId, fechaMensaje]
+        [clienteId, telefono, msg.key.id || null, textoGuardado, remitente, tipoMensaje, empresaQrId, whatsappQrId, fechaMensaje]
       );
 
-      console.log("Historial guardado:", telefono, texto);
+      console.log("Historial guardado:", telefono, textoGuardado);
     } catch (err) {
       console.error("Error guardando historial:", err);
     }
@@ -328,7 +336,7 @@ sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages
 
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
-      console.log("Conexión cerrada. Reintentando:", shouldReconnect);
+      console.log("Conexion cerrada. Reintentando:", shouldReconnect);
 
       if (shouldReconnect) {
         iniciarWhatsApp();
@@ -376,16 +384,16 @@ if (jidAlt && jidAlt.endsWith("@s.whatsapp.net")) {
 ) {
   telefono = msg.key.participant.replace("@s.whatsapp.net", "");
 } else if (jid.endsWith("@lid")) {
-  console.log("⚠️ WhatsApp envió un LID en vez del teléfono:", jid);
+  console.log("WhatsApp envio un LID en vez del telefono:", jid);
   telefono = jid.replace("@lid", "");
 } else {
-  console.log("⚠️ No se pudo identificar el número:", jid);
+  console.log("No se pudo identificar el numero:", jid);
   return;
 }
 
 console.log("JID RECIBIDO:", jid);
 console.log("JID ALT:", jidAlt);
-console.log("TELÉFONO DETECTADO:", telefono);
+console.log("TELEFONO DETECTADO:", telefono);
 
     const contenido =
   msg.message.ephemeralMessage?.message ||
