@@ -5,25 +5,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-async function prepararColumnas() {
-  await pool.query(`
-    ALTER TABLE conversaciones
-    ADD COLUMN IF NOT EXISTS leido BOOLEAN DEFAULT false;
-  `);
-
-  await pool.query(`
-    ALTER TABLE clientes
-      ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio',
-      ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true,
-      ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb;
-  `);
-}
-
 export async function GET(request: Request) {
   try {
-    await prepararColumnas();
-
     const { searchParams } = new URL(request.url);
     const empresaId = searchParams.get("empresa_id");
     const whatsappQrId = searchParams.get("whatsapp_qr_id");
@@ -102,8 +85,6 @@ export async function GET(request: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    await prepararColumnas();
-
     const { cliente_id, whatsapp_qr_id } = await req.json();
 
     if (!cliente_id || !whatsapp_qr_id) {

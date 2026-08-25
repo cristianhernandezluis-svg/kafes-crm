@@ -5,33 +5,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-async function prepararTablas() {
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
-  `);
-
-  await pool.query(`
-    ALTER TABLE conversaciones
-    ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
-  `);
-
-  await pool.query(`
-    ALTER TABLE conversaciones
-    ADD COLUMN IF NOT EXISTS media_id TEXT;
-  `);
-
-  await pool.query(`
-    ALTER TABLE conversaciones
-    ADD COLUMN IF NOT EXISTS mime_type TEXT;
-  `);
-
-  await pool.query(`
-    ALTER TABLE conversaciones
-    ADD COLUMN IF NOT EXISTS filename TEXT;
-  `);
-}
-
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
@@ -50,8 +23,6 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   try {
-    await prepararTablas();
-
     const value = body?.entry?.[0]?.changes?.[0]?.value;
     const contact = value?.contacts?.[0];
     const message = value?.messages?.[0];

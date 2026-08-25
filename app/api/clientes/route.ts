@@ -5,57 +5,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-async function prepararColumnasClientes() {
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS observacion TEXT;
-  `);
-
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS proximo_seguimiento TIMESTAMP;
-  `);
-
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS ultima_gestion TIMESTAMP;
-  `);
-
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS cantidad_seguimientos INTEGER DEFAULT 0;
-  `);
-
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id);
-  `);
-
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0;
-  `);
-
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio';
-  `);
-
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true;
-  `);
-
-  await pool.query(`
-    ALTER TABLE clientes
-    ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false;
-  `);
-}
-
 export async function GET(request: Request) {
   try {
-    await prepararColumnasClientes();
-
     const { searchParams } = new URL(request.url);
     const empresaId = searchParams.get("empresa_id");
     const whatsappQrId = searchParams.get("whatsapp_qr_id");
@@ -112,8 +63,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await prepararColumnasClientes();
-
     const body = await request.json();
 
     const {
