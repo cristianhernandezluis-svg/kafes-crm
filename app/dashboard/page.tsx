@@ -803,14 +803,22 @@ const barraTema = temaClaro
   </div>
 </Link>
   <Link href="/pagos-adelanto" className="block">
-  
+  <div
+    className={`${panelTema} border rounded-2xl p-5 hover:border-green-500 cursor-pointer transition`}
+  >
     <div className="flex items-center justify-between">
       <div>
         <p className="text-slate-400 text-sm">Pagó adelanto</p>
-        <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>{pagoAdelanto}</h2>
-        <p className="text-green-400 text-sm mt-2">↑ 15% vs ayer</p>
+
+        <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>
+          {pagoAdelanto}
+        </h2>
+
+        <p className="text-green-400 text-sm mt-2">
+          ↑ 15% vs ayer
+        </p>
       </div>
-<div className={`${panelTema} border rounded-2xl p-5 hover:border-green-500 cursor-pointer transition`}>
+
       <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
         <DollarSign className="text-green-400" size={28} />
       </div>
@@ -819,7 +827,9 @@ const barraTema = temaClaro
 </Link>
 
   <Link href="/ventas-entregadas" className="block">
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 hover:border-purple-500 cursor-pointer transition">
+  <div
+  className={`${panelTema} border rounded-2xl p-5 hover:border-purple-500 cursor-pointer transition`}
+>
     <div className="flex items-center justify-between">
       <div>
         <p className="text-slate-400 text-sm">Ventas entregadas</p>
