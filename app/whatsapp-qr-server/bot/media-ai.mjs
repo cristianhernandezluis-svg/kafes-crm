@@ -27,3 +27,15 @@ export async function analizarImagen(ruta, mimeType = "image/jpeg") {
   });
   return String(respuesta.output_text || "").trim();
 }
+
+export async function analizarDocumento(ruta, filename = "documento.pdf") {
+  const buffer = await readFile(ruta);
+  const respuesta = await client.responses.create({
+    model: "gpt-5.6-terra",
+    input: [{ role: "user", content: [
+      { type: "input_text", text: "Resume este documento para dar contexto a un asesor de ventas por WhatsApp. Identifica productos, cotizaciones, especificaciones, precios o datos comerciales relevantes. No inventes informacion ni confirmes pagos." },
+      { type: "input_file", file_data: buffer.toString("base64"), filename, detail: "low" }
+    ] }]
+  });
+  return String(respuesta.output_text || "").trim();
+}

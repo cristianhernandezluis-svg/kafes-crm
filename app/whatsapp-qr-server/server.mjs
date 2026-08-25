@@ -7,7 +7,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { decidirRespuestaBot } from "./bot/cerebro.mjs";
 import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
 import { obtenerHistorialReciente } from "./bot/historial.mjs";
-import { transcribirAudio, analizarImagen } from "./bot/media-ai.mjs";
+import { transcribirAudio, analizarImagen, analizarDocumento } from "./bot/media-ai.mjs";
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -480,6 +480,15 @@ let mediaAnalisis = null;
           console.log("IMAGEN ANALIZADA:", mediaAnalisis);
         } catch (errorIA) {
           console.error("ERROR ANALIZANDO IMAGEN:", errorIA?.message || errorIA);
+          mediaAnalisis = null;
+        }
+      }
+      if (tipoMensaje === "document" && mimeType === "application/pdf" && !esMio) {
+        try {
+          mediaAnalisis = await analizarDocumento(`${MEDIA_DIR}/${mediaId}`, filename || "documento.pdf");
+          console.log("PDF ANALIZADO");
+        } catch (errorIA) {
+          console.error("ERROR ANALIZANDO PDF:", errorIA?.message || errorIA);
           mediaAnalisis = null;
         }
       }
