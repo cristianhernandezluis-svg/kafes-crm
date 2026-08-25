@@ -52,7 +52,7 @@ async function analizarFotogramas(rutas) {
   const content = [
     {
       type: "input_text",
-      text: "Estos son fotogramas extraidos de un video enviado por WhatsApp. Resume brevemente lo que ocurre para dar contexto a un asesor de ventas. Identifica productos, texto visible, comprobantes, fallas, demostraciones u objetos relevantes. No inventes marcas, modelos, pagos confirmados ni datos que no sean visibles. Si algo no esta claro, indicalo."
+      text: "Estos son varios fotogramas del MISMO video enviado por WhatsApp. Analizalos como una secuencia y cruza la informacion entre todos antes de identificar un producto. Ten en cuenta conjuntamente la forma del objeto, accesorios, caja o empaque, imagenes impresas, etiquetas y texto visible. No clasifiques el producto basandote solo en un fotograma aislado. Si el aspecto del objeto parece una cosa pero el empaque o texto aporta evidencia de otra, menciona la discrepancia y prioriza la conclusion respaldada por el conjunto de evidencias. Identifica productos, texto visible, comprobantes, fallas o demostraciones relevantes. No inventes marcas, modelos, medidas, pagos confirmados ni datos que no sean visibles. Si la marca o modelo no se distinguen con claridad, indicalo."
     }
   ];
 
