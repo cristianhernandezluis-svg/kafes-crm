@@ -26,6 +26,12 @@ const etapas = [
 ];
 
 export default function KanbanPage() {
+const [temaClaro, setTemaClaro] = useState(false);
+
+useEffect(() => {
+  const temaGuardado = localStorage.getItem("tema-crm");
+  setTemaClaro(temaGuardado === "claro");
+}, []);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -70,11 +76,25 @@ export default function KanbanPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#08111f] text-white flex">
-      <aside className="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col min-h-screen border-r border-[#1f2a33]">
+    <div
+  className={`min-h-screen flex ${
+    temaClaro
+      ? "bg-slate-100 text-slate-900"
+      : "bg-[#08111f] text-white"
+  }`}
+>
+      <aside
+  className={`hidden lg:flex w-[220px] flex-col min-h-screen border-r ${
+    temaClaro
+      ? "bg-white text-slate-800 border-slate-200"
+      : "bg-[#101820] text-white border-[#1f2a33]"
+  }`}
+>
         <Link
           href="/dashboard"
-          className="flex items-center gap-3 px-4 py-4 border-b border-[#1f2a33]"
+          className={`flex items-center gap-3 px-4 py-4 border-b ${
+  temaClaro ? "border-slate-200" : "border-[#1f2a33]"
+}`}
         >
           <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
             K
@@ -92,7 +112,11 @@ export default function KanbanPage() {
         </div>
 
         <nav className="flex-1 px-2 space-y-1">
-          <Link href="/dashboard" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+          <Link href="/dashboard" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+  temaClaro
+    ? "hover:bg-slate-100 text-slate-700"
+    : "hover:bg-slate-800 text-white"
+}`}>
             📊 Dashboard
           </Link>
 
@@ -103,7 +127,11 @@ export default function KanbanPage() {
             </span>
           </Link>
 
-          <Link href="/contactos" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+          <Link href="/contactos" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+  temaClaro
+    ? "hover:bg-slate-100 text-slate-700"
+    : "hover:bg-slate-800 text-white"
+}`}>
             👤 Contactos
           </Link>
 
@@ -111,30 +139,60 @@ export default function KanbanPage() {
             🧩 Kanban
           </Link>
 
-          <Link href="/mensajes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+          <Link href="/mensajes" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+  temaClaro
+    ? "hover:bg-slate-100 text-slate-700"
+    : "hover:bg-slate-800 text-white"
+}`}>
             ✉️ Mensajes
           </Link>
 
-          <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+          <Link href="/plantillas" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+  temaClaro
+    ? "hover:bg-slate-100 text-slate-700"
+    : "hover:bg-slate-800 text-white"
+}`}>
             📄 Plantillas
           </Link>
 
-          <Link href="/automatizaciones" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+          <Link href="/automatizaciones" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+  temaClaro
+    ? "hover:bg-slate-100 text-slate-700"
+    : "hover:bg-slate-800 text-white"
+}`}>
             ⚙️ Automatizaciones
           </Link>
 
-          <Link href="/reportes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+          <Link href="/reportes" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+  temaClaro
+    ? "hover:bg-slate-100 text-slate-700"
+    : "hover:bg-slate-800 text-white"
+}`}>
             📊 Reportes
           </Link>
 
-          <Link href="/ajustes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+          <Link href="/ajustes" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+  temaClaro
+    ? "hover:bg-slate-100 text-slate-700"
+    : "hover:bg-slate-800 text-white"
+}`}>
             ⚙️ Ajustes
           </Link>
         </nav>
 
         <div className="p-3">
-          <div className="border border-[#26323d] rounded-xl p-4 bg-[#111c24]">
-            <p className="text-sm font-bold text-slate-300 mb-3">
+          <div
+  className={`border rounded-xl p-4 ${
+    temaClaro
+      ? "bg-slate-50 border-slate-200"
+      : "bg-[#111c24] border-[#26323d]"
+  }`}
+>
+            <p
+  className={`text-sm font-bold mb-3 ${
+    temaClaro ? "text-slate-700" : "text-slate-300"
+  }`}
+>
               Conexión WhatsApp
             </p>
 
@@ -151,7 +209,11 @@ export default function KanbanPage() {
 
             <Link
               href="/dashboard/canales"
-              className="block w-full text-center border border-slate-700 rounded-lg py-2 text-xs font-bold hover:bg-slate-800"
+              className={`block w-full text-center border rounded-lg py-2 text-xs font-bold ${
+  temaClaro
+    ? "border-slate-300 text-slate-700 hover:bg-slate-100"
+    : "border-slate-700 text-white hover:bg-slate-800"
+}`}
             >
               VER QR
             </Link>
@@ -160,8 +222,18 @@ export default function KanbanPage() {
       </aside>
 
       <main className="flex-1 min-w-0">
-        <div className="h-12 bg-[#0b1218] border-b border-[#1f2a33] flex items-center justify-between px-5">
-          <h1 className="text-sm font-bold text-white">
+        <div
+  className={`h-12 border-b flex items-center justify-between px-5 ${
+    temaClaro
+      ? "bg-white border-slate-200"
+      : "bg-[#0b1218] border-[#1f2a33]"
+  }`}
+>
+          <h1
+  className={`text-sm font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
             Kanban - Oportunidades
           </h1>
 
@@ -181,34 +253,62 @@ export default function KanbanPage() {
               </div>
 
               <div>
-                <p className="text-xs font-bold text-white">Administrador</p>
+                <p
+  className={`text-xs font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
+  Administrador
+</p>
                 <p className="text-[10px] text-green-400">● En línea</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="border-b border-slate-800 px-6 py-4 flex justify-between items-center">
+        <div
+  className={`border-b px-6 py-4 flex justify-between items-center ${
+    temaClaro
+      ? "bg-white border-slate-200"
+      : "border-slate-800"
+  }`}
+>
           <div className="flex gap-3">
-            <button className="bg-[#111827] border border-slate-700 px-4 py-2 rounded-xl">
-              Oportunidades
+            <button >
+              OportunidadesclassName={`border px-4 py-2 rounded-xl ${
+  temaClaro
+    ? "bg-white border-slate-300 text-slate-700"
+    : "bg-[#111827] border-slate-700 text-white"
+}`}
             </button>
 
             <button className="bg-green-700/50 border border-green-700 px-4 py-2 rounded-xl">
               Kanban
             </button>
 
-            <button className="bg-[#111827] border border-slate-700 px-4 py-2 rounded-xl">
+            <button className={`border px-4 py-2 rounded-xl ${
+  temaClaro
+    ? "bg-white border-slate-300 text-slate-700"
+    : "bg-[#111827] border-slate-700 text-white"
+}`}>
               Lista
             </button>
           </div>
 
           <div className="flex gap-3">
-            <button className="bg-[#111827] border border-slate-700 px-4 py-2 rounded-xl">
+            <button className={`border px-4 py-2 rounded-xl ${
+  temaClaro
+    ? "bg-white border-slate-300 text-slate-700"
+    : "bg-[#111827] border-slate-700 text-white"
+}`}>
               Filtro
             </button>
 
-            <button className="bg-[#111827] border border-slate-700 px-4 py-2 rounded-xl">
+            <button className={`border px-4 py-2 rounded-xl ${
+  temaClaro
+    ? "bg-white border-slate-300 text-slate-700"
+    : "bg-[#111827] border-slate-700 text-white"
+}`}>
               Asignado a: Todos
             </button>
 
@@ -232,13 +332,27 @@ export default function KanbanPage() {
                 return (
                   <div
                     key={etapa}
-                    className="w-[280px] bg-[#0f172a] border border-slate-800 rounded-2xl overflow-hidden"
+                    className={`w-[280px] border rounded-2xl overflow-hidden ${
+  temaClaro
+    ? "bg-white border-slate-200"
+    : "bg-[#0f172a] border-slate-800"
+}`}
                   >
-                    <div className="p-4 border-b border-slate-800">
+                    <div
+  className={`p-4 border-b ${
+    temaClaro ? "border-slate-200" : "border-slate-800"
+  }`}
+>
                       <div className="flex justify-between items-center">
                         <h2 className="font-bold">{etapa}</h2>
 
-                        <span className="bg-slate-800 text-slate-300 text-xs px-2 py-1 rounded-full">
+                        <span
+  className={`text-xs px-2 py-1 rounded-full ${
+    temaClaro
+      ? "bg-slate-100 text-slate-600"
+      : "bg-slate-800 text-slate-300"
+  }`}
+>
                           {clientesEtapa.length}
                         </span>
                       </div>
@@ -266,15 +380,27 @@ export default function KanbanPage() {
                       {clientesEtapa.slice(0, 20).map((cliente) => (
                         <div
                           key={cliente.id}
-                          className="bg-[#111827] border border-slate-800 rounded-xl p-4 hover:border-green-500 transition"
+                          className={`border rounded-xl p-4 hover:border-green-500 transition ${
+  temaClaro
+    ? "bg-slate-50 border-slate-200"
+    : "bg-[#111827] border-slate-800"
+}`}
                         >
                           <div className="flex justify-between gap-2">
                             <div>
-                              <h3 className="font-bold text-white text-sm">
+                              <h3
+  className={`font-bold text-sm ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
                                 {cliente.observacion || "Oportunidad de venta"}
                               </h3>
 
-                              <p className="text-slate-400 text-xs mt-1">
+                              <p
+  className={`text-xs mt-1 ${
+    temaClaro ? "text-slate-500" : "text-slate-400"
+  }`}
+>
                                 {cliente.nombre || "Sin nombre"}
                               </p>
                             </div>
@@ -291,7 +417,11 @@ export default function KanbanPage() {
                               <p className="text-sm font-bold">
                                 {cliente.nombre || "Sin nombre"}
                               </p>
-                              <p className="text-xs text-slate-400">
+                              <p
+  className={`text-xs ${
+    temaClaro ? "text-slate-500" : "text-slate-400"
+  }`}
+>
                                 {cliente.telefono}
                               </p>
                             </div>
@@ -302,12 +432,22 @@ export default function KanbanPage() {
                               {cliente.etapa}
                             </span>
 
-                            <span className="bg-slate-800 text-slate-400 px-2 py-1 rounded-full text-[11px]">
+                            <span
+  className={`px-2 py-1 rounded-full text-[11px] ${
+    temaClaro
+      ? "bg-slate-100 text-slate-600"
+      : "bg-slate-800 text-slate-400"
+  }`}
+>
                               {cliente.canal || "crm"}
                             </span>
                           </div>
 
-                          <div className="mt-3 text-xs text-slate-400">
+                          <div
+  className={`mt-3 text-xs ${
+    temaClaro ? "text-slate-500" : "text-slate-400"
+  }`}
+>
                             Asesor: {cliente.asesor || "Sin asesor"}
                           </div>
 
@@ -324,7 +464,11 @@ export default function KanbanPage() {
                               onChange={(e) =>
                                 moverEtapa(cliente, e.target.value)
                               }
-                              className="bg-[#0f172a] border border-slate-700 rounded-lg text-xs px-2"
+                              className={`border rounded-lg text-xs px-2 ${
+  temaClaro
+    ? "bg-white border-slate-300 text-slate-700"
+    : "bg-[#0f172a] border-slate-700 text-white"
+}`}
                             >
                               {etapas.map((e) => (
                                 <option key={e} value={e}>
@@ -336,7 +480,13 @@ export default function KanbanPage() {
                         </div>
                       ))}
 
-                      <button className="w-full text-slate-400 hover:text-white text-sm py-3">
+                      <button
+  className={`w-full text-sm py-3 ${
+    temaClaro
+      ? "text-slate-500 hover:text-slate-900"
+      : "text-slate-400 hover:text-white"
+  }`}
+>
                         + Agregar tarjeta
                       </button>
                     </div>
