@@ -7,6 +7,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { decidirRespuestaBot } from "./bot/cerebro.mjs";
 import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
 import { obtenerHistorialReciente } from "./bot/historial.mjs";
+import { crearBufferMensajes } from "./bot/buffer-mensajes.mjs";
 import { transcribirAudio, analizarImagen, analizarDocumento, analizarVideo } from "./bot/media-ai.mjs";
 
 import makeWASocket, {
@@ -78,6 +79,173 @@ const requiereCloser=false;
  await pool.query("UPDATE clientes SET bot_senales=$1::jsonb,score=$2,temperatura=$3,requiere_closer=$4,bot_activo=CASE WHEN $4 THEN false ELSE bot_activo END,etapa=CASE WHEN $4 THEN $6 ELSE etapa END WHERE id=$5",[JSON.stringify(senales),score,temperatura,requiereCloser,clienteId,"Calificado"]);
  return {senales,score,temperatura,requiereCloser};
 }
+
+
+async function procesarLoteBot(lote) {
+  if (!Array.isArray(lote) || lote.length === 0) return;
+
+  const ultimo = lote[lote.length - 1];
+  const clienteId = ultimo.clienteId;
+  const telefono = ultimo.telefono;
+  const jidRespuesta = ultimo.jidRespuesta || `${telefono}@s.whatsapp.net`;
+
+  const ids = lote
+    .map((item) => Number(item.idConversacion))
+    .filter((id) => Number.isFinite(id));
+
+  const primerId = ids.length ? Math.min(...ids) : Number.MAX_SAFE_INTEGER;
+
+  const partesBot = lote.map((item) => item.textoBot).filter(Boolean);
+  const partesAccion = lote.map((item) => item.textoAccion).filter(Boolean);
+
+  const textoBot =
+    partesBot.length > 1
+      ? `MENSAJES CONSECUTIVOS DEL CLIENTE - responde una sola vez al conjunto:\n${partesBot.join("\n")}`
+      : (partesBot[0] || "");
+
+  const textoAccion = partesAccion.join("\n").trim();
+
+  if (!textoBot) return;
+
+  console.log("BUFFER BOT PROCESANDO:", {
+    clienteId,
+    mensajes: lote.length,
+    primerId,
+  });
+
+  const calificacion = await actualizarCalificacionCliente(
+    clienteId,
+    textoAccion || ""
+  );
+
+  console.log("CALIFICACION BOT:", calificacion);
+
+  if (!calificacion || calificacion.requiereCloser) return;
+
+  const memoria = await obtenerMemoriaBot(pool, clienteId);
+  const historial = await obtenerHistorialReciente(pool, clienteId, primerId);
+
+  const respuestaBot = await decidirRespuestaBot({
+    texto: textoBot,
+    textoAccion: textoAccion || "",
+    calificacion,
+    memoria,
+    historial,
+  });
+
+  if (respuestaBot?.handoff) {
+    const asesorResult = await pool.query(
+      `
+      SELECT u.nombre
+      FROM usuarios u
+      JOIN clientes c ON c.empresa_id = u.empresa_id
+      WHERE c.id = $1
+        AND u.rol = 'asesor'
+      ORDER BY u.id ASC
+      LIMIT 1
+      `,
+      [clienteId]
+    );
+
+    const asesor = asesorResult.rows[0]?.nombre || null;
+
+    await pool.query(
+      `
+      UPDATE clientes
+      SET score = 100,
+          temperatura = 'caliente',
+          requiere_closer = true,
+          bot_activo = false,
+          etapa = 'Calificado',
+          asesor = COALESCE($2, asesor)
+      WHERE id = $1
+      `,
+      [clienteId, asesor]
+    );
+
+    console.log(
+      "HANDOFF A CLOSER:",
+      clienteId,
+      "ASESOR:",
+      asesor || "SIN ASESOR"
+    );
+  }
+
+  if (respuestaBot?.memoria) {
+    await guardarMemoriaBot(pool, clienteId, respuestaBot.memoria);
+  }
+
+  if (!respuestaBot?.mensaje) return;
+
+  const largo = String(respuestaBot.mensaje).length;
+  const demoraHumanaMs = Math.min(
+    4000,
+    1500 + Math.floor(largo * 7) + Math.floor(Math.random() * 700)
+  );
+
+  console.log("DEMORA HUMANA BOT:", demoraHumanaMs, "ms");
+
+  try {
+    await sock?.sendPresenceUpdate?.("composing", jidRespuesta);
+  } catch {}
+
+  await new Promise((resolve) => setTimeout(resolve, demoraHumanaMs));
+
+  try {
+    await sock?.sendPresenceUpdate?.("paused", jidRespuesta);
+  } catch {}
+
+  const enviadoBot = await sock.sendMessage(jidRespuesta, {
+    text: respuestaBot.mensaje,
+  });
+
+  await pool.query(
+    `
+    INSERT INTO conversaciones (
+      cliente_id,
+      telefono,
+      whatsapp_message_id,
+      mensaje,
+      remitente,
+      tipo,
+      empresa_id,
+      whatsapp_qr_id,
+      canal
+     )
+    VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'qr')
+    ON CONFLICT (whatsapp_message_id)
+    WHERE whatsapp_message_id IS NOT NULL
+    DO UPDATE SET
+      mensaje = EXCLUDED.mensaje,
+      remitente = 'bot'
+    `,
+    [
+      clienteId,
+      telefono,
+      enviadoBot?.key?.id || null,
+      respuestaBot.mensaje,
+      empresaQrId,
+      whatsappQrId,
+    ]
+  );
+
+  console.log("BOT RESPONDIO:", {
+    tipo: respuestaBot?.tipo,
+    producto: respuestaBot?.producto,
+    intencion: respuestaBot?.intencion,
+    objecion: respuestaBot?.objecion,
+    nivelInteres: respuestaBot?.nivelInteres,
+    accion: respuestaBot?.accion,
+    handoff: respuestaBot?.handoff,
+    mensajesAgrupados: lote.length,
+  });
+}
+
+const bufferMensajesBot = crearBufferMensajes({
+  silencioMs: 3000,
+  maxEsperaMs: 10000,
+  procesarLote: procesarLoteBot,
+});
 
 async function iniciarWhatsApp() {
   const MEDIA_DIR = "./auth/media";
@@ -596,108 +764,28 @@ if (mensajeGuardado.rowCount === 0) {
 
 console.log("Mensaje guardado en PostgreSQL");
 
-      const textoBot = [texto, mediaAnalisis ? `[ANALISIS INTERNO DEL ARCHIVO - NO ES TEXTO DEL CLIENTE]: ${mediaAnalisis}` : ""].filter(Boolean).join("\n\n");
+      const textoBot = [texto, mediaAnalisis ? `[ANALISIS INTERNO DEL ARCHIVO - NO ES TEXTO DEL CLIENTE]: ${mediaAnalisis}` : ""]
+        .filter(Boolean)
+        .join("\n\n");
 
       if (!esMio && textoBot) {
-        const calificacion = await actualizarCalificacionCliente(clienteId, textoBot);
-        console.log("CALIFICACION BOT:", calificacion);
+        const textoAccion = tipoMensaje === "audio" ? (mediaAnalisis || texto) : texto;
+        const jidRespuesta = msg.key.remoteJidAlt || `${telefono}@s.whatsapp.net`;
 
-        if (calificacion && !calificacion.requiereCloser) {
-          const memoria = await obtenerMemoriaBot(pool, clienteId);
-const historial = await obtenerHistorialReciente(pool, clienteId, mensajeGuardado.rows[0].id);
-const textoAccion = tipoMensaje === "audio" ? (mediaAnalisis || texto) : texto;
-const respuestaBot = await decidirRespuestaBot({ texto: textoBot, textoAccion, calificacion, memoria, historial });
+        bufferMensajesBot.agregar(`${empresaQrId}:${clienteId}`, {
+          idConversacion: mensajeGuardado.rows[0].id,
+          clienteId,
+          telefono,
+          jidRespuesta,
+          textoBot,
+          textoAccion,
+        });
 
-          if (respuestaBot?.handoff) {
-  const asesorResult = await pool.query(
-    `
-    SELECT u.nombre
-    FROM usuarios u
-    JOIN clientes c ON c.empresa_id = u.empresa_id
-    WHERE c.id = $1
-      AND u.rol = 'asesor'
-    ORDER BY u.id ASC
-    LIMIT 1
-    `,
-    [clienteId]
-  );
-
-  const asesor = asesorResult.rows[0]?.nombre || null;
-
-  await pool.query(
-    `
-    UPDATE clientes
-    SET score = 100,
-        temperatura = 'caliente',
-        requiere_closer = true,
-        bot_activo = false,
-        etapa = 'Calificado',
-        asesor = COALESCE($2, asesor)
-    WHERE id = $1
-    `,
-    [clienteId, asesor]
-  );
-
-  console.log(
-    "HANDOFF A CLOSER:",
-    clienteId,
-    "ASESOR:",
-    asesor || "SIN ASESOR"
-  );
-}
-
-          if (respuestaBot?.memoria) {
-            await guardarMemoriaBot(pool, clienteId, respuestaBot.memoria);
-          }
-
-          if (respuestaBot?.mensaje) {
-            const jidRespuesta = msg.key.remoteJidAlt || `${telefono}@s.whatsapp.net`;
-
-            const enviadoBot = await sock.sendMessage(jidRespuesta, {
-  text: respuestaBot.mensaje,
-});
-
-await pool.query(
-  `
-  INSERT INTO conversaciones (
-    cliente_id,
-    telefono,
-    whatsapp_message_id,
-    mensaje,
-    remitente,
-    tipo,
-    empresa_id,
-    whatsapp_qr_id,
-    canal
-  )
-  VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'qr')
-  ON CONFLICT (whatsapp_message_id)
-  WHERE whatsapp_message_id IS NOT NULL
-  DO UPDATE SET
-    mensaje = EXCLUDED.mensaje,
-    remitente = 'bot'
-  `,
-  [
-    clienteId,
-    telefono,
-    enviadoBot?.key?.id || null,
-    respuestaBot.mensaje,
-    empresaQrId,
-    whatsappQrId,
-  ]
-);
-
-console.log("BOT RESPONDIO:", {
-  tipo: respuestaBot?.tipo,
-  producto: respuestaBot?.producto,
-  intencion: respuestaBot?.intencion,
-  objecion: respuestaBot?.objecion,
-  nivelInteres: respuestaBot?.nivelInteres,
-  accion: respuestaBot?.accion,
-  handoff: respuestaBot?.handoff,
-});
-          }
-        }
+        console.log("BUFFER BOT AGREGADO:", {
+          clienteId,
+          idConversacion: mensajeGuardado.rows[0].id,
+          tipoMensaje,
+        });
       }
     } catch (error) {
       console.error("Error guardando mensaje:", error);
