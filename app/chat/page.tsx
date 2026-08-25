@@ -995,21 +995,63 @@ useEffect(() => {
       : "bg-slate-900/60 border-slate-700"
   }`}
 >
-          <p
-  className={`text-xs font-bold ${
-    temaClaro ? "text-slate-900" : "text-white"
-  }`}
->
-  Calificacion del bot
-</p>
-          <p className="text-xs text-slate-300">Producto: <span className="text-white font-bold">{nombreProductoBot(clienteActivo.bot_producto)}</span></p>
-          <p className="text-xs text-slate-300">Uso: <span className="text-white font-bold">{clienteActivo.bot_contexto?.uso || "Sin identificar"}</span></p>
-          <p className="text-xs text-slate-300">Ciudad detectada: <span className="text-white font-bold">{clienteActivo.bot_contexto?.ciudad || "Sin identificar"}</span></p>
-          <p className="text-xs text-slate-300">Score: <span className="text-white font-bold">{clienteActivo.score ?? 0}/100</span></p>
-          <p className="text-xs text-slate-300">Temperatura: <span className="text-white font-bold">{clienteActivo.temperatura || "frio"}</span></p>
-          <p className="text-xs text-slate-300">Bot: <span className="text-white font-bold">{clienteActivo.bot_activo === false ? "Pausado" : "Activo"}</span></p>
-          <p className="text-xs text-slate-300">Closer: <span className="text-white font-bold">{clienteActivo.requiere_closer ? "Requiere closer" : "Aun no"}</span></p>
-        </div>
+  <p
+    className={`text-xs font-bold ${
+      temaClaro ? "text-slate-900" : "text-white"
+    }`}
+  >
+    Calificacion del bot
+  </p>
+
+  <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
+    Producto:{" "}
+    <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
+      {nombreProductoBot(clienteActivo.bot_producto)}
+    </span>
+  </p>
+
+  <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
+    Uso:{" "}
+    <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
+      {clienteActivo.bot_contexto?.uso || "Sin identificar"}
+    </span>
+  </p>
+
+  <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
+    Ciudad detectada:{" "}
+    <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
+      {clienteActivo.bot_contexto?.ciudad || "Sin identificar"}
+    </span>
+  </p>
+
+  <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
+    Score:{" "}
+    <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
+      {clienteActivo.score ?? 0}/100
+    </span>
+  </p>
+
+  <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
+    Temperatura:{" "}
+    <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
+      {clienteActivo.temperatura || "frio"}
+    </span>
+  </p>
+
+  <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
+    Bot:{" "}
+    <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
+      {clienteActivo.bot_activo === false ? "Pausado" : "Activo"}
+    </span>
+  </p>
+
+  <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
+    Closer:{" "}
+    <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
+      {clienteActivo.requiere_closer ? "Requiere closer" : "Aun no"}
+    </span>
+  </p>
+</div>
 
         <div>
           <p className="text-slate-500 text-xs">Última actividad</p>
