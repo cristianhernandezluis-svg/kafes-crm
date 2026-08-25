@@ -385,8 +385,10 @@ if (jidAlt && jidAlt.endsWith("@s.whatsapp.net")) {
 ) {
   telefono = msg.key.participant.replace("@s.whatsapp.net", "");
 } else if (jid.endsWith("@lid")) {
-  console.log("WhatsApp envio un LID en vez del telefono:", jid);
-  telefono = jid.replace("@lid", "");
+  const pnMapeado = telefonoPorLidHistorial.get(jid);
+  if (pnMapeado?.endsWith("@s.whatsapp.net")) telefono = pnMapeado.replace("@s.whatsapp.net", "");
+  else if (pnMapeado?.endsWith("@c.us")) telefono = pnMapeado.replace("@c.us", "");
+  else { console.log("LID sin telefono mapeado:", jid); return; }
 } else {
   console.log("No se pudo identificar el numero:", jid);
   return;
