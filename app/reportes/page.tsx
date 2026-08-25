@@ -3,83 +3,155 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const [temaClaro, setTemaClaro] = useState(false);
+export default function ReportesPage() {
+  const [temaClaro, setTemaClaro] = useState(false);
 
-useEffect(() => {
-  const temaGuardado = localStorage.getItem("tema-crm");
-  setTemaClaro(temaGuardado === "claro");
-}, []);
+  useEffect(() => {
+    const temaGuardado = localStorage.getItem("tema-crm");
+    setTemaClaro(temaGuardado === "claro");
+  }, []);
 
-const panelTema = temaClaro
-  ? "bg-white border-slate-200 shadow-sm"
-  : "bg-[#0f172a] border-slate-800";
+  const panelTema = temaClaro
+    ? "bg-white border-slate-200 shadow-sm"
+    : "bg-[#0f172a] border-slate-800";
 
-const botonTema = temaClaro
-  ? "bg-white border-slate-300 text-slate-700"
-  : "bg-[#0f172a] border-slate-800 text-white";
+  const botonTema = temaClaro
+    ? "bg-white border-slate-300 text-slate-700"
+    : "bg-[#0f172a] border-slate-800 text-white";
+
   return (
-    
-      <aside class<div
-  className={`min-h-screen flex ${
-    temaClaro
-      ? "bg-slate-100 text-slate-900"
-      : "bg-[#08111f] text-white"
+
+  <div
+    className={`min-h-screen flex ${
+      temaClaro
+        ? "bg-slate-100 text-slate-900"
+        : "bg-[#08111f] text-white"
+    }`}
+  >
+    <aside
+      className={`hidden lg:flex w-[220px] flex-col h-screen sticky top-0 border-r ${
+        temaClaro
+          ? "bg-white text-slate-800 border-slate-200"
+          : "bg-[#101820] text-white border-[#1f2a33]"
+      }`}
+    >
+                         <Link
+  href="/dashboard"
+  className={`flex items-center gap-3 px-4 py-4 border-b ${
+    temaClaro ? "border-slate-200" : "border-[#1f2a33]"
   }`}
->Name="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col h-screen sticky top-0 border-r border-[#1f2a33]">
-        <Link href="/dashboard" className={`flex items-center gap-3 px-4 py-4 border-b ${
-  temaClaro ? "border-slate-200" : "border-[#1f2a33]"
-}`}>
-          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">K</div>
-          <h1 className="text-xl font-black">Kafes <span className="text-green-400">CRM</span></h1>
+>
+  <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
+    K
+  </div>
+
+  <h1 className="text-xl font-black">
+    Kafes <span className="text-green-400">CRM</span>
+  </h1>
+</Link>
+
+<div className="px-4 pt-5 pb-2">
+  <p className="text-[11px] text-slate-400 uppercase font-bold">
+    Principal
+  </p>
+</div>
+
+<nav className="flex-1 px-2 space-y-1">
+        <Link
+          href="/dashboard"
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+            temaClaro
+              ? "hover:bg-slate-100 text-slate-700"
+              : "hover:bg-slate-800 text-white"
+          }`}
+        >
+          📊 Dashboard
         </Link>
 
-        <div className="px-4 pt-5 pb-2">
-          <p className="text-[11px] text-slate-400 uppercase font-bold">Principal</p>
-        </div>
+        <Link
+          href="/chat"
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+            temaClaro
+              ? "hover:bg-slate-100 text-slate-700"
+              : "hover:bg-slate-800 text-white"
+          }`}
+        >
+          💬 Conversaciones
+        </Link>
 
-        <nav className="flex-1 px-2 space-y-1">
-          <Link href="/dashboard" className="flex items-center gap-3 px-3 py-3 rounded-lg className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`} text-sm">📊 Dashboard</Link>
-          <Link href="/chat" className="flex items-center gap-3 px-3 py-3 rounded-lg className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`} text-sm">💬 Conversaciones</Link>
-          <Link href="/contactos" className="flex items-center gap-3 px-3 py-3 rounded-lg className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`} text-sm">👤 Contactos</Link>
-          <Link href="/kanban" className="flex items-center gap-3 px-3 py-3 rounded-lg className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`} text-sm">🧩 Kanban</Link>
-          <Link href="/mensajes" className="flex items-center gap-3 px-3 py-3 rounded-lg className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`} text-sm">✉️ Mensajes</Link>
-          <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`} text-sm">📄 Plantillas</Link>
-          <Link href="/automatizaciones" className="flex items-center gap-3 px-3 py-3 rounded-lg className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`} text-sm">⚙️ Automatizaciones</Link>
-          <Link href="/reportes" className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm">📊 Reportes</Link>
-          <Link href="/ajustes" className="flex items-center gap-3 px-3 py-3 rounded-lg className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`} text-sm">⚙️ Ajustes</Link>
-        </nav>
+        <Link
+          href="/contactos"
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+            temaClaro
+              ? "hover:bg-slate-100 text-slate-700"
+              : "hover:bg-slate-800 text-white"
+          }`}
+        >
+          👤 Contactos
+        </Link>
+
+        <Link
+          href="/kanban"
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+            temaClaro
+              ? "hover:bg-slate-100 text-slate-700"
+              : "hover:bg-slate-800 text-white"
+          }`}
+        >
+          🧩 Kanban
+        </Link>
+
+        <Link
+          href="/mensajes"
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+            temaClaro
+              ? "hover:bg-slate-100 text-slate-700"
+              : "hover:bg-slate-800 text-white"
+          }`}
+        >
+          ✉️ Mensajes
+        </Link>
+
+        <Link
+          href="/plantillas"
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+            temaClaro
+              ? "hover:bg-slate-100 text-slate-700"
+              : "hover:bg-slate-800 text-white"
+          }`}
+        >
+          📄 Plantillas
+        </Link>
+
+        <Link
+          href="/automatizaciones"
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+            temaClaro
+              ? "hover:bg-slate-100 text-slate-700"
+              : "hover:bg-slate-800 text-white"
+          }`}
+        >
+          ⚙️ Automatizaciones
+        </Link>
+
+        <Link
+          href="/reportes"
+          className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm"
+        >
+          📊 Reportes
+        </Link>
+
+        <Link
+          href="/ajustes"
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
+            temaClaro
+              ? "hover:bg-slate-100 text-slate-700"
+              : "hover:bg-slate-800 text-white"
+          }`}
+        >
+          ⚙️ Ajustes
+        </Link>
+      </nav>
 
         <div className="p-3">
           <div
@@ -101,13 +173,16 @@ const botonTema = temaClaro
                 <p className="text-xs text-slate-400">QR activo</p>
               </div>
             </div>
-            <Link href="/dashboard/canales" className="block w-full text-center border border-slate-700 rounded-lg py-2 text-xs font-bold className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`}">
-              VER QR
-            </Link>
+            <Link
+  href="/dashboard/canales"
+  className={`block w-full text-center border rounded-lg py-2 text-xs font-bold ${
+    temaClaro
+      ? "border-slate-300 text-slate-700 hover:bg-slate-100"
+      : "border-slate-700 text-white hover:bg-slate-800"
+  }`}
+>
+  VER QR
+</Link>
           </div>
         </div>
       </aside>
@@ -201,7 +276,7 @@ const botonTema = temaClaro
           </div>
 
           <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-5 col-span-1">
+            <div className={`${panelTema} border rounded-2xl p-5 col-span-1`}>
               <h3 className="font-black mb-5">Conversaciones por día</h3>
               <div className="h-40 flex items-end gap-2">
                 {[30, 45, 60, 80, 65, 90, 120, 160, 130, 140, 110, 95].map((h, i) => (
