@@ -7,7 +7,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { decidirRespuestaBot } from "./bot/cerebro.mjs";
 import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
 import { obtenerHistorialReciente } from "./bot/historial.mjs";
-import { transcribirAudio } from "./bot/media-ai.mjs";
+import { transcribirAudio, analizarImagen } from "./bot/media-ai.mjs";
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -473,6 +473,16 @@ let mediaAnalisis = null;
           mediaAnalisis = null;
         }
       }
+
+      if (tipoMensaje === "image" && !esMio) {
+        try {
+          mediaAnalisis = await analizarImagen(`${MEDIA_DIR}/${mediaId}`, mimeType || "image/jpeg");
+          console.log("IMAGEN ANALIZADA:", mediaAnalisis);
+        } catch (errorIA) {
+          console.error("ERROR ANALIZANDO IMAGEN:", errorIA?.message || errorIA);
+          mediaAnalisis = null;
+        }
+      }
       console.log("MEDIA GUARDADO:", mediaId, mimeType);
     } catch (errorMedia) {
       console.error("ERROR DESCARGANDO MEDIA:", errorMedia?.message || errorMedia);
@@ -567,7 +577,7 @@ if (mensajeGuardado.rowCount === 0) {
 
 console.log("Mensaje guardado en PostgreSQL");
 
-      const textoBot = texto || mediaAnalisis || "";
+      const textoBot = [texto, mediaAnalisis].filter(Boolean).join("\n\n");
 
       if (!esMio && textoBot) {
         const calificacion = await actualizarCalificacionCliente(clienteId, textoBot);
