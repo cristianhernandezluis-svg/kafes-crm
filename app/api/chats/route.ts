@@ -14,6 +14,14 @@ export async function GET(request: Request) {
     if (!empresaId || !whatsappQrId) return NextResponse.json({ success: true, chats: [] });
 
     const result = await pool.query(`
+      WITH no_leidos AS (
+        SELECT cliente_id, COUNT(*) AS total
+        FROM conversaciones
+        WHERE whatsapp_qr_id = $2
+          AND remitente = 'cliente'
+          AND COALESCE(leido, false) = false
+        GROUP BY cliente_id
+      )
       SELECT
         c.id,
         c.nombre,
@@ -47,14 +55,7 @@ export async function GET(request: Request) {
         LIMIT 1
       ) ult ON true
 
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*) AS total
-        FROM conversaciones
-        WHERE cliente_id = c.id
-          AND whatsapp_qr_id = $2
-          AND remitente = 'cliente'
-          AND COALESCE(leido, false) = false
-      ) no_leidos ON true
+      LEFT JOIN no_leidos ON no_leidos.cliente_id = c.id
 
       WHERE c.empresa_id = $1
         AND EXISTS (
