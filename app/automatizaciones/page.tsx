@@ -16,6 +16,24 @@ type Automatizacion = {
 };
 
 export default function AutomatizacionesPage() {
+const [temaClaro, setTemaClaro] = useState(false);
+
+useEffect(() => {
+  const temaGuardado = localStorage.getItem("tema-crm");
+  setTemaClaro(temaGuardado === "claro");
+}, []);
+
+const panelTema = temaClaro
+  ? "bg-white border-slate-200 shadow-sm"
+  : "bg-[#0f172a] border-slate-800";
+
+const inputTema = temaClaro
+  ? "bg-white border-slate-300 text-slate-900"
+  : "bg-[#08111f] border-slate-700 text-white";
+
+const botonTema = temaClaro
+  ? "bg-white border-slate-300 text-slate-700"
+  : "bg-[#0f172a] border-slate-800 text-white";
   const [automatizaciones, setAutomatizaciones] = useState<Automatizacion[]>([]);
   const [activa, setActiva] = useState<Automatizacion | null>(null);
 
@@ -105,9 +123,23 @@ export default function AutomatizacionesPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#08111f] text-white flex">
-<aside className="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col h-screen sticky top-0 border-r border-[#1f2a33]">
-        <Link href="/dashboard" className="flex items-center gap-3 px-4 py-4 border-b border-[#1f2a33]">
+    <div
+  className={`min-h-screen flex ${
+    temaClaro
+      ? "bg-slate-100 text-slate-900"
+      : "bg-[#08111f] text-white"
+  }`}
+>
+<aside
+  className={`hidden lg:flex w-[220px] flex-col h-screen sticky top-0 border-r ${
+    temaClaro
+      ? "bg-white text-slate-800 border-slate-200"
+      : "bg-[#101820] text-white border-[#1f2a33]"
+  }`}
+>
+        <Link href="/dashboard" className={`flex items-center gap-3 px-4 py-4 border-b ${
+  temaClaro ? "border-slate-200" : "border-[#1f2a33]"
+}`}>
           <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
             K
           </div>
@@ -148,8 +180,18 @@ export default function AutomatizacionesPage() {
         </nav>
 
         <div className="p-3">
-          <div className="border border-[#26323d] rounded-xl p-4 bg-[#111c24]">
-            <p className="text-sm font-bold text-slate-300 mb-3">Conexión WhatsApp</p>
+          <div
+  className={`border rounded-xl p-4 ${
+    temaClaro
+      ? "bg-slate-50 border-slate-200"
+      : "bg-[#111c24] border-[#26323d]"
+  }`}
+>
+            <p
+  className={`text-sm font-bold mb-3 ${
+    temaClaro ? "text-slate-700" : "text-slate-300"
+  }`}
+>Conexión WhatsApp</p>
 
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">🟢</div>
@@ -159,19 +201,36 @@ export default function AutomatizacionesPage() {
               </div>
             </div>
 
-            <Link href="/dashboard/canales" className="block w-full text-center border border-slate-700 rounded-lg py-2 text-xs font-bold hover:bg-slate-800">
-              VER QR
-            </Link>
+            <Link
+  href="/dashboard/canales"
+  className={`block w-full text-center border rounded-lg py-2 text-xs font-bold ${
+    temaClaro
+      ? "border-slate-300 text-slate-700 hover:bg-slate-100"
+      : "border-slate-700 text-white hover:bg-slate-800"
+  }`}
+>
+  VER QR
+</Link>
           </div>
         </div>
       </aside>
 
       <main className="flex-1 min-w-0 h-screen overflow-hidden">
 
-  <div className="h-12 bg-[#0b1218] border-b border-[#1f2a33] flex items-center justify-between px-5 shrink-0">
-    <h1 className="text-sm font-bold text-white">
-      Automatizaciones
-    </h1>
+  <div
+  className={`h-12 border-b flex items-center justify-between px-5 shrink-0 ${
+    temaClaro
+      ? "bg-white border-slate-200"
+      : "bg-[#0b1218] border-[#1f2a33]"
+  }`}
+>
+    <h1
+  className={`text-sm font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
+  Automatizaciones
+</h1>
 
     <div className="flex items-center gap-4 text-slate-300">
       <button className="hover:text-white">🔍</button>
@@ -183,9 +242,13 @@ export default function AutomatizacionesPage() {
         </div>
 
         <div>
-          <p className="text-xs font-bold text-white">
-            Administrador
-          </p>
+          <p
+  className={`text-xs font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
+  Administrador
+</p>
 
           <p className="text-[10px] text-green-400">
             ● En línea
@@ -214,12 +277,12 @@ export default function AutomatizacionesPage() {
     <div className="relative">
       <span className="absolute left-4 top-3 text-slate-400">🔍</span>
       <input
-        className="bg-[#0f172a] border border-slate-800 rounded-xl pl-11 pr-4 py-3 outline-none w-[280px] text-sm"
+        className={`${inputTema} border rounded-xl pl-11 pr-4 py-3 outline-none w-[280px] text-sm`}
         placeholder="Buscar automatizaciones..."
       />
     </div>
 
-    <button className="bg-[#0f172a] border border-slate-800 px-4 py-3 rounded-xl text-sm">
+    <button className={`${botonTema} border px-4 py-3 rounded-xl text-sm`}>
       ⚗️ Filtros
     </button>
 
@@ -239,22 +302,40 @@ export default function AutomatizacionesPage() {
 
   <button className="text-slate-400 pb-2">
     Activas
-    <span className="ml-2 bg-slate-800 px-2 py-0.5 rounded-full">
+
+    <span
+      className={`ml-2 px-2 py-0.5 rounded-full ${
+        temaClaro
+          ? "bg-slate-100 text-slate-600"
+          : "bg-slate-800 text-slate-300"
+      }`}
+    >
       {automatizaciones.filter((a) => a.activa).length}
     </span>
   </button>
 
   <button className="text-slate-400 pb-2">
     Inactivas
-    <span className="ml-2 bg-slate-800 px-2 py-0.5 rounded-full">
+
+    <span
+      className={`ml-2 px-2 py-0.5 rounded-full ${
+        temaClaro
+          ? "bg-slate-100 text-slate-600"
+          : "bg-slate-800 text-slate-300"
+      }`}
+    >
       {automatizaciones.filter((a) => !a.activa).length}
     </span>
   </button>
 </div>
 
         <div className="grid grid-cols-[320px_1fr_320px] gap-4">
-          <section className="bg-[#0f172a] border border-slate-800 rounded-2xl overflow-hidden">
-            <div className="p-4 border-b border-slate-800">
+          <section className={`${panelTema} border rounded-2xl overflow-hidden`}>
+            <div
+  className={`p-4 border-b ${
+    temaClaro ? "border-slate-200" : "border-slate-800"
+  }`}
+>
               <h2 className="font-bold">Automatizaciones</h2>
               <p className="text-xs text-slate-400">
                 Selecciona una automatización
@@ -272,9 +353,15 @@ export default function AutomatizacionesPage() {
                 <button
                   key={auto.id}
                   onClick={() => setActiva(auto)}
-                  className={`w-full text-left p-4 border-b border-slate-800 hover:bg-slate-800/70 ${
-                    activa?.id === auto.id ? "bg-green-500/15" : ""
-                  }`}
+                  className={`w-full text-left p-4 border-b transition ${
+  temaClaro
+    ? `border-slate-200 hover:bg-slate-50 ${
+        activa?.id === auto.id ? "bg-green-50" : ""
+      }`
+    : `border-slate-800 hover:bg-slate-800/70 ${
+        activa?.id === auto.id ? "bg-green-500/15" : ""
+      }`
+}`}
                 >
                   <div className="flex justify-between gap-3">
                     <div>
@@ -315,19 +402,19 @@ export default function AutomatizacionesPage() {
             </div>
           </section>
 
-          <section className="bg-[#0f172a] border border-slate-800 rounded-2xl p-5">
+          <section className={`${panelTema} border rounded-2xl p-5`}>
             <h2 className="text-xl font-black mb-4">Crear automatización</h2>
 
             <div className="grid gap-4">
               <input
-                className="bg-[#08111f] border border-slate-700 rounded-xl px-4 py-3 outline-none"
+                className={`${inputTema} border rounded-xl px-4 py-3 outline-none min-h-[140px]`}
                 placeholder="Nombre"
                 value={form.nombre}
                 onChange={(e) => setForm({ ...form, nombre: e.target.value })}
               />
 
               <input
-                className="bg-[#08111f] border border-slate-700 rounded-xl px-4 py-3 outline-none"
+                className={`${inputTema} border rounded-xl px-4 py-3 outline-none`}
                 placeholder="Descripción"
                 value={form.descripcion}
                 onChange={(e) =>
@@ -336,7 +423,7 @@ export default function AutomatizacionesPage() {
               />
 
               <select
-                className="bg-[#08111f] border border-slate-700 rounded-xl px-4 py-3 outline-none"
+                className={`${inputTema} border rounded-xl px-4 py-3 outline-none`}
                 value={form.trigger_tipo}
                 onChange={(e) =>
                   setForm({ ...form, trigger_tipo: e.target.value })
@@ -349,7 +436,7 @@ export default function AutomatizacionesPage() {
               </select>
 
               <textarea
-                className="bg-[#08111f] border border-slate-700 rounded-xl px-4 py-3 outline-none min-h-[140px]"
+                className={`${inputTema} border rounded-xl px-4 py-3 outline-none`}
                 placeholder="Mensaje automático"
                 value={form.mensaje}
                 onChange={(e) => setForm({ ...form, mensaje: e.target.value })}
@@ -357,7 +444,7 @@ export default function AutomatizacionesPage() {
 
               <input
                 type="number"
-                className="bg-[#08111f] border border-slate-700 rounded-xl px-4 py-3 outline-none"
+                className={`${inputTema} border rounded-xl px-4 py-3 outline-none`}
                 placeholder="Horas de espera"
                 value={form.espera_horas}
                 onChange={(e) =>
@@ -377,21 +464,27 @@ export default function AutomatizacionesPage() {
             </div>
           </section>
 
-          <section className="bg-[#0f172a] border border-slate-800 rounded-2xl p-6">
+          <section className={`${panelTema} border rounded-2xl p-6`}>
   <div className="flex justify-between items-center mb-6">
     <h2 className="text-xl font-black">
       {activa?.nombre || "Flujo"}
     </h2>
 
     <div className="flex gap-2">
-      <button className="bg-slate-800 px-4 py-2 rounded-lg text-sm">
-        Probar flujo
-      </button>
+  <button
+    className={`px-4 py-2 rounded-lg text-sm ${
+      temaClaro
+        ? "bg-slate-100 text-slate-700"
+        : "bg-slate-800 text-white"
+    }`}
+  >
+    Probar flujo
+  </button>
 
-      <button className="bg-green-500 px-4 py-2 rounded-lg text-sm font-bold">
-        Guardar
-      </button>
-    </div>
+  <button className="bg-green-500 px-4 py-2 rounded-lg text-sm font-bold text-white">
+    Guardar
+  </button>
+</div>
   </div>
 
   <div className="flex flex-col items-center gap-6 py-8">
@@ -410,7 +503,11 @@ export default function AutomatizacionesPage() {
       </p>
     </div>
 
-    <div className="h-12 border-l border-slate-700"></div>
+    <div
+  className={`h-12 border-l ${
+    temaClaro ? "border-slate-300" : "border-slate-700"
+  }`}
+></div>
 
     <div className="w-[280px] border border-yellow-500 rounded-xl p-4 bg-yellow-500/10">
       <p className="text-yellow-400 text-sm font-bold">
@@ -428,7 +525,11 @@ export default function AutomatizacionesPage() {
 
     <div className="h-12 border-l border-slate-700"></div>
 
-    <div className="w-[320px] border border-green-500 rounded-xl p-4 bg-slate-900">
+    <div
+  className={`w-[320px] border border-green-500 rounded-xl p-4 ${
+    temaClaro ? "bg-green-50" : "bg-slate-900"
+  }`}
+>
       <p className="text-green-400 text-sm font-bold">
         💬 Enviar mensaje
       </p>
@@ -439,7 +540,11 @@ export default function AutomatizacionesPage() {
       </p>
     </div>
 
-    <div className="h-12 border-l border-slate-700"></div>
+    <div
+  className={`h-12 border-l ${
+    temaClaro ? "border-slate-300" : "border-slate-700"
+  }`}
+></div>
 
     <div className="w-[280px] border border-blue-500 rounded-xl p-4 bg-blue-500/10">
       <p className="text-blue-400 text-sm font-bold">
