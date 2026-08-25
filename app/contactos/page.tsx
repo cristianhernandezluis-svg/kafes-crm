@@ -15,6 +15,12 @@ type Cliente = {
 };
 
 export default function ContactosPage() {
+const [temaClaro, setTemaClaro] = useState(false);
+
+useEffect(() => {
+  const temaGuardado = localStorage.getItem("tema-crm");
+  setTemaClaro(temaGuardado === "claro");
+}, []);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -61,8 +67,20 @@ export default function ContactosPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#08111f] text-white">
-      <div className="border-b border-slate-800 px-6 py-4 flex justify-between items-center">
+    <div
+  className={`min-h-screen ${
+    temaClaro
+      ? "bg-slate-100 text-slate-900"
+      : "bg-[#08111f] text-white"
+  }`}
+>
+      <div
+  className={`border-b px-6 py-4 flex justify-between items-center ${
+    temaClaro
+      ? "bg-white border-slate-200"
+      : "border-slate-800"
+  }`}
+>
         <div>
           <h1 className="text-3xl font-black">
             Contactos{" "}
@@ -71,11 +89,19 @@ export default function ContactosPage() {
             </span>
           </h1>
 
-          <p className="text-slate-400">Gestiona todos tus clientes</p>
+          <p className={temaClaro ? "text-slate-500" : "text-slate-400"}>
+  Gestiona todos tus clientes
+</p>
         </div>
 
         <div className="flex gap-3">
-          <button className="bg-slate-800 px-4 py-2 rounded-xl">
+          <button
+  className={`px-4 py-2 rounded-xl ${
+    temaClaro
+      ? "bg-white border border-slate-300 text-slate-800"
+      : "bg-slate-800 text-white"
+  }`}
+>
             Importar
           </button>
 
@@ -114,10 +140,20 @@ export default function ContactosPage() {
             placeholder="🔍 Buscar contactos..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="bg-[#111827] border border-slate-700 rounded-xl px-4 py-3 w-[350px] outline-none"
+            className={`border rounded-xl px-4 py-3 w-[350px] outline-none ${
+  temaClaro
+    ? "bg-white border-slate-300 text-slate-900"
+    : "bg-[#111827] border-slate-700 text-white"
+}`}
           />
 
-          <button className="bg-[#111827] border border-slate-700 px-4 rounded-xl">
+          <button
+  className={`border px-4 rounded-xl ${
+    temaClaro
+      ? "bg-white border-slate-300 text-slate-700"
+      : "bg-[#111827] border-slate-700 text-white"
+  }`}
+>
             Filtros
           </button>
         </div>
@@ -127,7 +163,11 @@ export default function ContactosPage() {
             Todos
           </button>
 
-          <button className="bg-[#111827] px-4 py-2 rounded-xl text-sm">
+          <button className={`px-4 py-2 rounded-xl text-sm ${
+  temaClaro
+    ? "bg-white border border-slate-200 text-slate-700"
+    : "bg-[#111827] text-white"
+}`}>
             Clientes
           </button>
 
@@ -140,9 +180,15 @@ export default function ContactosPage() {
           </button>
         </div>
 
-        <div className="bg-[#0f172a] border border-slate-800 rounded-2xl overflow-hidden">
+        <div
+  className={`border rounded-2xl overflow-hidden ${
+    temaClaro
+      ? "bg-white border-slate-200"
+      : "bg-[#0f172a] border-slate-800"
+  }`}
+>
           <table className="w-full">
-            <thead className="bg-[#111827]">
+            <thead className={temaClaro ? "bg-slate-50" : "bg-[#111827]"}>
               <tr>
                 <th className="text-left p-4">Nombre</th>
                 <th className="text-left p-4">Teléfono</th>
@@ -171,7 +217,11 @@ export default function ContactosPage() {
                 contactosFiltrados.map((cliente) => (
                   <tr
                     key={cliente.id}
-                    className="border-t border-slate-800 hover:bg-slate-900"
+                    className={`border-t ${
+  temaClaro
+    ? "border-slate-200 hover:bg-slate-50"
+    : "border-slate-800 hover:bg-slate-900"
+}`}
                   >
                     <td className="p-4">
                       <div className="flex items-center gap-3">
@@ -180,7 +230,11 @@ export default function ContactosPage() {
                         </div>
 
                         <div>
-                          <p className="font-bold text-white">
+                          <p
+  className={`font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
                             {cliente.nombre || "Sin nombre"}
                           </p>
                           <p className="text-xs text-slate-400">
@@ -207,7 +261,13 @@ export default function ContactosPage() {
                     </td>
 
                     <td className="p-4">
-                      <span className="bg-slate-800 text-slate-300 px-3 py-1 rounded-full text-xs">
+                      <span
+  className={`px-3 py-1 rounded-full text-xs ${
+    temaClaro
+      ? "bg-slate-100 text-slate-600"
+      : "bg-slate-800 text-slate-300"
+  }`}
+>
                         {cliente.canal || "crm"}
                       </span>
                     </td>
@@ -215,7 +275,11 @@ export default function ContactosPage() {
                     <td className="p-4 flex gap-2">
                       <Link
                         href={`/clientes/${cliente.id}`}
-                        className="bg-slate-800 px-3 py-1 rounded-lg text-sm"
+                        className={`px-3 py-1 rounded-lg text-sm ${
+  temaClaro
+    ? "bg-slate-100 border border-slate-200 text-slate-700"
+    : "bg-slate-800 text-white"
+}`}
                       >
                         Ver
                       </Link>
