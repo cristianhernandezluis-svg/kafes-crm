@@ -273,53 +273,61 @@ useEffect(() => {
       : "border-slate-800"
   }`}
 >
-          <div className="flex gap-3">
-            <button >
-              OportunidadesclassName={`border px-4 py-2 rounded-xl ${
-  temaClaro
-    ? "bg-white border-slate-300 text-slate-700"
-    : "bg-[#111827] border-slate-700 text-white"
-}`}
-            </button>
+  <div className="flex gap-3">
+    <button
+      className={`border px-4 py-2 rounded-xl ${
+        temaClaro
+          ? "bg-white border-slate-300 text-slate-700"
+          : "bg-[#111827] border-slate-700 text-white"
+      }`}
+    >
+      Oportunidades
+    </button>
 
-            <button className="bg-green-700/50 border border-green-700 px-4 py-2 rounded-xl">
-              Kanban
-            </button>
+    <button className="bg-green-700/50 border border-green-700 px-4 py-2 rounded-xl">
+      Kanban
+    </button>
 
-            <button className={`border px-4 py-2 rounded-xl ${
-  temaClaro
-    ? "bg-white border-slate-300 text-slate-700"
-    : "bg-[#111827] border-slate-700 text-white"
-}`}>
-              Lista
-            </button>
-          </div>
+    <button
+      className={`border px-4 py-2 rounded-xl ${
+        temaClaro
+          ? "bg-white border-slate-300 text-slate-700"
+          : "bg-[#111827] border-slate-700 text-white"
+      }`}
+    >
+      Lista
+    </button>
+  </div>
 
-          <div className="flex gap-3">
-            <button className={`border px-4 py-2 rounded-xl ${
-  temaClaro
-    ? "bg-white border-slate-300 text-slate-700"
-    : "bg-[#111827] border-slate-700 text-white"
-}`}>
-              Filtro
-            </button>
+  <div className="flex gap-3">
+    <button
+      className={`border px-4 py-2 rounded-xl ${
+        temaClaro
+          ? "bg-white border-slate-300 text-slate-700"
+          : "bg-[#111827] border-slate-700 text-white"
+      }`}
+    >
+      Filtro
+    </button>
 
-            <button className={`border px-4 py-2 rounded-xl ${
-  temaClaro
-    ? "bg-white border-slate-300 text-slate-700"
-    : "bg-[#111827] border-slate-700 text-white"
-}`}>
-              Asignado a: Todos
-            </button>
+    <button
+      className={`border px-4 py-2 rounded-xl ${
+        temaClaro
+          ? "bg-white border-slate-300 text-slate-700"
+          : "bg-[#111827] border-slate-700 text-white"
+      }`}
+    >
+      Asignado a: Todos
+    </button>
 
-            <Link
-              href="/contactos"
-              className="bg-green-600 px-4 py-2 rounded-xl font-bold"
-            >
-              + Nueva oportunidad
-            </Link>
-          </div>
-        </div>
+    <Link
+      href="/contactos"
+      className="bg-green-600 px-4 py-2 rounded-xl font-bold text-white"
+    >
+      + Nueva oportunidad
+    </Link>
+  </div>
+</div>
 
         <div className="p-6 overflow-x-auto">
           {cargando ? (
