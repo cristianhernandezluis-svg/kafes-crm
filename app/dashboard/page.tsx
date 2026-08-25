@@ -515,6 +515,30 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   })
 );
 
+const panelTema = temaClaro
+  ? "bg-white border-slate-200 shadow-sm"
+  : "bg-[#111827] border-slate-800";
+
+const tituloTema = temaClaro
+  ? "text-slate-900"
+  : "text-white";
+
+const textoSecundarioTema = temaClaro
+  ? "text-slate-500"
+  : "text-slate-400";
+
+const tarjetaInternaTema = temaClaro
+  ? "bg-slate-50 border-slate-200"
+  : "bg-slate-900 border-slate-800";
+
+const inputTema = temaClaro
+  ? "bg-white border-slate-300 text-slate-700"
+  : "bg-[#0f172a] border-slate-700 text-slate-300";
+
+const barraTema = temaClaro
+  ? "bg-slate-200"
+  : "bg-slate-800";
+
   return (
     <div
   className={`min-h-screen flex transition-colors duration-300 ${
@@ -630,7 +654,11 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
       >
         VER QR
       </Link>
-<div className="mt-3 pt-3 border-t border-[#26323d]">
+<div
+  className={`mt-3 pt-3 border-t ${
+    temaClaro ? "border-slate-200" : "border-[#26323d]"
+  }`}
+>
   <button
     type="button"
     onClick={cambiarTema}
@@ -715,11 +743,11 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   <div className="h-[calc(100vh-48px)] overflow-y-auto p-3 md:p-6">
         <div className="flex justify-between items-center">
   <div>
-    <h1 className="text-2xl md:text-3xl font-black text-white">
+    <h1 className={`text-2xl md:text-3xl font-black ${tituloTema}`}>
       Hola Cristian 👋
     </h1>
 
-    <p className="text-slate-400 mt-1">
+    <p className={`${textoSecundarioTema} mt-1`}>
       Aquí tienes el resumen general de tu CRM
     </p>
   </div>
@@ -743,11 +771,11 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mt-6">
   <Link href="/leads-nuevos">
-    <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 hover:border-green-500 cursor-pointer transition">
+    <div className={`${panelTema} border rounded-2xl p-5 hover:border-green-500 cursor-pointer transition`}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-slate-400 text-sm">Leads nuevos</p>
-          <h2 className="text-3xl font-black text-white mt-2">{leadsNuevos}</h2>
+          <h2 className={`text-3xl font-black mt-2 ${tituloTema}`}>{leadsNuevos}</h2>
           <p className="text-green-400 text-sm mt-2">↑ 12% vs ayer</p>
         </div>
         <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -758,11 +786,11 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   </Link>
 
 <Link href="/seguimiento" className="block">
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 hover:border-yellow-500 cursor-pointer transition">
+  <div className={`${panelTema} border rounded-2xl p-5 hover:border-yellow-500 cursor-pointer transition`}>
     <div className="flex items-center justify-between">
       <div>
         <p className="text-slate-400 text-sm">En seguimiento</p>
-        <h2 className="text-4xl font-black text-white mt-2">
+        <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>
           {enSeguimiento}
         </h2>
         <p className="text-green-400 text-sm mt-2">↑ 8% vs ayer</p>
@@ -775,14 +803,14 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   </div>
 </Link>
   <Link href="/pagos-adelanto" className="block">
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 hover:border-green-500 cursor-pointer transition">
+  
     <div className="flex items-center justify-between">
       <div>
         <p className="text-slate-400 text-sm">Pagó adelanto</p>
-        <h2 className="text-4xl font-black text-white mt-2">{pagoAdelanto}</h2>
+        <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>{pagoAdelanto}</h2>
         <p className="text-green-400 text-sm mt-2">↑ 15% vs ayer</p>
       </div>
-
+<div className={`${panelTema} border rounded-2xl p-5 hover:border-green-500 cursor-pointer transition`}>
       <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
         <DollarSign className="text-green-400" size={28} />
       </div>
@@ -795,7 +823,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
     <div className="flex items-center justify-between">
       <div>
         <p className="text-slate-400 text-sm">Ventas entregadas</p>
-        <h2 className="text-4xl font-black text-white mt-2">{ventasEntregadas}</h2>
+        <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>{ventasEntregadas}</h2>
         <p className="text-green-400 text-sm mt-2">↑ 10% vs ayer</p>
       </div>
 
@@ -807,11 +835,11 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 </Link>
 
   <Link href="/no-responden" className="block">
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5 hover:border-red-500 cursor-pointer transition">
+  <div className={`${panelTema} border rounded-2xl p-5 hover:border-red-500 cursor-pointer transition`}>
     <div className="flex items-center justify-between">
       <div>
         <p className="text-slate-400 text-sm">No responden</p>
-        <h2 className="text-4xl font-black text-white mt-2">
+        <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>
           {noResponden}
         </h2>
         <p className="text-red-400 text-sm mt-2">↓ 5% vs ayer</p>
@@ -826,12 +854,12 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 </div>
 
 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
-    <h3 className="text-base font-bold text-white">📈 📈 Ventas por día</h3>
+  <div className={`${panelTema} border rounded-2xl p-3`}>
+    <h3 className={`text-base font-bold ${tituloTema}`}>📈 📈 Ventas por día</h3>
     <select
   value={filtroFechaVentas}
   onChange={(e) => setFiltroFechaVentas(e.target.value)}
-  className="bg-[#0f172a] border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-2 mb-3 outline-none"
+  className={`${inputTema} border text-xs rounded-lg px-3 py-2 mb-3 outline-none`}
 >
   <option value="hoy">Hoy</option>
   <option value="ayer">Ayer</option>
@@ -851,8 +879,14 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
     </linearGradient>
   </defs>
 
-  <XAxis dataKey="dia" stroke="#94a3b8" />
-  <YAxis stroke="#94a3b8" />
+  <XAxis
+  dataKey="dia"
+  stroke={temaClaro ? "#64748b" : "#94a3b8"}
+/>
+
+<YAxis
+  stroke={temaClaro ? "#64748b" : "#94a3b8"}
+/>
   <Tooltip />
 
   <Area
@@ -869,8 +903,8 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
     </div>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-5">
-  <h3 className="text-sm font-bold text-white mb-4">
+  <div className={`${panelTema} border rounded-2xl p-5`}>
+  <h3 className={`text-sm font-bold mb-4 ${tituloTema}`}>
     Leads por asesor
   </h3>
 
@@ -905,7 +939,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
 <Label
   value={clientes.length}
   position="center"
-  fill="#ffffff"
+  fill={temaClaro ? "#0f172a" : "#ffffff"}
 />
 
             {["#22c55e", "#3b82f6", "#eab308", "#14b8a6"].map(
@@ -935,7 +969,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
         .slice(0, 4)
         .map(([asesor, total]: any, index) => (
           <div key={asesor} className="flex justify-between text-xs">
-            <span className="text-slate-300">
+            <span className={temaClaro ? "text-slate-700" : "text-slate-300"}>
               {index + 1}. {asesor.charAt(0).toUpperCase() + asesor.slice(1)}
             </span>
             <span className="text-green-400 font-bold">{total}</span>
@@ -945,8 +979,8 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   </div>
 </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
-    <h3 className="text-base font-bold text-white mb-2">
+  <div className={`${panelTema} border rounded-2xl p-3`}>
+    <h3 className={`text-base font-bold mb-2 ${tituloTema}`}>
       📊 Conversión
     </h3>
 
@@ -959,13 +993,19 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
         return (
           <div key={estado}>
             <div className="flex justify-between text-[11px] mb-1">
-              <span className="text-slate-300 truncate">{estado}</span>
+              <span
+  className={`truncate ${
+    temaClaro ? "text-slate-700" : "text-slate-300"
+  }`}
+>
+  {estado}
+</span>
               <span className="text-green-400 font-bold">
                 {cantidad} ({porcentaje}%)
               </span>
             </div>
 
-            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div className={`h-1.5 ${barraTema} rounded-full overflow-hidden`}>
               <div
                 className="h-full bg-green-500 rounded-full"
                 style={{ width: `${porcentaje}%` }}
@@ -977,13 +1017,13 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
     </div>
   </div>
 
-  <div className="bg-[#111827] border border-slate-800 rounded-2xl p-3">
+  <div className={`${panelTema} border rounded-2xl p-3`}>
     <div className="flex justify-between items-center mb-3">
       <div>
-        <h3 className="text-base font-bold text-white">
+        <h3 className={`text-base font-bold ${tituloTema}`}>
           🚨 Clientes sin respuesta
         </h3>
-        <p className="text-slate-400 text-xs">
+        <p className={`${textoSecundarioTema} text-xs`}>
           Sin gestión reciente
         </p>
       </div>
@@ -1000,7 +1040,7 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
         .map((cliente) => (
           <div
             key={cliente.id}
-            className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex items-center justify-between"
+            className={`${tarjetaInternaTema} border rounded-xl p-2 flex items-center justify-between`}
           >
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center text-black font-black text-xs">
@@ -1008,7 +1048,11 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
               </div>
 
               <div>
-                <p className="font-bold text-white text-xs truncate max-w-[110px]">
+                <p
+  className={`font-bold text-xs truncate max-w-[110px] ${
+    temaClaro ? "text-slate-800" : "text-white"
+  }`}
+>
                   {cliente.nombre || "Sin nombre"}
                 </p>
                 <p className="text-[10px] text-slate-400">
@@ -1047,9 +1091,9 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
             {estados.map((estado) => (
               <div
                 key={estado}
-                className="bg-[#111827] border border-slate-800 rounded-2xl p-3 min-h-[420px]"
+                className={`${panelTema} border rounded-2xl p-3 min-h-[420px]`}
               >
-                <h3 className="font-bold mb-3 text-white text-sm uppercase">
+                <h3 className={`font-bold mb-3 text-sm uppercase ${tituloTema}`}>
   {estado}
                   <span className="text-gray-400">
                     {clientes.filter((c) => c.etapa === estado).length}
@@ -1073,10 +1117,14 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
   key={cliente.id}
   onClick={() => abrirConversacion(cliente)}
   className={`p-3 rounded-xl border cursor-pointer transition-all hover:border-green-500 ${
-    seguimientoVencido
-      ? "bg-red-950/60 border-red-500"
+  seguimientoVencido
+    ? temaClaro
+      ? "bg-red-50 border-red-400"
+      : "bg-red-950/60 border-red-500"
+    : temaClaro
+      ? "bg-slate-50 border-slate-200"
       : "bg-[#0f172a] border-slate-800"
-  }`}
+}`}
 >
   <div className="flex items-start justify-between gap-2">
     <div className="flex items-center gap-2 min-w-0">
@@ -1085,7 +1133,11 @@ const ventasPorDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(
       </div>
 
       <div className="min-w-0">
-        <p className="font-bold text-white text-xs truncate max-w-[110px]">
+        <p
+  className={`font-bold text-xs truncate max-w-[110px] ${
+    temaClaro ? "text-slate-800" : "text-white"
+  }`}
+>
           {cliente.nombre || "Sin nombre"}
         </p>
 
