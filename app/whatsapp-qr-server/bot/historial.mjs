@@ -9,7 +9,7 @@ export async function obtenerHistorialReciente(
 ) {
   const result = await pool.query(
     `
-    SELECT id, remitente, mensaje, created_at
+    SELECT id, remitente, mensaje, media_analisis, created_at
     FROM conversaciones
     WHERE cliente_id = $1
       AND id < $2
@@ -52,6 +52,6 @@ export async function obtenerHistorialReciente(
     .reverse()
     .map((fila) => ({
       rol: fila.remitente,
-      mensaje: fila.mensaje,
+      mensaje: fila.media_analisis || fila.mensaje,
     }));
 }

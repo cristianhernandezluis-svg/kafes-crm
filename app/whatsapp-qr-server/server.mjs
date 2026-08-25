@@ -7,6 +7,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { decidirRespuestaBot } from "./bot/cerebro.mjs";
 import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
 import { obtenerHistorialReciente } from "./bot/historial.mjs";
+import { transcribirAudio } from "./bot/media-ai.mjs";
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -447,6 +448,7 @@ const mediaContenido = contenido.imageMessage || contenido.videoMessage || conte
 let mediaId = null;
 const mimeType = mediaContenido?.mimetype || null;
 let filename = mediaContenido?.fileName || null;
+let mediaAnalisis = null;
 
     console.log(JSON.stringify(msg, null, 2));
 
@@ -461,6 +463,16 @@ let filename = mediaContenido?.fileName || null;
       const bufferMedia = await downloadMediaMessage(msg, "buffer", {});
       await writeFile(`${MEDIA_DIR}/${mediaId}`, bufferMedia);
       if (!filename) filename = mediaId;
+
+      if (tipoMensaje === "audio" && !esMio) {
+        try {
+          mediaAnalisis = await transcribirAudio(`${MEDIA_DIR}/${mediaId}`);
+          console.log("AUDIO TRANSCRITO:", mediaAnalisis);
+        } catch (errorIA) {
+          console.error("ERROR TRANSCRIBIENDO AUDIO:", errorIA?.message || errorIA);
+          mediaAnalisis = null;
+        }
+      }
       console.log("MEDIA GUARDADO:", mediaId, mimeType);
     } catch (errorMedia) {
       console.error("ERROR DESCARGANDO MEDIA:", errorMedia?.message || errorMedia);
@@ -520,9 +532,10 @@ RETURNING id
     canal,
     media_id,
     mime_type,
-    filename
+    filename,
+    media_analisis
   )
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'qr', $9, $10, $11)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'qr', $9, $10, $11, $12)
   ON CONFLICT (whatsapp_message_id)
   WHERE whatsapp_message_id IS NOT NULL
   DO NOTHING
@@ -540,6 +553,7 @@ RETURNING id
     mediaId,
     mimeType,
     filename,
+    mediaAnalisis,
   ]
 );
 
@@ -553,14 +567,16 @@ if (mensajeGuardado.rowCount === 0) {
 
 console.log("Mensaje guardado en PostgreSQL");
 
-      if (!esMio && texto) {
-        const calificacion = await actualizarCalificacionCliente(clienteId, texto);
+      const textoBot = texto || mediaAnalisis || "";
+
+      if (!esMio && textoBot) {
+        const calificacion = await actualizarCalificacionCliente(clienteId, textoBot);
         console.log("CALIFICACION BOT:", calificacion);
 
         if (calificacion && !calificacion.requiereCloser) {
           const memoria = await obtenerMemoriaBot(pool, clienteId);
 const historial = await obtenerHistorialReciente(pool, clienteId, mensajeGuardado.rows[0].id);
-const respuestaBot = await decidirRespuestaBot({ texto, calificacion, memoria, historial });
+const respuestaBot = await decidirRespuestaBot({ texto: textoBot, calificacion, memoria, historial });
 
           if (respuestaBot?.handoff) {
   const asesorResult = await pool.query(
