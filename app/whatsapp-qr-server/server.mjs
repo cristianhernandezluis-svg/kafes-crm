@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import qrcode from "qrcode";
 import pg from "pg";
+import { mkdir, writeFile } from "node:fs/promises";
 import { decidirRespuestaBot } from "./bot/cerebro.mjs";
 import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
 import { obtenerHistorialReciente } from "./bot/historial.mjs";
@@ -11,9 +12,16 @@ import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestWaWebVersion,
+  downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 
 const { Pool } = pg;
+
+function extensionMedia(mime = "") {
+  const tipo = mime.split(";")[0].toLowerCase();
+  const mapa = { "image/jpeg":"jpg", "image/png":"png", "image/webp":"webp", "video/mp4":"mp4", "audio/ogg":"ogg", "audio/mpeg":"mp3", "audio/mp4":"m4a", "application/pdf":"pdf" };
+  return mapa[tipo] || tipo.split("/")[1] || "bin";
+}
 
 const app = express();
 app.use(cors());
@@ -71,6 +79,9 @@ const requiereCloser=false;
 }
 
 async function iniciarWhatsApp() {
+  const MEDIA_DIR = "./auth/media";
+  await mkdir(MEDIA_DIR, { recursive: true });
+
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
 
   const { version } = await fetchLatestWaWebVersion();
@@ -418,21 +429,44 @@ const texto =
 let tipoMensaje = "text";
 let textoGuardado = texto;
 
+if (contenido.audioMessage) tipoMensaje = "audio";
+else if (contenido.imageMessage) tipoMensaje = "image";
+else if (contenido.videoMessage) tipoMensaje = "video";
+else if (contenido.documentMessage) tipoMensaje = "document";
+else if (contenido.stickerMessage) tipoMensaje = "sticker";
+else if (contenido.locationMessage) tipoMensaje = "location";
+else if (contenido.contactMessage || contenido.contactsArrayMessage) tipoMensaje = "contact";
+
 if (!textoGuardado) {
-  if (contenido.audioMessage) { tipoMensaje = "audio"; textoGuardado = "[Audio]"; }
-  else if (contenido.imageMessage) { tipoMensaje = "image"; textoGuardado = "[Imagen]"; }
-  else if (contenido.videoMessage) { tipoMensaje = "video"; textoGuardado = "[Video]"; }
-  else if (contenido.documentMessage) { tipoMensaje = "document"; textoGuardado = "[Documento]"; }
-  else if (contenido.stickerMessage) { tipoMensaje = "sticker"; textoGuardado = "[Sticker]"; }
-  else if (contenido.locationMessage) { tipoMensaje = "location"; textoGuardado = "[Ubicacion]"; }
-  else if (contenido.contactMessage || contenido.contactsArrayMessage) { tipoMensaje = "contact"; textoGuardado = "[Contacto]"; }
-  else { console.log("Mensaje sin contenido reconocido"); continue; }
+  const etiquetas = { audio: "[Audio]", image: "[Imagen]", video: "[Video]", document: "[Documento]", sticker: "[Sticker]", location: "[Ubicacion]", contact: "[Contacto]" };
+  textoGuardado = etiquetas[tipoMensaje] || "";
+  if (!textoGuardado) { console.log("Mensaje sin contenido reconocido"); continue; }
 }
+
+const mediaContenido = contenido.imageMessage || contenido.videoMessage || contenido.audioMessage || contenido.documentMessage || contenido.stickerMessage || null;
+let mediaId = null;
+const mimeType = mediaContenido?.mimetype || null;
+let filename = mediaContenido?.fileName || null;
 
     console.log(JSON.stringify(msg, null, 2));
 
     try {
   const esMio = msg.key.fromMe === true;
+
+  if (mediaContenido) {
+    try {
+      const extension = extensionMedia(mimeType || "");
+      const baseId = String(msg.key.id || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "_");
+      mediaId = `${baseId}.${extension}`;
+      const bufferMedia = await downloadMediaMessage(msg, "buffer", {});
+      await writeFile(`${MEDIA_DIR}/${mediaId}`, bufferMedia);
+      if (!filename) filename = mediaId;
+      console.log("MEDIA GUARDADO:", mediaId, mimeType);
+    } catch (errorMedia) {
+      console.error("ERROR DESCARGANDO MEDIA:", errorMedia?.message || errorMedia);
+      mediaId = null;
+    }
+  }
 
 const nombreCliente = !esMio && msg.pushName
   ? msg.pushName
@@ -483,9 +517,12 @@ RETURNING id
     tipo,
     empresa_id,
     whatsapp_qr_id,
-    canal
+    canal,
+    media_id,
+    mime_type,
+    filename
   )
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'qr')
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'qr', $9, $10, $11)
   ON CONFLICT (whatsapp_message_id)
   WHERE whatsapp_message_id IS NOT NULL
   DO NOTHING
@@ -500,6 +537,9 @@ RETURNING id
     tipoMensaje,
     empresaQrId,
     whatsappQrId,
+    mediaId,
+    mimeType,
+    filename,
   ]
 );
 
@@ -619,6 +659,14 @@ console.log("BOT RESPONDIO:", {
     }
   });
 }
+
+app.get("/media/:id", (req, res) => {
+  const id = String(req.params.id || "");
+  if (!/^[a-zA-Z0-9._-]+$/.test(id)) return res.status(400).json({ error: "Media invalido" });
+  res.sendFile(id, { root: process.cwd() + "/auth/media" }, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: "Media no encontrado" });
+  });
+});
 
 app.get("/qr", (req, res) => {
   res.json({

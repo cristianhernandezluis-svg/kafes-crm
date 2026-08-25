@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { Pool } from "pg";
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
 export async function GET(
   request: Request,
@@ -6,6 +11,28 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
+
+    const mediaDb = await pool.query(
+      "SELECT canal, mime_type FROM conversaciones WHERE media_id = $1 ORDER BY id DESC LIMIT 1",
+      [id]
+    );
+
+    if (mediaDb.rows[0]?.canal === "qr") {
+      const qrUrl = process.env.WHATSAPP_QR_URL || "http://localhost:4001";
+      const qrRes = await fetch(`${qrUrl}/media/${encodeURIComponent(id)}`);
+
+      if (!qrRes.ok) {
+        return NextResponse.json({ success: false, error: "Media QR no encontrado" }, { status: 404 });
+      }
+
+      const buffer = await qrRes.arrayBuffer();
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": mediaDb.rows[0].mime_type || qrRes.headers.get("content-type") || "application/octet-stream",
+          "Cache-Control": "private, max-age=300",
+        },
+      });
+    }
 
     const metaRes = await fetch(
       `https://graph.facebook.com/v25.0/${id}`,

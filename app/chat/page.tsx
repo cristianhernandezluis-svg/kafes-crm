@@ -599,6 +599,10 @@ useEffect(() => {
                       window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
                     }
                   />
+                ) : msg.tipo === "video" && msg.media_id ? (
+                  <video controls className="max-w-xs rounded-lg">
+                    <source src={`/api/whatsapp/media/${msg.media_id}`} type={msg.mime_type || "video/mp4"} />
+                  </video>
                 ) : msg.tipo === "document" && msg.media_id ? (
                   <button
                     onClick={() =>
