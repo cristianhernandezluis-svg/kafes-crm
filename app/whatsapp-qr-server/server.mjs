@@ -735,7 +735,6 @@ const PORT = process.env.PORT || 4001;
 
 app.listen(PORT, async () => {
   console.log(`Servidor WhatsApp QR en puerto ${PORT}`);
-  await prepararColumnasBot();
   await cargarIntegracionQr();
   await iniciarWhatsApp();
 });
