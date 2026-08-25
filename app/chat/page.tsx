@@ -25,6 +25,19 @@ type Cliente = {
   no_leidos?: number;
 };
 
+function etiquetaMensaje(tipo?: string | null, mensaje?: string | null) {
+  const etiquetas: Record<string, string> = {
+    image: "🖼 Imagen",
+    audio: "🎤 Audio",
+    video: "🎥 Video",
+    document: "📄 Documento",
+    sticker: "🏷 Sticker",
+    location: "📍 Ubicacion",
+    contact: "👤 Contacto",
+  };
+  return (tipo && etiquetas[tipo]) || mensaje || "Sin mensajes";
+}
+
 function nombreProductoBot(slug?: string | null) {
   if (slug === "sierra-bomvink-8") return "Sierra BOMVINK 8 pulgadas";
   if (slug === "soporte-telescopico-xtd") return "Soporte Telescopico XTD";
@@ -514,11 +527,7 @@ useEffect(() => {
 </div>
 
 <p className="text-sm text-slate-400 truncate mt-1">
-  {cliente.ultimo_tipo === "image"
-    ? "📷 Imagen"
-    : cliente.ultimo_tipo === "document"
-    ? "📄 Documento"
-    : cliente.ultimo_mensaje || "Sin mensajes"}
+  {etiquetaMensaje(cliente.ultimo_tipo, cliente.ultimo_mensaje)}
 </p>
 
 </button>
@@ -610,7 +619,7 @@ useEffect(() => {
                     />
                   </audio>
                 ) : (
-                  <p>{msg.mensaje}</p>
+                  <p>{etiquetaMensaje(msg.tipo, msg.mensaje)}</p>
                 )}
 
                 <p className="text-xs text-slate-300 mt-1">
