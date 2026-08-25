@@ -133,6 +133,7 @@ function respuestaRespaldo(texto, memoria = {}) {
 
 export async function decidirRespuestaBot({
   texto,
+  textoAccion,
   calificacion,
   memoria = {},
   historial = [],
@@ -172,7 +173,7 @@ export async function decidirRespuestaBot({
     const handoff =
       analisis.accion === "handoff_closer";
 
-const datosPago = construirDatosPago(texto);
+const datosPago = construirDatosPago(textoAccion ?? texto);
 
 const mensajeFinal = datosPago
   ? handoff

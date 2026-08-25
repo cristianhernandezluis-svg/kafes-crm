@@ -577,7 +577,7 @@ if (mensajeGuardado.rowCount === 0) {
 
 console.log("Mensaje guardado en PostgreSQL");
 
-      const textoBot = [texto, mediaAnalisis].filter(Boolean).join("\n\n");
+      const textoBot = [texto, mediaAnalisis ? `[ANALISIS INTERNO DEL ARCHIVO - NO ES TEXTO DEL CLIENTE]: ${mediaAnalisis}` : ""].filter(Boolean).join("\n\n");
 
       if (!esMio && textoBot) {
         const calificacion = await actualizarCalificacionCliente(clienteId, textoBot);
@@ -586,7 +586,8 @@ console.log("Mensaje guardado en PostgreSQL");
         if (calificacion && !calificacion.requiereCloser) {
           const memoria = await obtenerMemoriaBot(pool, clienteId);
 const historial = await obtenerHistorialReciente(pool, clienteId, mensajeGuardado.rows[0].id);
-const respuestaBot = await decidirRespuestaBot({ texto: textoBot, calificacion, memoria, historial });
+const textoAccion = tipoMensaje === "audio" ? (mediaAnalisis || texto) : texto;
+const respuestaBot = await decidirRespuestaBot({ texto: textoBot, textoAccion, calificacion, memoria, historial });
 
           if (respuestaBot?.handoff) {
   const asesorResult = await pool.query(
