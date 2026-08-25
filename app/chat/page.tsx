@@ -66,6 +66,12 @@ type Plantilla = {
 };
 
 export default function ChatsPage() {
+const [temaClaro, setTemaClaro] = useState(false);
+
+useEffect(() => {
+  const temaGuardado = localStorage.getItem("tema-crm");
+  setTemaClaro(temaGuardado === "claro");
+}, []);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [whatsappQrId, setWhatsappQrId] = useState<number | null>(null);
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
@@ -342,8 +348,20 @@ useEffect(() => {
   <>
     <VerificarSuscripcion />
 
-    <div className="min-h-screen bg-[#0b1220] flex text-white">
-      <aside className="hidden lg:flex w-[220px] bg-[#101820] text-white flex-col h-screen sticky top-0 border-r border-[#1f2a33]">
+    <div
+  className={`min-h-screen flex ${
+    temaClaro
+      ? "bg-slate-100 text-slate-900"
+      : "bg-[#0b1220] text-white"
+  }`}
+>
+      <aside
+  className={`hidden lg:flex w-[220px] flex-col h-screen sticky top-0 border-r ${
+    temaClaro
+      ? "bg-white text-slate-800 border-slate-200"
+      : "bg-[#101820] text-white border-[#1f2a33]"
+  }`}
+>
   <div className="flex items-center gap-3 mb-8">
     <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center text-black font-black">
       ☕
@@ -356,7 +374,9 @@ useEffect(() => {
   <p className="text-xs text-slate-500 uppercase mb-3">Principal</p>
 
   <nav className="space-y-2">
-    <Link href="/dashboard" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800">
+    <Link href="/dashboard" className={`flex items-center gap-3 p-3 rounded-xl ${
+  temaClaro ? "hover:bg-slate-100" : "hover:bg-slate-800"
+}`}>
       📊 Dashboard
     </Link>
 
@@ -386,8 +406,18 @@ useEffect(() => {
 </aside>
 
       <main className="flex-1 min-w-0 h-screen overflow-hidden flex">
-<div className="hidden md:flex fixed top-0 left-[220px] right-0 h-12 bg-[#0b1218] border-b border-[#1f2a33] z-40 items-center justify-between px-5">
-  <h1 className="text-sm font-bold text-white">
+<div
+  className={`hidden md:flex fixed top-0 left-[220px] right-0 h-12 border-b z-40 items-center justify-between px-5 ${
+    temaClaro
+      ? "bg-white border-slate-200"
+      : "bg-[#0b1218] border-[#1f2a33]"
+  }`}
+>
+  <h1
+  className={`text-sm font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
     Conversaciones - WhatsApp Manager
   </h1>
 
@@ -406,7 +436,13 @@ useEffect(() => {
         C
       </div>
       <div>
-        <p className="text-xs font-bold text-white">Administrador</p>
+        <p
+  className={`text-xs font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
+  Administrador
+</p>
         <p className="text-[10px] text-green-400">● En línea</p>
       </div>
     </div>
@@ -415,12 +451,24 @@ useEffect(() => {
         <section
   className={`${
     mostrarConversacion ? "hidden md:block" : "block"
-  } w-full md:w-[340px] bg-[#0f172a] border-r border-slate-800 overflow-y-auto h-screen pt-12 shrink-0`}
+  } w-full md:w-[340px] border-r overflow-y-auto h-screen pt-12 shrink-0 ${
+  temaClaro
+    ? "bg-white border-slate-200"
+    : "bg-[#0f172a] border-slate-800"
+}`}
 >
           <div className="p-5 border-b border-slate-800">
-  <h2 className="text-2xl font-black text-white">💬 Conversaciones</h2>
+  <h2
+  className={`text-2xl font-black ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>💬 Conversaciones</h2>
 
-  <p className="text-sm text-slate-400">
+  <p
+  className={`text-sm ${
+    temaClaro ? "text-slate-500" : "text-slate-400"
+  }`}
+>
     Atiende tus mensajes de WhatsApp.
   </p>
 
@@ -430,10 +478,18 @@ useEffect(() => {
       placeholder="Buscar conversaciones..."
       value={busqueda}
       onChange={(e) => setBusqueda(e.target.value)}
-      className="flex-1 bg-[#111827] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none"
+      className={`flex-1 border rounded-lg px-3 py-2 text-sm outline-none ${
+  temaClaro
+    ? "bg-slate-50 border-slate-300 text-slate-900"
+    : "bg-[#111827] border-slate-700 text-white"
+}`}
     />
 
-    <button className="w-10 h-10 bg-[#111827] border border-slate-700 rounded-lg">
+    <button className={`w-10 h-10 border rounded-lg ${
+  temaClaro
+    ? "bg-slate-50 border-slate-300"
+    : "bg-[#111827] border-slate-700"
+}`}>
       ⚙️
     </button>
 
@@ -442,7 +498,11 @@ useEffect(() => {
     </button>
   </div>
 
-  <div className="flex gap-5 mt-4 text-xs border-b border-slate-800 pb-3">
+  <div
+  className={`flex gap-5 mt-4 text-xs border-b pb-3 ${
+    temaClaro ? "border-slate-200" : "border-slate-800"
+  }`}
+>
     {[
       { id: "todas", label: "Todas" },
       { id: "no_leidas", label: "No leídas" },
@@ -455,7 +515,9 @@ useEffect(() => {
         className={
           filtroChat === filtro.id
             ? "text-green-400 font-bold"
-            : "text-slate-400 hover:text-white"
+            : temaClaro
+  ? "text-slate-500 hover:text-slate-900"
+  : "text-slate-400 hover:text-white"
         }
       >
         {filtro.label}
@@ -483,9 +545,15 @@ useEffect(() => {
   <button
     key={cliente.id}
     onClick={() => abrirConversacion(cliente)}
-    className={`w-full text-left p-4 border-b border-slate-800 hover:bg-slate-800 transition ${
-      clienteActivo?.id === cliente.id ? "bg-slate-800" : "bg-[#0f172a]"
-    }`}
+    className={`w-full text-left p-4 border-b transition ${
+  temaClaro
+    ? `border-slate-200 hover:bg-slate-100 ${
+        clienteActivo?.id === cliente.id ? "bg-slate-100" : "bg-white"
+      }`
+    : `border-slate-800 hover:bg-slate-800 ${
+        clienteActivo?.id === cliente.id ? "bg-slate-800" : "bg-[#0f172a]"
+      }`
+}`}
   >
                 <div className="flex justify-between gap-2">
   <div className="flex items-center gap-3 min-w-0">
@@ -495,13 +563,21 @@ useEffect(() => {
   </div>
 
   <div className="min-w-0">
-    <p className="font-bold truncate text-white">
+    <p
+  className={`font-bold truncate ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
       {cliente.temperatura === "caliente" ? `🔥 ${cliente.nombre || "Sin nombre"}` : (cliente.nombre || "Sin nombre")}
     </p>
 
     {cliente.temperatura === "caliente" && <p className="text-xs font-bold text-orange-400 truncate">CALIENTE · {nombreProductoBot(cliente.bot_producto)} · {cliente.bot_contexto?.ciudad || cliente.ciudad || "Sin ciudad"}</p>}
 
-    <p className="text-sm text-slate-400 truncate">
+    <p
+  className={`text-sm truncate ${
+    temaClaro ? "text-slate-500" : "text-slate-400"
+  }`}
+>
       {cliente.ultimo_mensaje || cliente.telefono}
     </p>
   </div>
@@ -526,7 +602,11 @@ useEffect(() => {
   </div>
 </div>
 
-<p className="text-sm text-slate-400 truncate mt-1">
+<p
+  className={`text-sm truncate mt-1 ${
+    temaClaro ? "text-slate-500" : "text-slate-400"
+  }`}
+>
   {etiquetaMensaje(cliente.ultimo_tipo, cliente.ultimo_mensaje)}
 </p>
 
@@ -538,7 +618,9 @@ useEffect(() => {
 <section
   className={`${
     mostrarConversacion ? "flex" : "hidden md:flex"
-  } flex-1 bg-[#101820]`}
+  } flex-1 ${
+  temaClaro ? "bg-slate-100" : "bg-[#101820]"
+}`}
 >
           {!clienteActivo ? (
             <div className="flex-1 flex items-center justify-center text-slate-400">
@@ -548,11 +630,19 @@ useEffect(() => {
   <>
     <div className="flex flex-1 overflow-hidden">
       <div className="flex-1 flex flex-col h-screen overflow-hidden pt-12">
-        <div className="bg-[#0f172a] p-5 border-b border-slate-800 flex items-center justify-between">
+        <div
+  className={`p-5 border-b flex items-center justify-between ${
+    temaClaro
+      ? "bg-white border-slate-200"
+      : "bg-[#0f172a] border-slate-800"
+  }`}
+>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMostrarConversacion(false)}
-              className="md:hidden text-white text-2xl"
+              className={`md:hidden text-2xl ${
+  temaClaro ? "text-slate-900" : "text-white"
+}`}
             >
               ←
             </button>
@@ -562,11 +652,19 @@ useEffect(() => {
             </div>
 
             <div>
-              <h2 className="text-xl font-bold text-white">
+              <h2
+  className={`text-xl font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
                 {clienteActivo.nombre}
               </h2>
 
-              <p className="text-sm text-slate-400">
+              <p
+  className={`text-sm ${
+    temaClaro ? "text-slate-500" : "text-slate-400"
+  }`}
+>
                 📱 {clienteActivo.telefono}
               </p>
             </div>
@@ -577,7 +675,11 @@ useEffect(() => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-[#0b1220] min-h-0">
+        <div
+  className={`flex-1 overflow-y-auto p-6 space-y-3 min-h-0 ${
+    temaClaro ? "bg-slate-100" : "bg-[#0b1220]"
+  }`}
+>
           {conversaciones.length === 0 ? (
             <p className="text-slate-400">No hay mensajes todavía.</p>
           ) : (
@@ -585,10 +687,12 @@ useEffect(() => {
               <div
                 key={msg.id}
                 className={`max-w-[70%] p-3 rounded-2xl text-sm shadow ${
-                  msg.remitente === "cliente"
-                    ? "bg-[#1e293b] text-white mr-auto rounded-bl-sm"
-                    : "bg-green-600 text-white ml-auto rounded-br-sm"
-                }`}
+  msg.remitente === "cliente"
+    ? temaClaro
+      ? "bg-white border border-slate-200 text-slate-900 mr-auto rounded-bl-sm"
+      : "bg-[#1e293b] text-white mr-auto rounded-bl-sm"
+    : "bg-green-600 text-white ml-auto rounded-br-sm"
+}`}
               >
                 {msg.tipo === "image" && msg.media_id ? (
                   <img
@@ -626,7 +730,13 @@ useEffect(() => {
                   <p>{etiquetaMensaje(msg.tipo, msg.mensaje)}</p>
                 )}
 
-                <p className="text-xs text-slate-300 mt-1">
+                <p
+  className={`text-xs mt-1 ${
+    msg.remitente === "cliente" && temaClaro
+      ? "text-slate-500"
+      : "text-slate-300"
+  }`}
+>
                   {msg.remitente} ·{" "}
                   {new Date(msg.created_at).toLocaleString("es-PE")}
                 </p>
@@ -637,7 +747,13 @@ useEffect(() => {
           <div ref={mensajesFinRef} />
         </div>
 
-        <div className="bg-[#0f172a] border-t border-slate-800 p-4">
+        <div
+  className={`border-t p-4 ${
+    temaClaro
+      ? "bg-white border-slate-200"
+      : "bg-[#0f172a] border-slate-800"
+  }`}
+>
           <button
             onClick={() => {
               const fecha = prompt("Fecha seguimiento (2026-06-15 10:00)");
@@ -665,7 +781,11 @@ useEffect(() => {
           </button>
 
           <textarea
-            className="w-full bg-[#020617] border border-slate-700 text-white rounded-xl p-3 h-20 resize-none"
+            className={`w-full border rounded-xl p-3 h-20 resize-none outline-none ${
+  temaClaro
+    ? "bg-slate-50 border-slate-300 text-slate-900"
+    : "bg-[#020617] border-slate-700 text-white"
+}`}
             rows={2}
             placeholder="Escribe un mensaje..."
             value={mensajeNuevo}
@@ -679,7 +799,13 @@ useEffect(() => {
           />
 
           <div className="flex items-center gap-2 mt-3">
-            <label className="w-10 h-10 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full cursor-pointer text-white text-xl font-bold">
+            <label
+  className={`w-10 h-10 flex items-center justify-center rounded-full cursor-pointer text-xl font-bold ${
+    temaClaro
+      ? "bg-slate-200 hover:bg-slate-300 text-slate-800"
+      : "bg-slate-700 hover:bg-slate-600 text-white"
+  }`}
+>
               +
               <input
                 type="file"
@@ -726,12 +852,32 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="hidden xl:block w-[360px] bg-[#101820] border-l border-[#1f2a33] overflow-y-auto h-screen pt-12 shrink-0">
-  <div className="p-4 border-b border-[#1f2a33] flex justify-between items-center">
-    <h3 className="font-bold text-white text-sm">
+      <div
+  className={`hidden xl:block w-[360px] border-l overflow-y-auto h-screen pt-12 shrink-0 ${
+    temaClaro
+      ? "bg-white border-slate-200"
+      : "bg-[#101820] border-[#1f2a33]"
+  }`}
+>
+  <div
+  className={`p-4 border-b flex justify-between items-center ${
+    temaClaro ? "border-slate-200" : "border-[#1f2a33]"
+  }`}
+>
+    <h3
+  className={`font-bold text-sm ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
       Detalles del contacto
     </h3>
-    <button className="text-slate-400 hover:text-white">×</button>
+    <button
+  className={
+    temaClaro
+      ? "text-slate-500 hover:text-slate-900"
+      : "text-slate-400 hover:text-white"
+  }
+>×</button>
   </div>
 
   <div className="p-5">
@@ -740,11 +886,19 @@ useEffect(() => {
         {(clienteActivo.nombre || "S").charAt(0).toUpperCase()}
       </div>
 
-      <h2 className="mt-4 text-xl font-bold text-white">
+      <h2
+  className={`mt-4 text-xl font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
         {clienteActivo.nombre}
       </h2>
 
-      <p className="text-slate-400 text-sm">
+      <p
+  className={`text-sm ${
+    temaClaro ? "text-slate-500" : "text-slate-400"
+  }`}
+>
         +51 {clienteActivo.telefono}
       </p>
 
@@ -754,22 +908,38 @@ useEffect(() => {
     </div>
 
     <div className="grid grid-cols-4 gap-3 mt-6 text-center">
-      <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
-        <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
+      <button className={`flex flex-col items-center gap-1 ${
+  temaClaro
+    ? "text-slate-500 hover:text-slate-900"
+    : "text-slate-400 hover:text-white"
+}`}>
+        <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${
+  temaClaro ? "border-slate-300" : "border-slate-700"
+}`}>
           👤
         </div>
         <span className="text-[11px]">Perfil</span>
       </button>
 
-      <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+      <button className={`flex flex-col items-center gap-1 ${
+  temaClaro
+    ? "text-slate-500 hover:text-slate-900"
+    : "text-slate-400 hover:text-white"
+}`}>
         <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
           🏷️
         </div>
         <span className="text-[11px]">Etiquetas</span>
       </button>
 
-      <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
-        <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
+      <button className={`flex flex-col items-center gap-1 ${
+  temaClaro
+    ? "text-slate-500 hover:text-slate-900"
+    : "text-slate-400 hover:text-white"
+}`}>
+        <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${
+  temaClaro ? "border-slate-300" : "border-slate-700"
+}`}>
           📝
         </div>
         <span className="text-[11px]">Notas</span>
@@ -783,33 +953,55 @@ useEffect(() => {
       </button>
     </div>
 
-    <div className="mt-6 border-t border-[#1f2a33] pt-5">
-      <h3 className="font-bold text-white text-sm mb-4">
+    <div
+  className={`mt-6 border-t pt-5 ${
+    temaClaro ? "border-slate-200" : "border-[#1f2a33]"
+  }`}
+>
+      <h3
+  className={`font-bold text-sm mb-4 ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
         Información
       </h3>
 
       <div className="space-y-4 text-sm">
         <div>
           <p className="text-slate-500 text-xs">Teléfono</p>
-          <p className="text-white">+51 {clienteActivo.telefono}</p>
+          <p className={temaClaro ? "text-slate-900" : "text-white"}>
+  +51 {clienteActivo.telefono}
+</p>
         </div>
 
         <div>
           <p className="text-slate-500 text-xs">Ciudad</p>
-          <p className="text-white">
-            {clienteActivo.ciudad || "Sin ciudad"}
-          </p>
+          <p className={temaClaro ? "text-slate-900" : "text-white"}>
+  {clienteActivo.ciudad || "Sin ciudad"}
+</p>
         </div>
 
         <div>
           <p className="text-slate-500 text-xs">Asesor</p>
-          <p className="text-white">
-            {clienteActivo.asesor || "Sin asesor"}
-          </p>
+          <p className={temaClaro ? "text-slate-900" : "text-white"}>
+  {clienteActivo.asesor || "Sin asesor"}
+</p>
         </div>
 
-        <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3 space-y-2">
-          <p className="text-xs font-bold text-white">Calificacion del bot</p>
+        <div
+  className={`rounded-xl border p-3 space-y-2 ${
+    temaClaro
+      ? "bg-slate-50 border-slate-200"
+      : "bg-slate-900/60 border-slate-700"
+  }`}
+>
+          <p
+  className={`text-xs font-bold ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
+  Calificacion del bot
+</p>
           <p className="text-xs text-slate-300">Producto: <span className="text-white font-bold">{nombreProductoBot(clienteActivo.bot_producto)}</span></p>
           <p className="text-xs text-slate-300">Uso: <span className="text-white font-bold">{clienteActivo.bot_contexto?.uso || "Sin identificar"}</span></p>
           <p className="text-xs text-slate-300">Ciudad detectada: <span className="text-white font-bold">{clienteActivo.bot_contexto?.ciudad || "Sin identificar"}</span></p>
@@ -821,13 +1013,23 @@ useEffect(() => {
 
         <div>
           <p className="text-slate-500 text-xs">Última actividad</p>
-          <p className="text-white">Hoy</p>
+          <p className={temaClaro ? "text-slate-900" : "text-white"}>
+  Hoy
+</p>
         </div>
       </div>
     </div>
 
-    <div className="mt-6 border-t border-[#1f2a33] pt-5">
-      <h3 className="font-bold text-white text-sm mb-3">
+    <div
+  className={`mt-6 border-t pt-5 ${
+    temaClaro ? "border-slate-200" : "border-[#1f2a33]"
+  }`}
+>
+      <h3
+  className={`font-bold text-sm mb-3 ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
         Etiquetas
       </h3>
 
@@ -840,25 +1042,53 @@ useEffect(() => {
           Interesado
         </span>
 
-        <button className="w-7 h-7 rounded-full border border-slate-700 text-slate-400">
+        <button
+  className={`w-7 h-7 rounded-full border ${
+    temaClaro
+      ? "border-slate-300 text-slate-600"
+      : "border-slate-700 text-slate-400"
+  }`}
+>
           +
         </button>
       </div>
     </div>
 
-    <div className="mt-6 border-t border-[#1f2a33] pt-5">
-      <h3 className="font-bold text-white text-sm mb-3">
+    <div
+  className={`mt-6 border-t pt-5 ${
+    temaClaro ? "border-slate-200" : "border-[#1f2a33]"
+  }`}
+>
+      <h3
+  className={`font-bold text-sm mb-3 ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
         Notas
       </h3>
 
       <textarea
-        className="w-full bg-[#0f172a] border border-slate-700 rounded-xl p-3 text-sm text-white"
+        className={`w-full border rounded-xl p-3 text-sm outline-none ${
+  temaClaro
+    ? "bg-slate-50 border-slate-300 text-slate-900"
+    : "bg-[#0f172a] border-slate-700 text-white"
+}`}
         rows={3}
         placeholder="Agregar nota..."
       />
 
-      <div className="mt-3 bg-[#0f172a] border border-slate-800 rounded-xl p-3">
-        <p className="text-white text-sm">
+      <div
+  className={`mt-3 border rounded-xl p-3 ${
+    temaClaro
+      ? "bg-slate-50 border-slate-200"
+      : "bg-[#0f172a] border-slate-800"
+  }`}
+>
+        <p
+  className={`text-sm ${
+    temaClaro ? "text-slate-900" : "text-white"
+  }`}
+>
           Cliente interesado en el producto.
         </p>
         <p className="text-slate-500 text-xs mt-2">
