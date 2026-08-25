@@ -352,24 +352,24 @@ sock.ev.on("messages.upsert", async ({ messages, type }) => {
     console.log("HISTORIAL IGNORADO:", type);
     return;
   }
-    const msg = messages[0];
+    for (const msg of messages) {
 
 const timestampMensaje = Number(msg.messageTimestamp || 0);
 
 if (timestampMensaje < inicioBotUnix) {
   console.log("MENSAJE ANTIGUO IGNORADO:", timestampMensaje);
-  return;
+  continue;
 }
 
-if (!msg.message) return;
+if (!msg.message) continue;
 
     const jid = msg.key.remoteJid;
 const jidAlt = msg.key.remoteJidAlt;
 
-if (!jid || jid === "status@broadcast") return;
+if (!jid || jid === "status@broadcast") continue;
 
 // Ignorar grupos
-if (jid.endsWith("@g.us")) return;
+if (jid.endsWith("@g.us")) continue;
 
 let telefono = "";
 
@@ -388,10 +388,10 @@ if (jidAlt && jidAlt.endsWith("@s.whatsapp.net")) {
   const pnMapeado = telefonoPorLidHistorial.get(jid);
   if (pnMapeado?.endsWith("@s.whatsapp.net")) telefono = pnMapeado.replace("@s.whatsapp.net", "");
   else if (pnMapeado?.endsWith("@c.us")) telefono = pnMapeado.replace("@c.us", "");
-  else { console.log("LID sin telefono mapeado:", jid); return; }
+  else { console.log("LID sin telefono mapeado:", jid); continue; }
 } else {
   console.log("No se pudo identificar el numero:", jid);
-  return;
+  continue;
 }
 
 console.log("JID RECIBIDO:", jid);
@@ -415,9 +415,18 @@ const texto =
   contenido.templateButtonReplyMessage?.selectedDisplayText ||
   "";
 
-if (!texto) {
-  console.log("Mensaje sin texto reconocido:", JSON.stringify(msg.message, null, 2));
-  return;
+let tipoMensaje = "text";
+let textoGuardado = texto;
+
+if (!textoGuardado) {
+  if (contenido.audioMessage) { tipoMensaje = "audio"; textoGuardado = "[Audio]"; }
+  else if (contenido.imageMessage) { tipoMensaje = "image"; textoGuardado = "[Imagen]"; }
+  else if (contenido.videoMessage) { tipoMensaje = "video"; textoGuardado = "[Video]"; }
+  else if (contenido.documentMessage) { tipoMensaje = "document"; textoGuardado = "[Documento]"; }
+  else if (contenido.stickerMessage) { tipoMensaje = "sticker"; textoGuardado = "[Sticker]"; }
+  else if (contenido.locationMessage) { tipoMensaje = "location"; textoGuardado = "[Ubicacion]"; }
+  else if (contenido.contactMessage || contenido.contactsArrayMessage) { tipoMensaje = "contact"; textoGuardado = "[Contacto]"; }
+  else { console.log("Mensaje sin contenido reconocido"); continue; }
 }
 
     console.log(JSON.stringify(msg, null, 2));
@@ -476,7 +485,7 @@ RETURNING id
     whatsapp_qr_id,
     canal
   )
-  VALUES ($1, $2, $3, $4, $5, 'text', $6, $7, 'qr')
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'qr')
   ON CONFLICT (whatsapp_message_id)
   WHERE whatsapp_message_id IS NOT NULL
   DO NOTHING
@@ -486,8 +495,9 @@ RETURNING id
     clienteId,
     telefono,
     msg.key.id || null,
-    texto,
+    textoGuardado,
     remitente,
+    tipoMensaje,
     empresaQrId,
     whatsappQrId,
   ]
@@ -498,12 +508,12 @@ if (mensajeGuardado.rowCount === 0) {
     "MENSAJE DUPLICADO IGNORADO:",
     msg.key.id
   );
-  return;
+  continue;
 }
 
 console.log("Mensaje guardado en PostgreSQL");
 
-      if (!esMio) {
+      if (!esMio && texto) {
         const calificacion = await actualizarCalificacionCliente(clienteId, texto);
         console.log("CALIFICACION BOT:", calificacion);
 
@@ -605,6 +615,7 @@ console.log("BOT RESPONDIO:", {
       }
     } catch (error) {
       console.error("Error guardando mensaje:", error);
+    }
     }
   });
 }
