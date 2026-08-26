@@ -3,11 +3,12 @@ import express from "express";
 import cors from "cors";
 import qrcode from "qrcode";
 import pg from "pg";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { decidirRespuestaBot } from "./bot/cerebro.mjs";
 import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
 import { obtenerHistorialReciente } from "./bot/historial.mjs";
 import { crearBufferMensajes } from "./bot/buffer-mensajes.mjs";
+import { obtenerMultimediaProducto } from "./bot/catalogo.mjs";
 import { transcribirAudio, analizarImagen, analizarDocumento, analizarVideo } from "./bot/media-ai.mjs";
 
 import makeWASocket, {
@@ -194,6 +195,54 @@ async function procesarLoteBot(lote) {
   try {
     await sock?.sendPresenceUpdate?.("paused", jidRespuesta);
   } catch {}
+
+  const multimediaSolicitada = respuestaBot?.multimedia || "ninguno";
+  const archivosMultimedia =
+    multimediaSolicitada !== "ninguno" && respuestaBot?.producto
+      ? obtenerMultimediaProducto(respuestaBot.producto, multimediaSolicitada)
+      : [];
+
+  if (archivosMultimedia.length > 0) {
+    const limite = multimediaSolicitada === "foto" ? 2 : 1;
+
+    for (const archivo of archivosMultimedia.slice(0, limite)) {
+      try {
+        const bufferArchivo = await readFile(archivo);
+
+        if (multimediaSolicitada === "foto") {
+          await sock.sendMessage(jidRespuesta, { image: bufferArchivo });
+        } else if (multimediaSolicitada === "video") {
+          await sock.sendMessage(jidRespuesta, { video: bufferArchivo });
+        } else if (multimediaSolicitada === "audio") {
+          const ruta = String(archivo).toLowerCase();
+          const mimetype = ruta.endsWith(".ogg")
+            ? "audio/ogg; codecs=opus"
+            : ruta.endsWith(".m4a") || ruta.endsWith(".mp4")
+              ? "audio/mp4"
+              : "audio/mpeg";
+
+          await sock.sendMessage(jidRespuesta, {
+            audio: bufferArchivo,
+            mimetype,
+            ptt: false,
+          });
+        }
+
+        console.log("MULTIMEDIA BOT ENVIADO:", {
+          clienteId,
+          producto: respuestaBot.producto,
+          tipo: multimediaSolicitada,
+          archivo,
+        });
+      } catch (error) {
+        console.error(
+          "ERROR ENVIANDO MULTIMEDIA BOT:",
+          archivo,
+          error?.message || error
+        );
+      }
+    }
+  }
 
   const enviadoBot = await sock.sendMessage(jidRespuesta, {
     text: respuestaBot.mensaje,

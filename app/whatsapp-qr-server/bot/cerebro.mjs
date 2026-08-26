@@ -190,6 +190,7 @@ const mensajeFinal = datosPago
       nivelInteres: analisis.nivel_interes,
       accion: analisis.accion,
       mensaje: mensajeFinal,
+      multimedia: analisis.multimedia || "ninguno",
       handoff,
       memoria: {
         producto,

@@ -65,6 +65,13 @@ REGLAS IMPORTANTES:
 - Evita expresiones como "compartís", "querés" o "podés".
 - La respuesta debe ser corta y natural para WhatsApp.
 - Responde primero la duda del cliente y luego avanza la venta.
+- En multimedia usa "ninguno" por defecto.
+- Usa multimedia="foto" cuando el cliente pida fotos, quiera ver como viene el producto o una imagen ayude directamente a entenderlo.
+- Usa multimedia="video" cuando el cliente pida video, demostracion, funcionamiento o quiera ver el producto trabajando.
+- Usa multimedia="audio" solo cuando un audio aporte valor real a la venta; no lo uses por rutina.
+- No uses multimedia en cada respuesta. Debe tener una razon comercial o responder una solicitud del cliente.
+- Solo solicita multimedia si identificaste un producto del catalogo. Si producto=null usa multimedia="ninguno".
+- Nunca inventes que existe una foto, video o audio; el sistema verificara la disponibilidad real.
 `;
 
   const response = await client.responses.parse({
