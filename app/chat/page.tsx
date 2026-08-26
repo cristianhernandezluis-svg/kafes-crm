@@ -122,6 +122,10 @@ const cargarClientes = async () => {
 
   if (data.success) {
     setClientes(data.chats);
+    setClienteActivo((actual) => {
+      if (!actual) return actual;
+      return data.chats.find((c: Cliente) => c.id === actual.id) || actual;
+    });
   }
 };
 
