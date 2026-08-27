@@ -41,7 +41,7 @@ async function prepararColumnasBot() {
       ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio',
       ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true,
       ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb,\n      ADD COLUMN IF NOT EXISTS handoff_motivo TEXT DEFAULT 'ninguno',\n      ADD COLUMN IF NOT EXISTS cerrado_por TEXT,\n      ADD COLUMN IF NOT EXISTS cerrado_at TIMESTAMPTZ;
+      ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb,\n      ADD COLUMN IF NOT EXISTS handoff_motivo TEXT DEFAULT 'ninguno',\n      ADD COLUMN IF NOT EXISTS cerrado_por TEXT,\n      ADD COLUMN IF NOT EXISTS cerrado_at TIMESTAMPTZ,\n      ADD COLUMN IF NOT EXISTS humano_hasta TIMESTAMPTZ;
   `);
 }
 
@@ -71,18 +71,43 @@ function calificarMensajeCliente(texto){const t=normalizarTexto(texto);const sen
 const PESOS_SENALES={precio:5,envio:10,ubicacion:10,garantia:5,pago:30,intencion_compra:60,urgencia:10};
 
 async function actualizarCalificacionCliente(clienteId,texto){
- const detectado=calificarMensajeCliente(texto);
- const r=await pool.query(`SELECT COALESCE(bot_senales,'[]'::jsonb) AS bot_senales,COALESCE(bot_activo,true) AS bot_activo FROM clientes WHERE id=$1 LIMIT 1`,[clienteId]);
- if(!r.rows[0]||r.rows[0].bot_activo===false)return null;
- const anteriores=Array.isArray(r.rows[0].bot_senales)?r.rows[0].bot_senales:[];
- const senales=[...new Set([...anteriores,...detectado.senales])];
- const score=Math.min(100,senales.reduce((t,x)=>t+(PESOS_SENALES[x]||0),0));
- const temperatura=score>=80?'caliente':score>=25?'tibio':'frio';
-const requiereCloser=false;
- await pool.query("UPDATE clientes SET bot_senales=$1::jsonb,score=$2,temperatura=$3,requiere_closer=$4,bot_activo=CASE WHEN $4 THEN false ELSE bot_activo END,etapa=CASE WHEN $4 THEN $6 ELSE etapa END WHERE id=$5",[JSON.stringify(senales),score,temperatura,requiereCloser,clienteId,"Calificado"]);
- return {senales,score,temperatura,requiereCloser};
-}
+  const detectado=calificarMensajeCliente(texto);
 
+  await pool.query(
+    `UPDATE clientes
+     SET bot_activo=true, humano_hasta=NULL
+     WHERE id=$1
+       AND bot_activo=false
+       AND humano_hasta IS NOT NULL
+       AND humano_hasta <= NOW()`
+,    [clienteId]
+  );
+
+  const r=await pool.query(
+    `SELECT COALESCE(bot_senales,'[]'::jsonb) AS bot_senales,
+            COALESCE(bot_activo,true) AS bot_activo
+     FROM clientes
+     WHERE id=$1
+     LIMIT 1`,
+    [clienteId]
+  );
+
+  if(!r.rows[0] || r.rows[0].bot_activo===false) return null;
+
+  const anteriores=Array.isArray(r.rows[0].bot_senales)?r.rows[0].bot_senales:[];
+  const senales=[...new Set([...anteriores,...detectado.senales])];
+  const score=Math.min(100,senales.reduce((t,x)=>t+(PESOS_SENALES[x]||0),0));
+  const temperatura=score>=80?'caliente':score>=25?'tibio':'frio';
+
+  await pool.query(
+    `UPDATE clientes
+     SET bot_senales=$1::jsonb, score=$2, temperatura=$3
+     WHERE id=$4`,
+    [JSON.stringify(senales),score,temperatura,clienteId]
+  );
+
+  return {senales,score,temperatura,requiereCloser:false};
+}
 
 async function procesarLoteBot(lote) {
   if (!Array.isArray(lote) || lote.length === 0) return;
@@ -160,7 +185,6 @@ async function procesarLoteBot(lote) {
       SET score = CASE WHEN $4 THEN score ELSE 100 END,
           temperatura = CASE WHEN $4 THEN temperatura ELSE 'caliente' END,
           requiere_closer = true,
-          bot_activo = false,
           etapa = CASE WHEN $4 THEN etapa ELSE 'Calificado' END,
           handoff_motivo = $3,
           asesor = COALESCE($2, asesor)

@@ -99,7 +99,7 @@ function respuestaRespaldo(texto, memoria = {}) {
       handoff: true,
       memoria: {
         producto: memoria.producto || null,
-        paso: "closer",
+        paso: "postventa",
         contexto: memoria.contexto || {},
       },
     };
@@ -210,7 +210,7 @@ const mensajeFinal = datosPago
       handoff,
       memoria: {
         producto,
-        paso: handoff ? "closer" : memoria.paso === "postventa" ? "postventa" : "conversacion",
+        paso: memoria.paso === "postventa" ? "postventa" : "conversacion",
         contexto,
       },
       analisis,

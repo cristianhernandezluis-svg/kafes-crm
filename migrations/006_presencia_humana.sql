@@ -1,0 +1,2 @@
+ALTER TABLE clientes
+  ADD COLUMN IF NOT EXISTS humano_hasta TIMESTAMPTZ;

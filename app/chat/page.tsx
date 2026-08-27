@@ -159,6 +159,19 @@ const cargarPlantillas = async () => {
 
   const abrirConversacion = async (cliente: Cliente) => {
   if (!whatsappQrId) return;
+
+  if (clienteActivo && clienteActivo.id !== cliente.id) {
+    await fetch("/api/chats", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cliente_id: clienteActivo.id,
+        whatsapp_qr_id: whatsappQrId,
+        accion: "liberar",
+      }),
+    });
+  }
+
   setMostrarConversacion(true);
   setClienteActivo(cliente);
 
@@ -168,6 +181,7 @@ await fetch("/api/chats", {
   body: JSON.stringify({
     cliente_id: cliente.id,
     whatsapp_qr_id: whatsappQrId,
+    accion: "tomar",
   }),
 });
 
@@ -258,6 +272,29 @@ const enviarArchivo = async (archivo: File) => {
   } finally {
     setEnviandoArchivo(false);
   }
+};
+
+const cerrarConversacion = async () => {
+  const cliente = clienteActivo;
+
+  if (cliente && whatsappQrId) {
+    try {
+      await fetch("/api/chats", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cliente_id: cliente.id,
+          whatsapp_qr_id: whatsappQrId,
+          accion: "liberar",
+        }),
+      });
+    } catch (error) {
+      console.error("Error liberando chat:", error);
+    }
+  }
+
+  setMostrarConversacion(false);
+  setClienteActivo(null);
 };
 
 const devolverAlBot = async () => {
@@ -769,7 +806,7 @@ useEffect(() => {
 >
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setMostrarConversacion(false)}
+              onClick={cerrarConversacion}
               className={`md:hidden text-2xl ${
   temaClaro ? "text-slate-900" : "text-white"
 }`}

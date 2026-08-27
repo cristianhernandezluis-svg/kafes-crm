@@ -86,13 +86,28 @@ export async function GET(request: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const { cliente_id, whatsapp_qr_id } = await req.json();
+    const { cliente_id, whatsapp_qr_id, accion } = await req.json();
 
     if (!cliente_id || !whatsapp_qr_id) {
       return NextResponse.json(
         { success: false, error: "Falta cliente_id o whatsapp_qr_id" },
         { status: 400 }
       );
+    }
+
+    if (accion === 'liberar') {
+      await pool.query(
+        `
+        UPDATE clientes
+        SET bot_activo = true,
+            humano_hasta = NULL
+        WHERE id = $1
+          AND humano_hasta IS NOT NULL
+        `,
+        [cliente_id]
+      );
+
+      return NextResponse.json({ success: true, liberado: true });
     }
 
     await pool.query(
@@ -106,6 +121,17 @@ export async function PATCH(req: Request) {
       [cliente_id, whatsapp_qr_id]
     );
 
+
+    await pool.query(
+      `
+      UPDATE clientes
+      SET bot_activo = false,
+          requiere_closer = false,
+          humano_hasta = NOW() + INTERVAL '90 seconds'
+      WHERE id = $1
+      `,
+      [cliente_id]
+    );
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("ERROR MARCANDO CHAT LEIDO:", error);
