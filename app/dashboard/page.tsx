@@ -80,6 +80,10 @@ const cambiarTema = () => {
   });
 };
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [metricasDashboard, setMetricasDashboard] = useState({
+    conversaciones_hoy: 0,
+    conversaciones_ayer: 0,
+  });
   const [cargando, setCargando] = useState(true);
 const [filtroFechaVentas, setFiltroFechaVentas] = useState("esta_semana");
 const [filtroFecha, setFiltroFecha] = useState("esta_semana");
@@ -167,6 +171,41 @@ const seguimientosHoy = clientes.filter((c) => {
   );
 });
 
+  const cargarMetricasDashboard = async () => {
+    try {
+      const usuarioGuardado = localStorage.getItem("usuario");
+
+      if (!usuarioGuardado) return;
+
+      const usuario = JSON.parse(usuarioGuardado);
+
+      const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
+      const qrData = await qrRes.json();
+      const whatsappQrId = qrData.whatsapp_qr_id;
+
+      if (!whatsappQrId) {
+        setMetricasDashboard({
+          conversaciones_hoy: 0,
+          conversaciones_ayer: 0,
+        });
+        return;
+      }
+
+      const res = await fetch(
+        `/api/metricas-dashboard?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}`,
+        { cache: "no-store" }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        setMetricasDashboard(data.metricas);
+      }
+    } catch (error) {
+      console.error("Error cargando métricas dashboard:", error);
+    }
+  };
+
   const cargarClientes = async () => {
     try {
       const usuarioGuardado = localStorage.getItem("usuario");
@@ -201,6 +240,16 @@ const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp
       setCargando(false);
     }
   };
+
+  useEffect(() => {
+    cargarMetricasDashboard();
+
+    const intervalo = window.setInterval(() => {
+      cargarMetricasDashboard();
+    }, 30000);
+
+    return () => window.clearInterval(intervalo);
+  }, []);
 
   const abrirConversacion = async (cliente: Cliente) => {
 setEditandoInfo(false);
@@ -770,13 +819,13 @@ const barraTema = temaClaro
         </div>
 
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mt-6">
-  <Link href="/leads-nuevos">
+  <Link href="/chat">
     <div className={`${panelTema} border rounded-2xl p-5 hover:border-green-500 cursor-pointer transition`}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-slate-400 text-sm">Leads nuevos</p>
-          <h2 className={`text-3xl font-black mt-2 ${tituloTema}`}>{leadsNuevos}</h2>
-          <p className="text-green-400 text-sm mt-2">↑ 12% vs ayer</p>
+          <p className="text-slate-400 text-sm">Conversaciones hoy</p>
+          <h2 className={`text-3xl font-black mt-2 ${tituloTema}`}>{metricasDashboard.conversaciones_hoy}</h2>
+          <p className="text-slate-400 text-sm mt-2">Ayer: {metricasDashboard.conversaciones_ayer}</p>
         </div>
         <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center">
           <Users className="text-blue-400" size={28} />
