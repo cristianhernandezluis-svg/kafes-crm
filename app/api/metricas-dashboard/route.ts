@@ -25,31 +25,73 @@ export async function GET(request: Request) {
       `
       WITH fechas AS (
         SELECT (NOW() AT TIME ZONE 'America/Lima')::date AS hoy
+      ),
+      conversaciones_metricas AS (
+        SELECT
+          COUNT(DISTINCT c.cliente_id) FILTER (
+            WHERE
+              c.remitente = 'cliente'
+              AND (
+                c.created_at
+                AT TIME ZONE 'UTC'
+                AT TIME ZONE 'America/Lima'
+              )::date = f.hoy
+          )::int AS conversaciones_hoy,
+
+          COUNT(DISTINCT c.cliente_id) FILTER (
+            WHERE
+              c.remitente = 'cliente'
+              AND (
+                c.created_at
+                AT TIME ZONE 'UTC'
+                AT TIME ZONE 'America/Lima'
+              )::date = f.hoy - 1
+          )::int AS conversaciones_ayer
+        FROM conversaciones c
+        CRoSS JOIN fechas f
+        WHERE c.empresa_id = $1
+          AND c.whatsapp_qr_id = $2
+      ),
+      cierres_metricas AS (
+        SELECT
+          COUNT(DISTINCT h.cliente_id) FILTERE (
+            WHERE
+              h.etapa_nueva = 'Pagó Adelanto'
+              AND h.es_baseline = false
+              AND (h.created_at AT TIME ZONE 'America/Lima')::date = f.hoy
+              AND EXISTS (
+                SELECT 1
+                FROM clientes_whatsapp_qr rel
+                WHERE rel.empresa_id = h.empresa_id
+                  AND rel.cliente_id = h.cliente_id
+                  AND rel.whatsapp_qr_id = $2
+              )
+          )::int AS cierres_hoy,
+
+          COUNT(DISTINCT h.cliente_id) FILTER (
+            WHERE
+              h.etapa_nueva = 'Pagó Adelanto'
+              AND h.es_baseline = false
+              AND (h.created_at AT TIME ZONE 'America/Lima')::date = f.hoy - 1
+              AND EXISTS (
+                SELECT 1
+                FROM clientes_whatsapp_qr rel
+                WHERE rel.empresa_id = h.empresa_id
+                  AND rel.cliente_id = h.cliente_id
+                  AND rel.whatsapp_qr_id = $2
+              )
+          )::int AS cierres_ayer
+        FROM historial_etapas h
+        CRoSS JOIN fechas f
+        WHERE h.empresa_id = $1
       )
       SELECT
-        COUNT(DISTINCT c.cliente_id) FILTER (
-          WHERE
-            c.remitente = 'cliente'
-            AND (
-              c.created_at
-              AT TIME ZONE 'UTC'
-              AT TIME ZONE 'America/Lima'
-            )::date = f.hoy
-        )::int AS conversaciones_hoy,
-
-        COUNT(DISTINCT c.cliente_id) FILTER (
-          WHERE
-            c.remitente = 'cliente'
-            AND (
-              c.created_at
-              AT TIME ZONE 'UTC'
-              AT TIME ZONE 'America/Lima'
-            )::date = f.hoy - 1
-        )::int AS conversaciones_ayer
-      FROM conversaciones c
-      CROSS JOIN fechas f
-      WHERE c.empresa_id = $1
-        AND c.whatsapp_qr_id = $2
+        c.conversaciones_hoy,
+        c.conversaciones_ayer,
+        h.cierres_hoy,
+        h.cierres_ayer
+      FROM conversaciones_metricas c
+      CROSS JOIN cierres_metricas h
       `,
       [empresaId, whatsappQrId]
     );
@@ -59,6 +101,8 @@ export async function GET(request: Request) {
       metricas: result.rows[0] ?? {
         conversaciones_hoy: 0,
         conversaciones_ayer: 0,
+        cierres_hoy: 0,
+        cierres_ayer: 0,
       },
     });
   } catch (error) {
@@ -70,9 +114,11 @@ export async function GET(request: Request) {
         metricas: {
           conversaciones_hoy: 0,
           conversaciones_ayer: 0,
+          cierres_hoy: 0,
+          cierres_ayer: 0,
         },
       },
       { status: 500 }
-    );
+     );
   }
 }

@@ -83,6 +83,8 @@ const cambiarTema = () => {
   const [metricasDashboard, setMetricasDashboard] = useState({
     conversaciones_hoy: 0,
     conversaciones_ayer: 0,
+    cierres_hoy: 0,
+    cierres_ayer: 0,
   });
   const [cargando, setCargando] = useState(true);
 const [filtroFechaVentas, setFiltroFechaVentas] = useState("esta_semana");
@@ -187,6 +189,8 @@ const seguimientosHoy = clientes.filter((c) => {
         setMetricasDashboard({
           conversaciones_hoy: 0,
           conversaciones_ayer: 0,
+          cierres_hoy: 0,
+          cierres_ayer: 0,
         });
         return;
       }
@@ -857,15 +861,13 @@ const barraTema = temaClaro
   >
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-slate-400 text-sm">Pagó adelanto</p>
+        <p className="text-slate-400 text-sm">Cierres hoy</p>
 
         <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>
-          {pagoAdelanto}
+          {metricasDashboard.cierres_hoy}
         </h2>
 
-        <p className="text-green-400 text-sm mt-2">
-          ↑ 15% vs ayer
-        </p>
+        <p className="text-slate-400 text-sm mt-2">Ayer: {metricasDashboard.cierres_ayer}</p>
       </div>
 
       <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
