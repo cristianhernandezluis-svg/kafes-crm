@@ -1,407 +1,303 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+type FilaReporte = {
+  fecha: string;
+  conversaciones: number;
+  pendientes: number | null;
+  cierres: number;
+  enviados: number;
+  entregados: number;
+};
 
 export default function ReportesPage() {
   const [temaClaro, setTemaClaro] = useState(false);
+  const [dias, setDias] = useState(30);
+  const [historial, setHistorial] = useState<FilaReporte[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const temaGuardado = localStorage.getItem("tema-crm");
-    setTemaClaro(temaGuardado === "claro");
+    setTemaClaro(localStorage.getItem("tema-crm") === "claro");
   }, []);
 
-  const panelTema = temaClaro
+  useEffect(() => {
+    const cargar = async () => {
+      try {
+        setCargando(true);
+        setError("");
+
+        const usuarioGuardado = localStorage.getItem("usuario");
+        if (!usuarioGuardado) {
+          window.location.href = "/login";
+          return;
+        }
+
+        const usuario = JSON.parse(usuarioGuardado);
+
+        const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
+        const qrData = await qrRes.json();
+        const whatsappQrId = qrData.whatsapp_qr_id;
+
+        if (!whatsappQrId) {
+          setHistorial([]);
+          setError("No hay un canal de WhatsApp seleccionado.");
+          return;
+        }
+
+        const res = await fetch(
+          `/api/reportes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}&dias=${dias}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "No se pudo cargar el reporte");
+        }
+
+        setHistorial(data.historial || []);
+      } catch (e) {
+        console.error("Error cargando reporte:", e);
+        setError("No se pudo cargar el reporte.");
+        setHistorial([]);
+      } finally {
+        setCargando(false);
+      }
+    };
+
+    cargar();
+  }, [dias]);
+
+  const resumen = useMemo(
+    () =>
+      historial.reduce(
+        (acc, fila) => {
+          acc.conversaciones += Number(fila.conversaciones || 0);
+          acc.cierres += Number(fila.cierres || 0);
+          acc.enviados += Number(fila.enviados || 0);
+          acc.entregados += Number(fila.entregados || 0);
+          return acc;
+        },
+        { conversaciones: 0, cierres: 0, enviados: 0, entregados: 0 }
+      ),
+    [historial]
+  );
+
+  const pendientesActuales =
+    historial.length > 0 ? historial[0].pendientes : null;
+
+  const panel = temaClaro
     ? "bg-white border-slate-200 shadow-sm"
     : "bg-[#0f172a] border-slate-800";
 
-  const botonTema = temaClaro
-    ? "bg-white border-slate-300 text-slate-700"
-    : "bg-[#0f172a] border-slate-800 text-white";
+  const fondo = temaClaro
+    ? "bg-slate-100 text-slate-900"
+    : "bg-[#08111f] text-white";
+
+  const secundario = temaClaro ? "text-slate-500" : "text-slate-400";
+
+  const formatearFecha = (fecha: string) =>
+    new Date(`${fecha}T12:00:00`).toLocaleDateString("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
 
   return (
+    <div className={`min-h-screen ${fondo}`}>
+      <header
+        className={`border-b ${
+          temaClaro
+            ? "bg-white border-slate-200"
+            : "bg-[#0b1218] border-[#1f2a33]"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-black">
+              Kafes <span className="text-green-400">CRM</span>
+            </h1>
+            <p className={`text-xs ${secundario}`}>Reportes ecommerce</p>
+          </div>
 
-  <div
-    className={`min-h-screen flex ${
-      temaClaro
-        ? "bg-slate-100 text-slate-900"
-        : "bg-[#08111f] text-white"
-    }`}
-  >
-    <aside
-      className={`hidden lg:flex w-[220px] flex-col h-screen sticky top-0 border-r ${
-        temaClaro
-          ? "bg-white text-slate-800 border-slate-200"
-          : "bg-[#101820] text-white border-[#1f2a33]"
-      }`}
-    >
-                         <Link
-  href="/dashboard"
-  className={`flex items-center gap-3 px-4 py-4 border-b ${
-    temaClaro ? "border-slate-200" : "border-[#1f2a33]"
-  }`}
->
-  <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
-    K
-  </div>
-
-  <h1 className="text-xl font-black">
-    Kafes <span className="text-green-400">CRM</span>
-  </h1>
-</Link>
-
-<div className="px-4 pt-5 pb-2">
-  <p className="text-[11px] text-slate-400 uppercase font-bold">
-    Principal
-  </p>
-</div>
-
-<nav className="flex-1 px-2 space-y-1">
-        <Link
-          href="/dashboard"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-            temaClaro
-              ? "hover:bg-slate-100 text-slate-700"
-              : "hover:bg-slate-800 text-white"
-          }`}
-        >
-          📊 Dashboard
-        </Link>
-
-        <Link
-          href="/chat"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-            temaClaro
-              ? "hover:bg-slate-100 text-slate-700"
-              : "hover:bg-slate-800 text-white"
-          }`}
-        >
-          💬 Conversaciones
-        </Link>
-
-        <Link
-          href="/contactos"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-            temaClaro
-              ? "hover:bg-slate-100 text-slate-700"
-              : "hover:bg-slate-800 text-white"
-          }`}
-        >
-          👤 Contactos
-        </Link>
-
-        <Link
-          href="/kanban"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-            temaClaro
-              ? "hover:bg-slate-100 text-slate-700"
-              : "hover:bg-slate-800 text-white"
-          }`}
-        >
-          🧩 Kanban
-        </Link>
-
-        <Link
-          href="/mensajes"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-            temaClaro
-              ? "hover:bg-slate-100 text-slate-700"
-              : "hover:bg-slate-800 text-white"
-          }`}
-        >
-          ✉️ Mensajes
-        </Link>
-
-        <Link
-          href="/plantillas"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-            temaClaro
-              ? "hover:bg-slate-100 text-slate-700"
-              : "hover:bg-slate-800 text-white"
-          }`}
-        >
-          📄 Plantillas
-        </Link>
-
-        <Link
-          href="/automatizaciones"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-            temaClaro
-              ? "hover:bg-slate-100 text-slate-700"
-              : "hover:bg-slate-800 text-white"
-          }`}
-        >
-          ⚙️ Automatizaciones
-        </Link>
-
-        <Link
-          href="/reportes"
-          className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm"
-        >
-          📊 Reportes
-        </Link>
-
-        <Link
-          href="/ajustes"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-            temaClaro
-              ? "hover:bg-slate-100 text-slate-700"
-              : "hover:bg-slate-800 text-white"
-          }`}
-        >
-          ⚙️ Ajustes
-        </Link>
-      </nav>
-
-        <div className="p-3">
-          <div
-  className={`border rounded-xl p-4 ${
-    temaClaro
-      ? "bg-slate-50 border-slate-200"
-      : "bg-[#111c24] border-[#26323d]"
-  }`}
->
-            <p
-  className={`text-sm font-bold mb-3 ${
-    temaClaro ? "text-slate-700" : "text-slate-300"
-  }`}
->Conexión WhatsApp</p>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">🟢</div>
-              <div>
-                <p className="text-green-400 font-bold text-sm">Conectado</p>
-                <p className="text-xs text-slate-400">QR activo</p>
-              </div>
-            </div>
+          <div className="flex gap-2">
             <Link
-  href="/dashboard/canales"
-  className={`block w-full text-center border rounded-lg py-2 text-xs font-bold ${
-    temaClaro
-      ? "border-slate-300 text-slate-700 hover:bg-slate-100"
-      : "border-slate-700 text-white hover:bg-slate-800"
-  }`}
->
-  VER QR
-</Link>
+              href="/dashboard"
+              className="px-3 py-2 rounded-lg text-sm font-bold border border-slate-700"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/kanban"
+              className="px-3 py-2 rounded-lg text-sm font-bold border border-slate-700"
+            >
+              Kanban
+            </Link>
           </div>
         </div>
-      </aside>
+      </header>
 
-      <main className="flex-1 min-w-0 h-screen overflow-hidden">
-        <div
-  className={`h-12 border-b flex items-center justify-between px-5 shrink-0 ${
-    temaClaro
-      ? "bg-white border-slate-200"
-      : "bg-[#0b1218] border-[#1f2a33]"
-  }`}
->
-          <h1 className={`text-sm font-bold ${
-  temaClaro ? "text-slate-900" : "text-white"
-}`}>
-  Reportes
-</h1>
-          <div className="flex items-center gap-4 text-slate-300">
-            <button className="hover:text-white">🔍</button>
-            <button className="hover:text-white">🔔</button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-black font-black">C</div>
-              <div>
-                <p className="text-xs font-bold text-white">Administrador</p>
-                <p className="text-[10px] text-green-400">● En línea</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="h-[calc(100vh-48px)] overflow-y-auto p-6">
-          <div className="flex justify-between items-start mb-5">
-            <div>
-              <h1 className="text-3xl font-black">Reportes</h1>
-              <p className="text-slate-400 mt-1">
-                Analiza el rendimiento de tu CRM y toma mejores decisiones.
-              </p>
-            </div>
-
-            <button className="bg-green-600 hover:bg-green-700 px-5 py-3 rounded-xl font-bold text-sm">
-              ⬇ Exportar reporte
-            </button>
+      <main className="max-w-7xl mx-auto p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-3xl font-black">Rendimiento diario</h2>
+            <p className={`${secundario} mt-1`}>
+              Conversaciones, pendientes, cierres, envíos y entregas por día.
+            </p>
           </div>
 
-          <div className="flex flex-wrap gap-3 mb-5">
-            <button className={`${botonTema} border px-4 py-3 rounded-xl text-sm`}>
-              📅 01/05/2024 - 31/05/2024
-            </button>
-            <button className={`${botonTema} border px-4 py-3 rounded-xl text-sm`}>
-              Comparar con: 01/04/2024 - 30/04/2024
-            </button>
-            <button className={`${botonTema} border px-4 py-3 rounded-xl text-sm`}>
-              Todos los equipos
-            </button>
-          </div>
-
-          <div className="flex gap-8 mb-5 text-sm">
-            <button className="text-green-400 border-b-2 border-green-500 pb-2">Resumen</button>
-            <button className="text-slate-400 pb-2">Conversaciones</button>
-            <button className="text-slate-400 pb-2">Leads</button>
-            <button className="text-slate-400 pb-2">Ventas</button>
-            <button className="text-slate-400 pb-2">Mensajes</button>
-            <button className="text-slate-400 pb-2">Agentes</button>
-            <button className="text-slate-400 pb-2">Clientes</button>
-          </div>
-
-          <div className="grid grid-cols-5 gap-4 mb-4">
-            {[
-              ["👥", "Conversaciones totales", "1.245", "↑ 18% vs periodo anterior"],
-              ["🎯", "Leads nuevos", "128", "↑ 12% vs periodo anterior"],
-              ["💵", "Ventas totales", "S/ 32.450", "↑ 15% vs periodo anterior"],
-              ["✅", "Ventas entregadas", "89", "↑ 10% vs periodo anterior"],
-              ["❌", "No responden", "34", "↓ 8% vs periodo anterior"],
-            ].map((item) => (
-              <div
-  key={item[1]}
-  className={`${panelTema} border rounded-2xl p-5`}
->
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center text-2xl">
-                    {item[0]}
-                  </div>
-                  <div>
-                    <p className="text-slate-400 text-sm font-bold">{item[1]}</p>
-                    <h2 className="text-2xl font-black mt-1">{item[2]}</h2>
-                    <p className="text-green-400 text-xs mt-1">{item[3]}</p>
-                  </div>
-                </div>
-              </div>
+          <div className="flex gap-2">
+            {[7, 30, 90].map((valor) => (
+              <button
+                key={valor}
+                onClick={() => setDias(valor)}
+                className={`px-4 py-2 rounded-xl border text-sm font-bold ${
+                  dias === valor
+                    ? "bg-green-600 border-green-600 text-white"
+                    : temaClaro
+                    ? "bg-white border-slate-300 text-slate-700"
+                    : "bg-[#0f172a] border-slate-700 text-slate-300"
+                }`}
+              >
+                {valor} días
+              </button>
             ))}
           </div>
-
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className={`${panelTema} border rounded-2xl p-5 col-span-1`}>
-              <h3 className="font-black mb-5">Conversaciones por día</h3>
-              <div className="h-40 flex items-end gap-2">
-                {[30, 45, 60, 80, 65, 90, 120, 160, 130, 140, 110, 95].map((h, i) => (
-                  <div key={i} className="flex-1 bg-green-500/70 rounded-t" style={{ height: `${h}px` }} />
-                ))}
-              </div>
-              <p className="text-xs text-slate-500 mt-4">01 May - 31 May</p>
-            </div>
-
-            <div className={`${panelTema} border rounded-2xl p-5`}>
-              <h3 className="font-black mb-5">Leads por etapa</h3>
-              <div className="flex items-center gap-6">
-                <div className="w-32 h-32 rounded-full border-[22px] border-green-500 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-2xl font-black">256</p>
-                    <p className="text-xs text-slate-400">Total</p>
-                  </div>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <p>🟢 Nuevo <span className="text-slate-400">23</span></p>
-                  <p>🟡 Interesado <span className="text-slate-400">45</span></p>
-                  <p>🟣 Pagó adelanto <span className="text-slate-400">57</span></p>
-                  <p>🔴 No responde <span className="text-slate-400">33</span></p>
-                </div>
-              </div>
-            </div>
-
-            <div className={`${panelTema} border rounded-2xl p-5`}>
-              <h3 className="font-black mb-5">Ventas por mes</h3>
-              <div className="h-40 flex items-end gap-4">
-                {[70, 66, 78, 88, 120, 65].map((h, i) => (
-                  <div key={i} className="flex-1 bg-green-500 rounded-t" style={{ height: `${h}px` }} />
-                ))}
-              </div>
-              <div className="flex justify-between text-xs text-slate-500 mt-3">
-                <span>Ene</span><span>Feb</span><span>Mar</span><span>Abr</span><span>May</span><span>Jun</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className={`${panelTema} border rounded-2xl p-5`}>
-              <h3 className="font-black mb-5">Tasa de respuesta</h3>
-              <div className="text-center py-8">
-                <p className="text-5xl font-black text-green-400">78%</p>
-                <p className="text-slate-400 mt-2">Respondidas</p>
-              </div>
-            </div>
-
-            <div className={`${panelTema} border rounded-2xl p-5`}>
-              <h3 className="font-black mb-5">Conversaciones por agente</h3>
-              {["María González", "Carlos Martínez", "Laura Sánchez", "Juan Pérez", "Ana Rodríguez"].map((n, i) => (
-                <div key={n} className="mb-3">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>{n}</span>
-                    <span>{245 - i * 35}</span>
-                  </div>
-                  <div
-  className={`h-2 rounded-full ${
-    temaClaro ? "bg-slate-200" : "bg-slate-800"
-  }`}
->
-                    <div className="h-2 bg-green-500 rounded-full" style={{ width: `${90 - i * 12}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className={`${panelTema} border rounded-2xl p-5`}>
-              <h3 className="font-black mb-5">Mensajes enviados</h3>
-              <div className="text-center py-8">
-                <p className="text-5xl font-black text-green-400">3.856</p>
-                <p className="text-slate-400 mt-2">Total</p>
-              </div>
-            </div>
-          </div>
-
-          <div className={`${panelTema} border rounded-2xl overflow-hidden`}>
-            <div
-  className={`p-5 border-b ${
-    temaClaro ? "border-slate-200" : "border-slate-800"
-  }`}
->
-              <h3 className="font-black">Reporte de conversaciones</h3>
-            </div>
-
-            <table className="w-full text-sm">
-              <thead
-  className={
-    temaClaro
-      ? "bg-slate-50 text-slate-600"
-      : "bg-[#111827] text-slate-400"
-  }
->
-                <tr>
-                  <th className="text-left p-4">Canal</th>
-                  <th className="text-left p-4">Conversaciones</th>
-                  <th className="text-left p-4">Respondidas</th>
-                  <th className="text-left p-4">No respondidas</th>
-                  <th className="text-left p-4">Tasa respuesta</th>
-                  <th className="text-left p-4">Tiempo promedio</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ["WhatsApp", "1.102", "876", "203", "79%", "2m 34s"],
-                  ["Instagram", "87", "71", "14", "82%", "5m 12s"],
-                  ["Facebook", "56", "42", "14", "75%", "4m 02s"],
-                ].map((row) => (
-                  <tr
-  key={row[0]}
-  className={`border-t ${
-    temaClaro ? "border-slate-200" : "border-slate-800"
-  }`}
->
-                    {row.map((cell) => (
-                      <td key={cell} className="p-4">{cell}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+          <Tarjeta
+            titulo="Conversaciones"
+            valor={resumen.conversaciones}
+            detalle={`Últimos ${dias} días`}
+            panel={panel}
+            secundario={secundario}
+          />
+          <Tarjeta
+            titulo="Pendientes actuales"
+            valor={pendientesActuales === null ? "—" : pendientesActuales}
+            detalle="Cartera por gestionar"
+            panel={panel}
+            secundario={secundario}
+          />
+          <Tarjeta
+            titulo="Cierres"
+            valor={resumen.cierres}
+            detalle="Pagó adelanto"
+            panel={panel}
+            secundario={secundario}
+          />
+          <Tarjeta
+            titulo="Enviados"
+            valor={resumen.enviados}
+            detalle={`Últimos ${dias} días`}
+            panel={panel}
+            secundario={secundario}
+          />
+          <Tarjeta
+            titulo="Entregados"
+            valor={resumen.entregados}
+            detalle={`Últimos ${dias} días`}
+            panel={panel}
+            secundario={secundario}
+          />
+        </div>
+
+        <section className={`${panel} border rounded-2xl overflow-hidden`}>
+          <div
+            className={`p-5 border-b ${
+              temaClaro ? "border-slate-200" : "border-slate-800"
+            }`}
+          >
+            <h3 className="font-black">Historial por día</h3>
+            <p className={`text-xs mt-1 ${secundario}`}>
+              El cierre cuenta el día en que el cliente pasó a “Pagó Adelanto”.
+            </p>
+          </div>
+
+          {error ? (
+            <div className="p-8 text-center text-red-400">{error}</div>
+          ) : cargando ? (
+            <div className={`p-8 text-center ${secundario}`}>
+              Cargando reporte...
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[760px]">
+                <thead
+                  className={
+                    temaClaro
+                      ? "bg-slate-50 text-slate-600"
+                      : "bg-[#111827] text-slate-400"
+                  }
+                >
+                  <tr>
+                    <th className="text-left p-4">Fecha</th>
+                    <th className="text-right p-4">Conversaciones</th>
+                    <th className="text-right p-4">Pendientes</th>
+                    <th className="text-right p-4">Cierres</th>
+                    <th className="text-right p-4">Enviados</th>
+                    <th className="text-right p-4">Entregados</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historial.map((fila) => (
+                    <tr
+                      key={fila.fecha}
+                      className={`border-t ${
+                        temaClaro ? "border-slate-200" : "border-slate-800"
+                      }`}
+                    >
+                      <td className="p-4 font-bold">
+                        {formatearFecha(fila.fecha)}
+                      </td>
+                      <td className="p-4 text-right">{fila.conversaciones}</td>
+                      <td className="p-4 text-right">
+                        {fila.pendientes === null ? "—" : fila.pendientes}
+                      </td>
+                      <td className="p-4 text-right font-black text-green-400">
+                        {fila.cierres}
+                      </td>
+                      <td className="p-4 text-right">{fila.enviados}</td>
+                      <td className="p-4 text-right">{fila.entregados}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <p className={`text-xs mt-4 ${secundario}`}>
+          Nota: el historial de etapas es confiable desde que activamos el
+          seguimiento histórico. En días anteriores, “Pendientes” puede
+          mostrarse como —.
+        </p>
       </main>
+    </div>
+  );
+}
+
+function Tarjeta({
+  titulo,
+  valor,
+  detalle,
+  panel,
+  secundario,
+}: {
+  titulo: string;
+  valor: number | string;
+  detalle: string;
+  panel: string;
+  secundario: string;
+}) {
+  return (
+    <div className={`${panel} border rounded-2xl p-5`}>
+      <p className={`text-sm font-bold ${secundario}`}>{titulo}</p>
+      <p className="text-3xl font-black mt-2">{valor}</p>
+      <p className={`text-xs mt-2 ${secundario}`}>{detalle}</p>
     </div>
   );
 }
