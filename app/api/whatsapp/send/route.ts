@@ -41,6 +41,7 @@ export async function POST(req: Request) {
     }
 
     const empresaId = cliente.empresa_id;
+
     const canal = cliente.canal || "cloud";
     const telefonoFinal = limpiarTelefono(telefono);
 
@@ -130,6 +131,21 @@ export async function POST(req: Request) {
 
       whatsappMessageId = data.messages?.[0]?.id || null;
     }
+
+    await pool.query(
+      `
+      UPDATE clientes
+      SET bot_activo = false,
+          requiere_closer = false,
+          handoff_motivo = CASE
+            WHEN handoff_motivo = 'validar_pago' THEN 'validar_pago'
+            WHEN handoff_motivo IN ('pide_humano', 'bot_no_puede') THEN handoff_motivo
+            ELSE 'intervencion_manual'
+          END
+      WHERE id = $1
+      `,
+      [cliente_id]
+    );
 
     if (canal !== "qr") {
   await pool.query(

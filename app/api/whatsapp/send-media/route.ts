@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       );
     }
 
+
     const telefonoFinal = limpiarTelefono(telefono);
     const tipo = detectarTipo(archivo.type);
 
@@ -113,6 +114,21 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
+
+    await pool.query(
+      `
+      UPDATE clientes
+      SET bot_activo = false,
+          requiere_closer = false,
+          handoff_motivo = CASE
+            WHEN handoff_motivo = 'validar_pago' THEN 'validar_pago'
+            WHEN handoff_motivo IN ('pide_humano', 'bot_no_puede') THEN handoff_motivo
+            ELSE 'intervencion_manual'
+          END
+      WHERE id = $1
+      `,
+      [clienteId]
+    );
 
     const mensaje =
       tipo === "image"

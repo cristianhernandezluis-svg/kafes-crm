@@ -41,7 +41,7 @@ async function prepararColumnasBot() {
       ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio',
       ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true,
       ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb;
+      ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb,\n      ADD COLUMN IF NOT EXISTS handoff_motivo TEXT DEFAULT 'ninguno',\n      ADD COLUMN IF NOT EXISTS cerrado_por TEXT,\n      ADD COLUMN IF NOT EXISTS cerrado_at TIMESTAMPTZ;
   `);
 }
 
@@ -63,6 +63,8 @@ async function cargarIntegracionQr() {
 }
 
 function normalizarTexto(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+
+function detectarMotivoHandoff(textoAccion,textoBot){const accion=normalizarTexto(textoAccion);const completo=normalizarTexto(textoBot);const archivo=String(textoBot||'').includes('[ANALISIS INTERNO DEL ARCHIVO');if(archivo&&/\b(comprobante|voucher|constancia|pago realizado|transferencia realizada|deposito realizado)\b/.test(completo))return 'validar_pago';if(/\b(asesor|persona|humano|vendedor)\b/.test(accion))return 'pide_humano';return 'bot_no_puede';}
 
 function calificarMensajeCliente(texto){const t=normalizarTexto(texto);const senales=[];if(/\b(precio|cuanto|costo|vale)\b/.test(t))senales.push('precio');if(/\b(envio|envios|delivery|entrega|entregas|llega|llegan|agencia|agencias|shalom|olva)\b/.test(t))senales.push('envio');if(/\b(ciudad|distrito|provincia|departamento|direccion|soy de|vivo en)\b/.test(t))senales.push('ubicacion');if(/\b(garantia)\b/.test(t))senales.push('garantia');if(/\b(yape|plin|transferencia|transferir|deposito|depositar|pago|pagos|pagar)\b/.test(t))senales.push('pago');if(/\b(quiero|compro|comprar|separar|separame|reservar|pedido|quiero uno)\b/.test(t))senales.push('intencion_compra');if(/\b(hoy|ahora|ya mismo)\b/.test(t))senales.push('urgencia');return {senales};}
 
@@ -135,6 +137,8 @@ async function procesarLoteBot(lote) {
   });
 
   if (respuestaBot?.handoff) {
+    const handoffMotivo = detectarMotivoHandoff(textoAccion, textoBot);
+
     const asesorResult = await pool.query(
       `
       SELECT u.nombre
@@ -158,10 +162,11 @@ async function procesarLoteBot(lote) {
           requiere_closer = true,
           bot_activo = false,
           etapa = 'Calificado',
+          handoff_motivo = $3,
           asesor = COALESCE($2, asesor)
       WHERE id = $1
       `,
-      [clienteId, asesor]
+      [clienteId, asesor, handoffMotivo]
     );
 
     console.log(
