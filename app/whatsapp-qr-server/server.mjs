@@ -157,16 +157,16 @@ async function procesarLoteBot(lote) {
     await pool.query(
       `
       UPDATE clientes
-      SET score = 100,
-          temperatura = 'caliente',
+      SET score = CASE WHEN $4 THEN score ELSE 100 END,
+          temperatura = CASE WHEN $4 THEN temperatura ELSE 'caliente' END,
           requiere_closer = true,
           bot_activo = false,
-          etapa = 'Calificado',
+          etapa = CASE WHEN $4 THEN etapa ELSE 'Calificado' END,
           handoff_motivo = $3,
           asesor = COALESCE($2, asesor)
       WHERE id = $1
       `,
-      [clienteId, asesor, handoffMotivo]
+      [clienteId, asesor, handoffMotivo, memoria?.paso === "postventa"]
     );
 
     console.log(

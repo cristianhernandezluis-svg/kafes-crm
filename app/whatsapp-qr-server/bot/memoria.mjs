@@ -1,10 +1,11 @@
 export async function obtenerMemoriaBot(pool,clienteId){
-  const r=await pool.query(`SELECT bot_producto,bot_paso,COALESCE(bot_contexto,'{}'::jsonb) AS bot_contexto FROM clientes WHERE id=$1 LIMIT 1`,[clienteId]);
+  const r=await pool.query(`SELECT bot_producto,bot_paso,COALESCE(bot_contexto,'{}'::jsonb) AS bot_contexto,etapa FROM clientes WHERE id=$1 LIMIT 1`,[clienteId]);
   if(!r.rows[0])return {producto:null,paso:null,contexto:{}};
   return {
     producto:r.rows[0].bot_producto||null,
     paso:r.rows[0].bot_paso||null,
-    contexto:r.rows[0].bot_contexto&&typeof r.rows[0].bot_contexto==='object'?r.rows[0].bot_contexto:{}
+    contexto:r.rows[0].bot_contexto&&typeof r.rows[0].bot_contexto==='object'?r.rows[0].bot_contexto:{},
+    etapa:r.rows[0].etapa||null
   };
 }
 

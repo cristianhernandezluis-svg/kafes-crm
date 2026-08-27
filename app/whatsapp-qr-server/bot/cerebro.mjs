@@ -89,6 +89,22 @@ function construirDatosPago(texto) {
 function respuestaRespaldo(texto, memoria = {}) {
   const t = normalizar(texto);
 
+  if (memoria.paso === "postventa") {
+    return {
+      tipo: "respaldo_postventa",
+      producto: memoria.producto || null,
+      accion: "handoff_closer",
+      mensaje: "Voy a pedir que un asesor revise el estado exacto de tu pedido para darte informacion confirmada.",
+      multimedia: "ninguno",
+      handoff: true,
+      memoria: {
+        producto: memoria.producto || null,
+        paso: "closer",
+        contexto: memoria.contexto || {},
+      },
+    };
+  }
+
   const producto =
     buscarProducto(texto) ||
     buscarProductoPorSlug(memoria.producto);
@@ -194,7 +210,7 @@ const mensajeFinal = datosPago
       handoff,
       memoria: {
         producto,
-        paso: handoff ? "closer" : "conversacion",
+        paso: handoff ? "closer" : memoria.paso === "postventa" ? "postventa" : "conversacion",
         contexto,
       },
       analisis,

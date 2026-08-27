@@ -260,6 +260,29 @@ const enviarArchivo = async (archivo: File) => {
   }
 };
 
+const devolverAlBot = async () => {
+  if (!clienteActivo) return;
+
+  try {
+    const res = await fetch(`/api/clientes/${clienteActivo.id}/bot`, {
+      method: "PATCH",
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "No se pudo devolver al bot");
+      return;
+    }
+
+    setClienteActivo(data.cliente);
+    cargarClientes();
+  } catch (error) {
+    console.error("Error devolviendo al bot:", error);
+    alert("Error devolviendo al bot");
+  }
+};
+
 const iniciarGrabacion = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -1158,6 +1181,16 @@ useEffect(() => {
       {clienteActivo.requiere_closer ? "Requiere closer" : "Aun no"}
     </span>
   </p>
+
+  {clienteActivo.bot_paso === "postventa" && clienteActivo.bot_activo === false && (
+    <button
+      type="button"
+      onClick={devolverAlBot}
+      className="mt-3 w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700"
+    >
+      🤖 Devolver al bot
+    </button>
+  )}
 </div>
 
         <div>

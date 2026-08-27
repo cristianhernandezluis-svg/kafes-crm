@@ -45,8 +45,12 @@ export async function PATCH(
           ELSE requiere_closer
         END,
         bot_activo = CASE
-          WHEN $1 LIKE 'Pag%Adelanto' THEN false
+          WHEN $1 LIKE 'Pag%Adelanto' THEN true
           ELSE bot_activo
+        END,
+        bot_paso = CASE
+          WHEN $1 LIKE 'Pag%Adelanto' THEN 'postventa'
+          ELSE bot_paso
         END
       WHERE id = $7
       RETURNING *

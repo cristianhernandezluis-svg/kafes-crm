@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { PROMPT_VENDEDOR } from "./prompt.mjs";
+import { PROMPT_VENDEDOR, PROMPT_POSTVENTA } from "./prompt.mjs";
 import { AnalisisVenta } from "./esquema.mjs";
 import { PRODUCTOS } from "./catalogo.mjs";
 import { obtenerPoliticasComerciales } from "./politicas.mjs";
@@ -74,9 +74,11 @@ REGLAS IMPORTANTES:
 - Nunca inventes que existe una foto, video o audio; el sistema verificara la disponibilidad real.
 `;
 
+  const promptActivo = memoria?.paso === "postventa" ? PROMPT_POSTVENTA : PROMPT_VENDEDOR;
+
   const response = await client.responses.parse({
     model: "gpt-5.6-terra",
-    instructions: PROMPT_VENDEDOR,
+    instructions: promptActivo,
     input: contexto,
     text: {
       format: zodTextFormat(
