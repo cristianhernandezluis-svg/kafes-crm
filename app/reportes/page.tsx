@@ -176,9 +176,9 @@ export default function ReportesPage() {
             secundario={secundario}
           />
           <Tarjeta
-            titulo="Pendientes actuales"
+            titulo="Pendientes hoy"
             valor={pendientesActuales === null ? "—" : pendientesActuales}
-            detalle="Cartera por gestionar"
+            detalle="Conversaciones del día sin cierre"
             panel={panel}
             secundario={secundario}
           />

@@ -86,20 +86,23 @@ export async function GET(request: Request) {
         CASE
           WHEN i.fecha_inicio IS NULL OR f.fecha < i.fecha_inicio THEN NULL
           ELSE (
-            SELECT COUNT(*)::int
-            FROM clientes_whatsapp_qr rel
+            SELECT COUNT(DISTINCT c2.cliente_id)::int
+            FROM conversaciones c2
             JOIN LATERAL (
               SELECT h.etapa_nueva
               FROM historial_etapas h
               WHERE h.empresa_id = $1
-                AND h.cliente_id = rel.cliente_id
+                AND h.cliente_id = c2.cliente_id
                 AND (h.created_at AT TIME ZONE 'America/Lima') < (f.fecha + 1)
               ORDER BY h.created_at DESC
               LIMIT 1
             ) ultimo ON true
-            WHERE rel.empresa_id = $1
-              AND rel.whatsapp_qr_id = $2
-              AND ultimo.etapa_nueva NOT IN ('Pagó Adelanto', 'Enviado', 'Entregado')
+            WHERE c2.empresa_id = $1
+              AND c2.whatsapp_qr_id = $2
+              AND c2.remitente = 'cliente'
+              AND (c2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Lima')::date = f.fecha
+              AND ultimo.etapa_nueva NOT IN ('Enviado', 'Entregado')
+              AND ultimo.etapa_nueva NOT LIKE 'Pag%Adelanto'
           )
         END AS pendientes,
         COALESCE(e.cierres, 0)::int AS cierres,
