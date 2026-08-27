@@ -514,7 +514,7 @@ useEffect(() => {
 
       <main className="flex-1 min-w-0 h-screen overflow-hidden flex">
 <div
-  className={`hidden md:flex fixed top-0 left-[220px] right-0 h-12 border-b z-40 items-center justify-between px-5 ${
+  className={`hidden md:flex fixed top-0 left-60 right-0 h-12 border-b z-40 items-center justify-between px-5 ${
     temaClaro
       ? "bg-white border-slate-200"
       : "bg-[#0b1218] border-[#1f2a33]"
