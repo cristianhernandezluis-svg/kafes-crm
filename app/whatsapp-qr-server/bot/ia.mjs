@@ -37,6 +37,20 @@ export async function consultarIA(input) {
       ? input?.historial || []
       : [];
 
+  const venta = memoria?.venta || null;
+
+  const datosPostventa = {
+    etapa_cliente: memoria?.etapa || null,
+    producto: venta?.producto || null,
+    monto_total: venta?.monto ?? null,
+    adelanto_pagado: venta?.adelanto ?? null,
+    saldo_pendiente: venta?.saldo ?? null,
+    estado_venta: venta?.estado || null,
+    agencia: venta?.agencia || null,
+    numero_guia: venta?.numero_guia || null,
+    estado_envio: venta?.estado_envio || null,
+  };
+
   const contexto = `
 CATALOGO REAL:
 ${JSON.stringify(prepararCatalogo(), null, 2)}
@@ -46,6 +60,9 @@ ${JSON.stringify(obtenerPoliticasComerciales(), null, 2)}
 
 MEMORIA DEL CLIENTE:
 ${JSON.stringify(memoria, null, 2)}
+
+DATOS REALES DE POSTVENTA:
+${JSON.stringify(datosPostventa, null, 2)}
 
 HISTORIAL RECIENTE:
 ${JSON.stringify(historial, null, 2)}
@@ -58,23 +75,39 @@ REGLAS IMPORTANTES:
 - Ejemplo: "sierra" o "BOMVINK" corresponde a "sierra-bomvink-8".
 - No inventes productos.
 - No inventes precios, promociones, caracteristicas ni beneficios.
-- Usa solamente la informacion del CATALOGO REAL.
+- Usa solamente la informacion real disponible.
 - Si no puedes identificar el producto, devuelve producto=null.
 - Usa la memoria para no volver a preguntar datos que el cliente ya dio.
-- Responde en español natural usado en Peru.
-- Evita expresiones como "compartís", "querés" o "podés".
+- Responde en espanol natural usado en Peru.
 - La respuesta debe ser corta y natural para WhatsApp.
-- Responde primero la duda del cliente y luego avanza la venta.
+- Responde primero la duda del cliente y luego avanza la conversacion.
 - En multimedia usa "ninguno" por defecto.
 - Usa multimedia="foto" cuando el cliente pida fotos, quiera ver como viene el producto o una imagen ayude directamente a entenderlo.
 - Usa multimedia="video" cuando el cliente pida video, demostracion, funcionamiento o quiera ver el producto trabajando.
-- Usa multimedia="audio" solo cuando un audio aporte valor real a la venta; no lo uses por rutina.
-- No uses multimedia en cada respuesta. Debe tener una razon comercial o responder una solicitud del cliente.
-- Solo solicita multimedia si identificaste un producto del catalogo. Si producto=null usa multimedia="ninguno".
-- Nunca inventes que existe una foto, video o audio; el sistema verificara la disponibilidad real.
+- Usa multimedia="audio" solo cuando un audio aporte valor real; no lo uses por rutina.
+- No uses multimedia en cada respuesta.
+- Solo solicita multimedia si identificaste un producto del catalogo.
+- Nunca inventes que existe una foto, video o audio.
+
+REGLAS POSTVENTA:
+- DATOS REALES DE POSTVENTA es la fuente de verdad para dinero, saldo, adelanto, agencia, guia y estado de envio.
+- Si monto_total, adelanto_pagado o saldo_pendiente tienen un valor, responde usando exactamente esos datos.
+- Si el cliente pregunta cuanto debe y saldo_pendiente tiene valor, responde directamente el saldo pendiente.
+- Si pregunta cuanto adelanto y adelanto_pagado tiene valor, responde directamente ese monto.
+- Si pregunta el total de su compra y monto_total tiene valor, responde directamente ese monto.
+- Si agencia tiene valor, puedes indicar esa agencia.
+- Si numero_guia tiene valor, puedes indicar esa guia.
+- Si estado_envio tiene valor, puedes indicar ese estado.
+- Un valor 0 es un dato valido y no significa que falte informacion.
+- Si el dato solicitado es null o no esta registrado, no inventes.
+- Solo usa handoff_closer cuando el cliente necesita un dato real que no esta registrado o existe una situacion que requiere intervencion humana.
+- No hagas handoff_closer si puedes responder correctamente con los datos reales disponibles.
 `;
 
-  const promptActivo = memoria?.paso === "postventa" ? PROMPT_POSTVENTA : PROMPT_VENDEDOR;
+  const promptActivo =
+    memoria?.paso === "postventa"
+      ? PROMPT_POSTVENTA
+      : PROMPT_VENDEDOR;
 
   const response = await client.responses.parse({
     model: "gpt-5.6-terra",

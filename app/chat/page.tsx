@@ -27,13 +27,13 @@ type Cliente = {
 
 function etiquetaMensaje(tipo?: string | null, mensaje?: string | null) {
   const etiquetas: Record<string, string> = {
-    image: "🖼 Imagen",
-    audio: "🎤 Audio",
-    video: "🎥 Video",
-    document: "📄 Documento",
-    sticker: "🏷 Sticker",
-    location: "📍 Ubicacion",
-    contact: "👤 Contacto",
+    image: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¼ Imagen",
+    audio: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¤ Audio",
+    video: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¥ Video",
+    document: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Documento",
+    sticker: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â· Sticker",
+    location: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â Ubicacion",
+    contact: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¤ Contacto",
   };
   return (tipo && etiquetas[tipo]) || mensaje || "Sin mensajes";
 }
@@ -89,6 +89,10 @@ const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
 const [mostrarConversacion, setMostrarConversacion] = useState(false);
   const [enviando, setEnviando] = useState(false);
+const [ventaProducto, setVentaProducto] = useState('');
+const [ventaMonto, setVentaMonto] = useState('');
+const [ventaAdelanto, setVentaAdelanto] = useState('');
+const [guardandoVenta, setGuardandoVenta] = useState(false);
 const [enviandoArchivo, setEnviandoArchivo] = useState(false);
 
 const [grabandoAudio, setGrabandoAudio] = useState(false);
@@ -320,6 +324,111 @@ const devolverAlBot = async () => {
   }
 };
 
+useEffect(() => {
+  const clienteId = clienteActivo?.id;
+
+  if (!clienteId) {
+    setVentaProducto("");
+    setVentaMonto("");
+    setVentaAdelanto("");
+    return;
+  }
+
+  let cancelado = false;
+
+  const cargarVenta = async () => {
+    try {
+      const res = await fetch(`/api/ventas?cliente_id=${clienteId}`, {
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (cancelado) return;
+
+      if (res.ok && data.venta) {
+        setVentaProducto(data.venta.producto || "");
+        setVentaMonto(String(data.venta.monto ?? ""));
+        setVentaAdelanto(String(data.venta.adelanto ?? ""));
+      } else {
+        setVentaProducto(clienteActivo?.bot_producto || "");
+        setVentaMonto("");
+        setVentaAdelanto("");
+      }
+    } catch (error) {
+      console.error("Error cargando venta:", error);
+    }
+  };
+
+  cargarVenta();
+
+  return () => {
+    cancelado = true;
+  };
+}, [clienteActivo?.id]);
+
+const confirmarAdelanto = async () => {
+  if (!clienteActivo || guardandoVenta) return;
+
+  const producto = ventaProducto.trim();
+  const monto = Number(ventaMonto);
+  const adelanto = Number(ventaAdelanto);
+
+  if (!producto) {
+    alert("Ingresa el producto");
+    return;
+  }
+
+  if (!Number.isFinite(monto) || monto <= 0) {
+    alert("Ingresa un monto total valido");
+    return;
+  }
+
+  if (!Number.isFinite(adelanto) || adelanto < 0 || adelanto > monto) {
+    alert("Ingresa un adelanto valido");
+    return;
+  }
+
+  setGuardandoVenta(true);
+
+  try {
+    const res = await fetch("/api/ventas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cliente_id: clienteActivo.id,
+        producto,
+        monto,
+        adelanto,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      alert(data.error || "No se pudo registrar la venta");
+      return;
+    }
+
+    setVentaMonto(String(data.venta?.monto ?? monto));
+    setVentaAdelanto(String(data.venta?.adelanto ?? adelanto));
+
+    setClienteActivo((actual) =>
+      actual
+        ? { ...actual, etapa: "PagÃƒÂ³ Adelanto", bot_paso: "postventa" }
+        : actual
+    );
+
+    await cargarClientes();
+    alert("Adelanto registrado correctamente");
+  } catch (error) {
+    console.error("Error registrando adelanto:", error);
+    alert("Error registrando adelanto");
+  } finally {
+    setGuardandoVenta(false);
+  }
+};
+
 const iniciarGrabacion = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -457,38 +566,38 @@ useEffect(() => {
 
   <nav className="flex-1 px-2 space-y-1">
     <Link href="/dashboard" className={"flex items-center gap-3 px-3 py-3 rounded-lg text-sm " + (temaClaro ? "hover:bg-slate-100 text-slate-700" : "hover:bg-slate-800 text-white")}>
-      📊 Dashboard
+      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  Dashboard
     </Link>
 
     <Link href="/chat" className="flex items-center justify-between bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm">
-      <span className="flex items-center gap-3">💬 Conversaciones</span>
+      <span className="flex items-center gap-3">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¬ Conversaciones</span>
       <span className="bg-green-500 text-white text-[11px] px-2 py-0.5 rounded-full">
         {clientes.length}
       </span>
     </Link>
 
     <Link href="/contactos" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      👤 Contactos
+      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¤ Contactos
     </Link>
 
     <Link href="/kanban" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      🧩 Kanban
+      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â§Ãƒâ€šÃ‚Â© Kanban
     </Link>
 
     <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      📄 Plantillas
+      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Plantillas
     </Link>
 
     <Link href="/automatizaciones" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ⚙️ Automatizaciones
+      ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Automatizaciones
     </Link>
 
     <Link href="/reportes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      📊 Reportes
+      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  Reportes
     </Link>
 
     <Link href="/ajustes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ⚙️ Ajustes
+      ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Ajustes
     </Link>
   </nav>
 
@@ -505,12 +614,12 @@ useEffect(() => {
     temaClaro ? "text-slate-700" : "text-slate-300"
   }`}
 >
-        Conexión WhatsApp
+        ConexiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n WhatsApp
       </p>
 
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-xl">
-          🟢
+          ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¢
         </div>
 
         <div>
@@ -537,7 +646,7 @@ useEffect(() => {
   >
     <div className="flex items-center gap-2">
       <span className="text-base">
-        {temaClaro ? "☀️" : "🌙"}
+        {temaClaro ? "ÃƒÆ’Ã‚Â¢Ãƒâ€¹Ã…â€œÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â" : "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢"}
       </span>
 
       <span className="text-xs font-semibold text-slate-300">
@@ -568,7 +677,7 @@ useEffect(() => {
     }}
     className="px-4 pb-4 text-left text-slate-400 hover:text-red-400 text-sm"
   >
-    ↩ Cerrar sesión
+    ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â© Cerrar sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n
   </button>
 </aside>
 
@@ -589,10 +698,10 @@ useEffect(() => {
   </h1>
 
   <div className="flex items-center gap-4 text-slate-300">
-    <button className="hover:text-white">🔍</button>
+    <button className="hover:text-white">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â</button>
 
     <div className="relative">
-      <button className="hover:text-white">🔔</button>
+      <button className="hover:text-white">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â</button>
       <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
         3
       </span>
@@ -610,7 +719,7 @@ useEffect(() => {
 >
   Administrador
 </p>
-        <p className="text-[10px] text-green-400">● En línea</p>
+        <p className="text-[10px] text-green-400">ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂÃƒâ€šÃ‚Â En lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­nea</p>
       </div>
     </div>
   </div>
@@ -629,7 +738,7 @@ useEffect(() => {
   className={`text-2xl font-black ${
     temaClaro ? "text-slate-900" : "text-white"
   }`}
->💬 Conversaciones</h2>
+>ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¬ Conversaciones</h2>
 
   <p
   className={`text-sm ${
@@ -657,11 +766,11 @@ useEffect(() => {
     ? "bg-slate-50 border-slate-300"
     : "bg-[#111827] border-slate-700"
 }`}>
-      ⚙️
+      ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
     </button>
 
     <button className="w-10 h-10 bg-green-700 rounded-lg">
-      🔗
+      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
     </button>
   </div>
 
@@ -672,7 +781,7 @@ useEffect(() => {
 >
     {[
       { id: "todas", label: "Todas" },
-      { id: "no_leidas", label: "No leídas" },
+      { id: "no_leidas", label: "No leÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­das" },
       { id: "asignadas", label: "Asignadas" },
       { id: "sin_asignar", label: "Sin asignar" },
     ].map((filtro) => (
@@ -735,10 +844,10 @@ useEffect(() => {
     temaClaro ? "text-slate-900" : "text-white"
   }`}
 >
-      {cliente.temperatura === "caliente" ? `🔥 ${cliente.nombre || "Sin nombre"}` : (cliente.nombre || "Sin nombre")}
+      {cliente.temperatura === "caliente" ? `ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ ${cliente.nombre || "Sin nombre"}` : (cliente.nombre || "Sin nombre")}
     </p>
 
-    {cliente.temperatura === "caliente" && <p className="text-xs font-bold text-orange-400 truncate">CALIENTE · {nombreProductoBot(cliente.bot_producto)} · {cliente.bot_contexto?.ciudad || cliente.ciudad || "Sin ciudad"}</p>}
+    {cliente.temperatura === "caliente" && <p className="text-xs font-bold text-orange-400 truncate">CALIENTE ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {nombreProductoBot(cliente.bot_producto)} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {cliente.bot_contexto?.ciudad || cliente.ciudad || "Sin ciudad"}</p>}
 
     <p
   className={`text-sm truncate ${
@@ -811,7 +920,7 @@ useEffect(() => {
   temaClaro ? "text-slate-900" : "text-white"
 }`}
             >
-              ←
+              ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â
             </button>
 
             <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-black text-lg">
@@ -832,13 +941,13 @@ useEffect(() => {
     temaClaro ? "text-slate-500" : "text-slate-400"
   }`}
 >
-                📱 {clienteActivo.telefono}
+                ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â± {clienteActivo.telefono}
               </p>
             </div>
           </div>
 
           <div className="text-green-400 text-sm font-bold">
-            ● En línea
+            ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂÃƒâ€šÃ‚Â En lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­nea
           </div>
         </div>
 
@@ -848,7 +957,7 @@ useEffect(() => {
   }`}
 >
           {conversaciones.length === 0 ? (
-            <p className="text-slate-400">No hay mensajes todavía.</p>
+            <p className="text-slate-400">No hay mensajes todavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a.</p>
           ) : (
             conversaciones.map((msg) => (
               <div
@@ -881,7 +990,7 @@ useEffect(() => {
                     }
                     className="bg-white border rounded-lg p-3 text-left hover:bg-gray-50 text-black"
                   >
-                    <p className="font-bold">📄 Documento recibido</p>
+                    <p className="font-bold">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Documento recibido</p>
                     <p className="text-xs text-slate-400">
                       {msg.filename || "Abrir documento"}
                     </p>
@@ -904,7 +1013,7 @@ useEffect(() => {
       : "text-slate-300"
   }`}
 >
-                  {msg.remitente} ·{" "}
+                  {msg.remitente} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·{" "}
                   {new Date(msg.created_at).toLocaleString("es-PE")}
                 </p>
               </div>
@@ -924,7 +1033,7 @@ useEffect(() => {
           <button
             onClick={() => {
               const fecha = prompt("Fecha seguimiento (2026-06-15 10:00)");
-              const observacion = prompt("Observación");
+              const observacion = prompt("ObservaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n");
 
               if (!fecha || !observacion || !clienteActivo) return;
 
@@ -944,7 +1053,7 @@ useEffect(() => {
             }}
             className="mb-3 bg-yellow-500 text-black px-4 py-2 rounded-xl font-bold"
           >
-            📅 Programar seguimiento
+            ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Programar seguimiento
           </button>
 
           <textarea
@@ -994,7 +1103,7 @@ useEffect(() => {
               onClick={() => setMostrarPlantillas(!mostrarPlantillas)}
               className="w-10 h-10 flex items-center justify-center bg-yellow-500 hover:bg-yellow-400 rounded-full text-black"
             >
-              📝
+              ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â
             </button>
 
             <button
@@ -1005,7 +1114,7 @@ useEffect(() => {
                   : "bg-green-600 text-white"
               }`}
             >
-              🎤
+              ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¤
             </button>
 
             <button
@@ -1013,7 +1122,7 @@ useEffect(() => {
   disabled={enviando}
   className="ml-auto w-12 h-12 flex items-center justify-center bg-green-600 hover:bg-green-700 rounded-full text-white text-xl disabled:bg-slate-600"
 >
-  {enviando ? "..." : "➤"}
+  {enviando ? "..." : "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¾Ãƒâ€šÃ‚Â¤"}
 </button>
           </div>
         </div>
@@ -1044,7 +1153,7 @@ useEffect(() => {
       ? "text-slate-500 hover:text-slate-900"
       : "text-slate-400 hover:text-white"
   }
->×</button>
+>ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â</button>
   </div>
 
   <div className="p-5">
@@ -1083,7 +1192,7 @@ useEffect(() => {
         <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${
   temaClaro ? "border-slate-300" : "border-slate-700"
 }`}>
-          👤
+          ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¤
         </div>
         <span className="text-[11px]">Perfil</span>
       </button>
@@ -1094,7 +1203,7 @@ useEffect(() => {
     : "text-slate-400 hover:text-white"
 }`}>
         <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
-          🏷️
+          ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â·ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
         </div>
         <span className="text-[11px]">Etiquetas</span>
       </button>
@@ -1107,16 +1216,16 @@ useEffect(() => {
         <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${
   temaClaro ? "border-slate-300" : "border-slate-700"
 }`}>
-          📝
+          ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â
         </div>
         <span className="text-[11px]">Notas</span>
       </button>
 
       <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
         <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
-          ⋯
+          ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹Ãƒâ€šÃ‚Â¯
         </div>
-        <span className="text-[11px]">Más</span>
+        <span className="text-[11px]">MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡s</span>
       </button>
     </div>
 
@@ -1130,12 +1239,12 @@ useEffect(() => {
     temaClaro ? "text-slate-900" : "text-white"
   }`}
 >
-        Información
+        InformaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n
       </h3>
 
       <div className="space-y-4 text-sm">
         <div>
-          <p className="text-slate-500 text-xs">Teléfono</p>
+          <p className="text-slate-500 text-xs">TelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fono</p>
           <p className={temaClaro ? "text-slate-900" : "text-white"}>
   +51 {clienteActivo.telefono}
 </p>
@@ -1225,13 +1334,90 @@ useEffect(() => {
       onClick={devolverAlBot}
       className="mt-3 w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700"
     >
-      🤖 Devolver al bot
+      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ Devolver al bot
     </button>
   )}
 </div>
+        <div
+          className={`rounded-xl border p-3 space-y-3 ${
+            temaClaro
+              ? "bg-slate-50 border-slate-200"
+              : "bg-slate-900/60 border-slate-700"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className={`text-xs font-bold ${temaClaro ? "text-slate-900" : "text-white"}`}>
+              Venta
+            </p>
+            <span className="text-[11px] text-slate-500">
+              Saldo: S/ {Math.max((Number(ventaMonto) || 0) - (Number(ventaAdelanto) || 0), 0).toFixed(2)}
+            </span>
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-500">Producto</label>
+            <input
+              type="text"
+              value={ventaProducto}
+              onChange={(e) => setVentaProducto(e.target.value)}
+              placeholder="Producto vendido"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-xs outline-none ${
+                temaClaro
+                  ? "bg-white border-slate-300 text-slate-900"
+                  : "bg-slate-950 border-slate-700 text-white"
+              }`}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[11px] text-slate-500">Total</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={ventaMonto}
+                onChange={(e) => setVentaMonto(e.target.value)}
+                placeholder="235"
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-xs outline-none ${
+                  temaClaro
+                    ? "bg-white border-slate-300 text-slate-900"
+                    : "bg-slate-950 border-slate-700 text-white"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] text-slate-500">Adelanto</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={ventaAdelanto}
+                onChange={(e) => setVentaAdelanto(e.target.value)}
+                placeholder="30"
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-xs outline-none ${
+                  temaClaro
+                    ? "bg-white border-slate-300 text-slate-900"
+                    : "bg-slate-950 border-slate-700 text-white"
+                }`}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={confirmarAdelanto}
+            disabled={guardandoVenta}
+            className="w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 disabled:bg-slate-600"
+          >
+            {guardandoVenta ? "Guardando..." : "Confirmar adelanto"}
+          </button>
+        </div>
+
 
         <div>
-          <p className="text-slate-500 text-xs">Última actividad</p>
+          <p className="text-slate-500 text-xs">ÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â¡ltima actividad</p>
           <p className={temaClaro ? "text-slate-900" : "text-white"}>
   Hoy
 </p>
@@ -1311,7 +1497,7 @@ useEffect(() => {
           Cliente interesado en el producto.
         </p>
         <p className="text-slate-500 text-xs mt-2">
-          Hoy · Administrador
+          Hoy ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Administrador
         </p>
       </div>
     </div>
