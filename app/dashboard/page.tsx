@@ -85,6 +85,10 @@ const cambiarTema = () => {
     conversaciones_ayer: 0,
     cierres_hoy: 0,
     cierres_ayer: 0,
+    enviados_hoy: 0,
+    enviados_ayer: 0,
+    entregados_hoy: 0,
+    entregados_ayer: 0,
   });
   const [cargando, setCargando] = useState(true);
 const [filtroFechaVentas, setFiltroFechaVentas] = useState("esta_semana");
@@ -191,6 +195,10 @@ const seguimientosHoy = clientes.filter((c) => {
           conversaciones_ayer: 0,
           cierres_hoy: 0,
           cierres_ayer: 0,
+    enviados_hoy: 0,
+    enviados_ayer: 0,
+    entregados_hoy: 0,
+    entregados_ayer: 0,
         });
         return;
       }
@@ -877,14 +885,14 @@ const barraTema = temaClaro
   </div>
 </Link>
 
-  <Link href="/ventas-entregadas" className="block">
+  <Link href="/kanban" className="block">
   <div
   className={`${panelTema} border rounded-2xl p-5 hover:border-purple-500 cursor-pointer transition`}
 >
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-slate-400 text-sm">Ventas entregadas</p>
-        <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>{ventasEntregadas}</h2>
+        <p className="text-slate-400 text-sm">Enviados hoy</p>
+        <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>{metricasDashboard.enviados_hoy}</h2>
         <p className="text-green-400 text-sm mt-2">↑ 10% vs ayer</p>
       </div>
 
@@ -895,13 +903,13 @@ const barraTema = temaClaro
   </div>
 </Link>
 
-  <Link href="/no-responden" className="block">
+  <Link href="/ventas-entregadas" className="block">
   <div className={`${panelTema} border rounded-2xl p-5 hover:border-red-500 cursor-pointer transition`}>
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-slate-400 text-sm">No responden</p>
+        <p className="text-slate-400 text-sm">Entregados hoy</p>
         <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>
-          {noResponden}
+          {metricasDashboard.entregados_hoy}
         </h2>
         <p className="text-red-400 text-sm mt-2">↓ 5% vs ayer</p>
       </div>

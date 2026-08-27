@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { Pool } from "pg";
 
 const pool = new Pool({
@@ -48,15 +48,15 @@ export async function GET(request: Request) {
               )::date = f.hoy - 1
           )::int AS conversaciones_ayer
         FROM conversaciones c
-        CRoSS JOIN fechas f
+        CROSS JOIN fechas f
         WHERE c.empresa_id = $1
           AND c.whatsapp_qr_id = $2
       ),
       cierres_metricas AS (
         SELECT
-          COUNT(DISTINCT h.cliente_id) FILTERE (
+          COUNT(DISTINCT h.cliente_id) FILTER (
             WHERE
-              h.etapa_nueva = 'Pagó Adelanto'
+              h.etapa_nueva = 'PagÃ³ Adelanto'
               AND h.es_baseline = false
               AND (h.created_at AT TIME ZONE 'America/Lima')::date = f.hoy
               AND EXISTS (
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
 
           COUNT(DISTINCT h.cliente_id) FILTER (
             WHERE
-              h.etapa_nueva = 'Pagó Adelanto'
+              h.etapa_nueva = 'PagÃ³ Adelanto'
               AND h.es_baseline = false
               AND (h.created_at AT TIME ZONE 'America/Lima')::date = f.hoy - 1
               AND EXISTS (
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
               )
           )::int AS cierres_ayer
         FROM historial_etapas h
-        CRoSS JOIN fechas f
+        CROSS JOIN fechas f
         WHERE h.empresa_id = $1
       )
       SELECT
@@ -122,3 +122,4 @@ export async function GET(request: Request) {
      );
   }
 }
+
