@@ -85,6 +85,8 @@ export default function ReportesPage() {
     [historial]
   );
 
+  const tasaCierre = resumen.conversaciones === 0 ? 0 : (resumen.cierres / resumen.conversaciones) * 100;
+
   const pendientesActuales =
     historial.length > 0 ? historial[0].pendientes : null;
 
@@ -167,9 +169,9 @@ export default function ReportesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
           <Tarjeta
-            titulo="Conversaciones"
+            titulo="Conversaciones del período"
             valor={resumen.conversaciones}
             detalle={`Últimos ${dias} días`}
             panel={panel}
@@ -183,21 +185,28 @@ export default function ReportesPage() {
             secundario={secundario}
           />
           <Tarjeta
-            titulo="Cierres"
+            titulo="Cierres del período"
             valor={resumen.cierres}
             detalle="Pagó adelanto"
             panel={panel}
             secundario={secundario}
           />
           <Tarjeta
-            titulo="Enviados"
+            titulo="Tasa de cierre"
+            valor={tasaCierre.toFixed(1) + "%"}
+            detalle="Cierres / conversaciones"
+            panel={panel}
+            secundario={secundario}
+          />
+          <Tarjeta
+            titulo="Enviados del período"
             valor={resumen.enviados}
             detalle={`Últimos ${dias} días`}
             panel={panel}
             secundario={secundario}
           />
           <Tarjeta
-            titulo="Entregados"
+            titulo="Entregados del período"
             valor={resumen.entregados}
             detalle={`Últimos ${dias} días`}
             panel={panel}
