@@ -495,8 +495,8 @@ const leadsNuevos = clientes.filter(
   (c) => c.etapa === "Nuevo"
 ).length;
 
-const enSeguimiento = clientes.filter(
-  (c) => c.etapa === "Seguimiento"
+const pendientesActuales = clientes.filter(
+  (c) => !["Pagó Adelanto", "Enviado", "Entregado"].includes(c.etapa)
 ).length;
 
 const pagoAdelanto = clientes.filter(
@@ -842,9 +842,9 @@ const barraTema = temaClaro
   <div className={`${panelTema} border rounded-2xl p-5 hover:border-yellow-500 cursor-pointer transition`}>
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-slate-400 text-sm">En seguimiento</p>
+        <p className="text-slate-400 text-sm">Pendientes actuales</p>
         <h2 className={`text-4xl font-black mt-2 ${tituloTema}`}>
-          {enSeguimiento}
+          {pendientesActuales}
         </h2>
         <p className="text-green-400 text-sm mt-2">↑ 8% vs ayer</p>
       </div>
