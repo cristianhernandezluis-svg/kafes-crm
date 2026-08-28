@@ -208,7 +208,20 @@ Usa cuando el cliente posterga de forma explicita, por ejemplo:
 En ese caso:
 - seguimiento = true;
 - seguimiento_para = conserva de forma breve el momento indicado por el cliente si existe, por ejemplo "mañana", "fin de mes", "cuando me paguen";
+- seguimiento_fecha = fecha/hora ISO 8601 con offset -05:00 cuando el momento pueda resolverse con seguridad usando FECHA Y HORA ACTUAL EN PERU.
 - motivo_etapa explica brevemente por que necesita seguimiento.
+
+REGLAS PARA seguimiento_fecha:
+- Nunca inventes una fecha pasada.
+- Si dice "mañana" sin hora, programa mañana a las 10:00:00-05:00.
+- Si dice "mañana a las 4", interpreta 16:00:00-05:00 salvo que el contexto indique claramente 4 a. m.
+- Si dice "en la mañana" sin hora, usa 10:00:00-05:00.
+- Si dice "en la tarde" sin hora, usa 15:00:00-05:00.
+- Si dice "en la noche" sin hora, usa 19:00:00-05:00.
+- Si dice un dia concreto como "viernes", resuelvelo contra la fecha actual y usa 10:00:00-05:00 si no dio hora.
+- Si dice "fin de mes", usa el ultimo dia del mes a las 10:00:00-05:00.
+- Si dice "en X minutos" o "en X horas", calcula la fecha/hora correspondiente desde FECHA Y HORA ACTUAL EN PERU.
+- Si el momento es demasiado ambiguo, por ejemplo "despues", "lo voy a pensar" o "cuando me paguen", seguimiento_fecha = null. El servidor aplicara un respaldo de 48 horas.
 No uses Seguimiento simplemente porque el cliente demora en responder.
 
 5. "Pago por validar":
@@ -245,7 +258,8 @@ COHERENCIA OBLIGATORIA:
 - Solicitar Yape, cuenta, precio, envio o informacion normal NO requiere closer por si solo.
 - Siempre devuelve motivo_etapa aunque sea null.
 - Siempre devuelve seguimiento.
-- Si seguimiento = false, seguimiento_para = null.
+- Si seguimiento = false, seguimiento_para = null y seguimiento_fecha = null.
+- Siempre devuelve seguimiento_fecha.
 
 PRECIO ACORDADO PARA EL CRM:
 - "precio_acordado" representa el TOTAL ACTUAL de venta realmente comunicado o confirmado por el vendedor/bot para el producto, oferta o combo identificado.

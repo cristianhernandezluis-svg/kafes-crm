@@ -9,6 +9,27 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+function obtenerFechaHoraPeru() {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+
+  const valores = Object.fromEntries(
+    partes
+      .filter((p) => p.type !== "literal")
+      .map((p) => [p.type, p.value])
+  );
+
+  return `${valores.year}-${valores.month}-${valores.day}T${valores.hour}:${valores.minute}:${valores.second}-05:00`;
+}
+
 function prepararCatalogo() {
   return PRODUCTOS.map((p) => ({
     slug: p.slug,
@@ -51,7 +72,13 @@ export async function consultarIA(input) {
     estado_envio: venta?.estado_envio || null,
   };
 
+  const fechaHoraPeru = obtenerFechaHoraPeru();
+
   const contexto = `
+FECHA Y HORA ACTUAL EN PERU:
+${fechaHoraPeru}
+Zona horaria: America/Lima (UTC-05:00)
+
 CATALOGO REAL:
 ${JSON.stringify(prepararCatalogo(), null, 2)}
 

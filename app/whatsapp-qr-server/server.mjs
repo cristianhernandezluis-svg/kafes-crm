@@ -254,24 +254,252 @@ async function cancelarSeguimientoSilencio(clienteId) {
     UPDATE clientes
     SET proximo_seguimiento = CASE
           WHEN COALESCE(bot_contexto->>'seguimiento_silencio_activo', 'false') = 'true'
+            OR COALESCE(bot_contexto->>'seguimiento_explicito_activo', 'false') = 'true'
           THEN NULL
           ELSE proximo_seguimiento
         END,
-        bot_contexto = jsonb_set(
-          jsonb_set(
-            COALESCE(bot_contexto, '{}'::jsonb),
-            '{seguimiento_silencio_activo}',
-            'false'::jsonb,
-            true
-          ),
-          '{seguimiento_silencio_intento}',
-          '0'::jsonb,
-          true
-        )
+        bot_contexto = COALESCE(bot_contexto, '{}'::jsonb) ||
+          jsonb_build_object(
+            'seguimiento_silencio_activo', false,
+            'seguimiento_silencio_intento', 0,
+            'seguimiento_explicito_activo', false,
+            'seguimiento_explicito_para', NULL
+          )
     WHERE id = $1
     `,
     [clienteId]
   );
+}
+
+function resolverFechaSeguimientoExplicito(analisisCRM) {
+  const raw = String(analisisCRM?.seguimiento_fecha || "").trim();
+
+  if (raw) {
+    const fecha = new Date(raw);
+    const ahora = Date.now();
+    const maximo = ahora + 366 * 24 * 60 * 60 * 1000;
+
+    if (
+      Number.isFinite(fecha.getTime()) &&
+      fecha.getTime() > ahora + 30 * 1000 &&
+      fecha.getTime() <= maximo
+    ) {
+      return { fecha, origen: "ia" };
+    }
+  }
+
+  return {
+    fecha: new Date(Date.now() + 48 * 60 * 60 * 1000),
+    origen: "respaldo_48h",
+  };
+}
+
+async function programarSeguimientoExplicito({
+  clienteId,
+  analisisCRM,
+  requiereCloserIA,
+}) {
+  if (requiereCloserIA === true) {
+    await cancelarSeguimientoSilencio(clienteId);
+    return;
+  }
+
+  const seguimientoPara = String(analisisCRM?.seguimiento_para || "").trim();
+  const { fecha, origen } = resolverFechaSeguimientoExplicito(analisisCRM);
+
+  const result = await pool.query(
+    `
+    UPDATE clientes
+    SET etapa = CASE
+          WHEN etapa IN ('Nuevo', 'Interesado', 'Calificado', 'Seguimiento')
+          THEN 'Seguimiento'
+          ELSE etapa
+        END,
+        proximo_seguimiento = $2,
+        bot_contexto = COALESCE(bot_contexto, '{}'::jsonb) ||
+          jsonb_build_object(
+            'seguimiento_silencio_activo', false,
+            'seguimiento_silencio_intento', 0,
+            'seguimiento_explicito_activo', true,
+            'seguimiento_explicito_para', NULLIF($3, '')
+          )
+    WHERE id = $1
+      AND bot_activo = true
+      AND COALESCE(requiere_closer, false) = false
+      AND etapa NOT IN (
+        'Pago por validar',
+        'Pagó Adelanto',
+        'Enviado',
+        'Entregado',
+        'Descartado'
+      )
+    RETURNING id
+    `,
+    [clienteId, fecha, seguimientoPara]
+  );
+
+  if (result.rowCount > 0) {
+    console.log(
+      "SEGUIMIENTO EXPLICITO PROGRAMADO:",
+      clienteId,
+      fecha.toISOString(),
+      "ORIGEN:",
+      origen,
+      "PARA:",
+      seguimientoPara || "sin detalle"
+    );
+  }
+}
+
+function mensajeSeguimientoExplicito() {
+  return "Hola 👋 Quedamos en retomar tu consulta por estas horas. ¿Deseas continuar con tu pedido?";
+}
+
+let seguimientoExplicitoEnCurso = false;
+
+async function procesarSeguimientosExplicitos() {
+  if (seguimientoExplicitoEnCurso) return;
+  if (!sock || estado !== "conectado" || !empresaQrId || !whatsappQrId) return;
+
+  seguimientoExplicitoEnCurso = true;
+
+  try {
+    const pendientes = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.telefono,
+        c.etapa,
+        c.bot_contexto->>'seguimiento_explicito_para' AS seguimiento_para,
+        ult.remitente AS ultimo_remitente
+      FROM clientes c
+      JOIN clientes_whatsapp_qr cwq
+        ON cwq.cliente_id = c.id
+       AND cwq.empresa_id = c.empresa_id
+       AND cwq.whatsapp_qr_id = $2
+      LEFT JOIN LATERAL (
+        SELECT conv.remitente
+        FROM conversaciones conv
+        WHERE conv.cliente_id = c.id
+          AND conv.whatsapp_qr_id = $2
+        ORDER BY conv.created_at DESC, conv.id DESC
+        LIMIT 1
+      ) ult ON true
+      WHERE c.empresa_id = $1
+        AND c.proximo_seguimiento IS NOT NULL
+        AND c.proximo_seguimiento <= NOW()
+        AND COALESCE(c.bot_contexto->>'seguimiento_explicito_activo', 'false') = 'true'
+        AND c.bot_activo = true
+        AND COALESCE(c.requiere_closer, false) = false
+        AND (c.humano_hasta IS NULL OR c.humano_hasta <= NOW())
+        AND c.etapa NOT IN (
+          'Pago por validar',
+          'Pagó Adelanto',
+          'Enviado',
+          'Entregado',
+          'Descartado'
+        )
+      ORDER BY c.proximo_seguimiento ASC
+      LIMIT 20
+      `,
+      [empresaQrId, whatsappQrId]
+    );
+
+    for (const cliente of pendientes.rows) {
+      try {
+        const clienteId = Number(cliente.id);
+        const telefono = String(cliente.telefono || "").replace(/\D/g, "");
+
+        if (!clienteId || !telefono) {
+          if (clienteId) await cancelarSeguimientoSilencio(clienteId);
+          continue;
+        }
+
+        if (cliente.ultimo_remitente !== "bot") {
+          await cancelarSeguimientoSilencio(clienteId);
+          console.log(
+            "SEGUIMIENTO EXPLICITO CANCELADO POR NUEVA INTERACCION:",
+            clienteId,
+            cliente.ultimo_remitente || "sin remitente"
+          );
+          continue;
+        }
+
+        const mensaje = mensajeSeguimientoExplicito();
+        const jid = `${telefono}@s.whatsapp.net`;
+        const enviado = await sock.sendMessage(jid, { text: mensaje });
+
+        await pool.query(
+          `
+          INSERT INTO conversaciones (
+            cliente_id,
+            telefono,
+            whatsapp_message_id,
+            mensaje,
+            remitente,
+            tipo,
+            empresa_id,
+            whatsapp_qr_id,
+            canal
+          )
+          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'qr')
+          ON CONFLICT (whatsapp_message_id)
+          WHERE whatsapp_message_id IS NOT NULL
+          DO UPDATE SET
+            mensaje = EXCLUDED.mensaje,
+            remitente = 'bot'
+          `,
+          [
+            clienteId,
+            telefono,
+            enviado?.key?.id || null,
+            mensaje,
+            empresaQrId,
+            whatsappQrId,
+          ]
+        );
+
+        const siguienteSilencio = fechaDesdeAhora(FOLLOWUP_1_MIN * 60 * 1000);
+
+        await pool.query(
+          `
+          UPDATE clientes
+          SET proximo_seguimiento = $2,
+              cantidad_seguimientos = COALESCE(cantidad_seguimientos, 0) + 1,
+              bot_contexto = COALESCE(bot_contexto, '{}'::jsonb) ||
+                jsonb_build_object(
+                  'seguimiento_explicito_activo', false,
+                  'seguimiento_explicito_para', NULL,
+                  'seguimiento_silencio_activo', true,
+                  'seguimiento_silencio_intento', 0
+                )
+          WHERE id = $1
+          `,
+          [clienteId, siguienteSilencio]
+        );
+
+        console.log(
+          "SEGUIMIENTO EXPLICITO ENVIADO:",
+          clienteId,
+          "SIGUIENTE SILENCIO:",
+          siguienteSilencio.toISOString()
+        );
+      } catch (errorCliente) {
+        console.error(
+          "ERROR SEGUIMIENTO EXPLICITO CLIENTE:",
+          cliente?.id,
+          errorCliente?.message || errorCliente
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      "ERROR MOTOR SEGUIMIENTO EXPLICITO:",
+      error?.message || error
+    );
+  } finally {
+    seguimientoExplicitoEnCurso = false;
+  }
 }
 
 async function programarSeguimientoSilencio({
@@ -279,28 +507,17 @@ async function programarSeguimientoSilencio({
   analisisCRM,
   requiereCloserIA,
 }) {
-  if (
-    requiereCloserIA === true ||
-    analisisCRM?.seguimiento === true
-  ) {
-    await pool.query(
-      `
-      UPDATE clientes
-      SET bot_contexto = jsonb_set(
-            jsonb_set(
-              COALESCE(bot_contexto, '{}'::jsonb),
-              '{seguimiento_silencio_activo}',
-              'false'::jsonb,
-              true
-            ),
-            '{seguimiento_silencio_intento}',
-            '0'::jsonb,
-            true
-          )
-      WHERE id = $1
-      `,
-      [clienteId]
-    );
+  if (analisisCRM?.seguimiento === true) {
+    await programarSeguimientoExplicito({
+      clienteId,
+      analisisCRM,
+      requiereCloserIA,
+    });
+    return;
+  }
+
+  if (requiereCloserIA === true) {
+    await cancelarSeguimientoSilencio(clienteId);
     return;
   }
 
@@ -1549,6 +1766,13 @@ app.listen(PORT, async () => {
   await iniciarWhatsApp();
 
   setInterval(() => {
+    procesarSeguimientosExplicitos().catch((error) => {
+      console.error(
+        "ERROR INTERVALO SEGUIMIENTO EXPLICITO:",
+        error?.message || error
+      );
+    });
+
     procesarSeguimientosSilencio().catch((error) => {
       console.error(
         "ERROR INTERVALO SEGUIMIENTO SILENCIO:",

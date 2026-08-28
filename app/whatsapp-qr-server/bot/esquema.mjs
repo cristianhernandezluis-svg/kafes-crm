@@ -69,6 +69,7 @@ export const AnalisisVenta = z.object({
   seguimiento: z.boolean(),
 
   seguimiento_para: z.string().nullable(),
+  seguimiento_fecha: z.string().nullable(),
   precio_acordado: z.number().nullable(),
 
   respuesta: z.string(),
