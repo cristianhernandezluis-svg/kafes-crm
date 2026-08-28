@@ -305,6 +305,37 @@ const cerrarConversacion = async () => {
   setClienteActivo(null);
 };
 
+useEffect(() => {
+  const clienteId = clienteActivo?.id;
+  const qrId = whatsappQrId;
+
+  if (!clienteId || !qrId) return;
+
+  const liberarAlSalir = () => {
+    fetch("/api/chats", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cliente_id: clienteId,
+        whatsapp_qr_id: qrId,
+        accion: "liberar",
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  };
+
+  const manejarPageHide = () => {
+    liberarAlSalir();
+  };
+
+  window.addEventListener("pagehide", manejarPageHide);
+
+  return () => {
+    window.removeEventListener("pagehide", manejarPageHide);
+    liberarAlSalir();
+  };
+}, [clienteActivo?.id, whatsappQrId]);
+
 const devolverAlBot = async () => {
   if (!clienteActivo) return;
 
