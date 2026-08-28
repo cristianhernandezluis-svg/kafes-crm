@@ -186,6 +186,26 @@ export async function decidirRespuestaBot({
       memoria.producto ||
       null;
 
+    const productoAnterior = memoria.producto || null;
+
+    if (
+      producto &&
+      productoAnterior &&
+      producto !== productoAnterior
+    ) {
+      delete contexto.precio_acordado;
+    }
+
+    const precioAcordado = Number(analisis.precio_acordado);
+
+    if (
+      analisis.precio_acordado !== null &&
+      Number.isFinite(precioAcordado) &&
+      precioAcordado > 0
+    ) {
+      contexto.precio_acordado = precioAcordado;
+    }
+
     const handoff =
       analisis.accion === "handoff_closer";
 

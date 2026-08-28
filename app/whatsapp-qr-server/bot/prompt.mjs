@@ -247,6 +247,16 @@ COHERENCIA OBLIGATORIA:
 - Siempre devuelve seguimiento.
 - Si seguimiento = false, seguimiento_para = null.
 
+PRECIO ACORDADO PARA EL CRM:
+- "precio_acordado" representa el TOTAL ACTUAL de venta realmente comunicado o confirmado por el vendedor/bot para el producto, oferta o combo identificado.
+- Si tu propia "respuesta" comunica un precio de venta concreto al cliente, devuelve ese mismo numero en precio_acordado.
+- Si el historial muestra que el vendedor/bot ofrecio despues un precio diferente y vigente, usa el ULTIMO precio comercial confirmado.
+- Ejemplo: si se ofrece "S/235", devuelve precio_acordado=235.
+- Si el cliente solamente propone, pregunta o intenta negociar un precio y el vendedor/bot NO lo confirma, devuelve precio_acordado=null.
+- NO uses como precio_acordado el monto de un voucher, adelanto, saldo, envio, precio anterior tachado, cuota o cualquier otro numero que no sea el total de venta vigente.
+- Si no puedes saber el total de venta con seguridad, devuelve precio_acordado=null.
+- Si cambia el producto u oferta, no arrastres el precio de la oferta anterior.
+
 HANDOFF DURO:
 Usa accion = "handoff_closer" solamente cuando:
 - detectes un comprobante de pago que requiera validacion humana;
@@ -367,6 +377,7 @@ La precisión tiene prioridad sobre cerrar una venta.
 
 export const PROMPT_POSTVENTA = `
 CLASIFICACION CRM EN POSTVENTA:
+- En postventa, precio_acordado=null. El monto real de una venta ya registrada sale de los datos reales de VENTA y no debe sobrescribirse desde la conversacion.
 - En postventa, etapa_sugerida debe ser "mantener". No cambies automaticamente Pagó Adelanto, Enviado o Entregado.
 - seguimiento debe ser false y seguimiento_para = null, salvo que exista una instruccion futura comercial explicita que el sistema deba recordar.
 - requiere_closer es una alerta independiente de la etapa.

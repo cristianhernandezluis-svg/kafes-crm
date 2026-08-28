@@ -21,6 +21,7 @@ type Cliente = {
     uso?: string;
     ciudad?: string;
     adelanto_detectado?: number;
+    precio_acordado?: number;
   } | null;
   created_at: string;
   ultimo_mensaje?: string | null;
@@ -386,7 +387,16 @@ useEffect(() => {
         setVentaAdelanto(String(data.venta.adelanto ?? ""));
       } else {
         setVentaProducto(clienteActivo?.bot_producto || "");
-        setVentaMonto("");
+
+        const precioAcordado =
+          clienteActivo?.bot_contexto?.precio_acordado;
+
+        setVentaMonto(
+          Number.isFinite(Number(precioAcordado)) &&
+            Number(precioAcordado) > 0
+            ? String(precioAcordado)
+            : ""
+        );
 
         const adelantoDetectado =
           clienteActivo?.bot_contexto?.adelanto_detectado;
@@ -408,7 +418,12 @@ useEffect(() => {
   return () => {
     cancelado = true;
   };
-}, [clienteActivo?.id]);
+}, [
+  clienteActivo?.id,
+  clienteActivo?.bot_producto,
+  clienteActivo?.bot_contexto?.precio_acordado,
+  clienteActivo?.bot_contexto?.adelanto_detectado,
+]);
 
 const confirmarAdelanto = async () => {
   if (!clienteActivo || guardandoVenta) return;
