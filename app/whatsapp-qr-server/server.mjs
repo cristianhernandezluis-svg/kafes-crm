@@ -43,6 +43,16 @@ async function prepararColumnasBot() {
       ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false,
       ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb,\n      ADD COLUMN IF NOT EXISTS handoff_motivo TEXT DEFAULT 'ninguno',\n      ADD COLUMN IF NOT EXISTS cerrado_por TEXT,\n      ADD COLUMN IF NOT EXISTS cerrado_at TIMESTAMPTZ,\n      ADD COLUMN IF NOT EXISTS humano_hasta TIMESTAMPTZ;
   `);
+
+
+  await pool.query(`
+    ALTER TABLE conversaciones
+      ADD COLUMN IF NOT EXISTS estado_whatsapp TEXT,
+      ADD COLUMN IF NOT EXISTS enviado_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS entregado_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS leido_whatsapp_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS reproducido_at TIMESTAMPTZ;
+  `);
 }
 
 let sock;
@@ -51,6 +61,120 @@ let estado = "desconectado";
 let whatsappQrId = null;
 let empresaQrId = null;
 const telefonoPorLidHistorial = new Map();
+
+function estadoDesdeWAMessageStatus(status) {
+  const numero = Number(status);
+  if (numero === 2) return "enviado";
+  if (numero === 3) return "entregado";
+  if (numero === 4) return "leido";
+  if (numero === 5) return "reproducido";
+
+  const texto = String(status || "").toUpperCase();
+  if (texto === "SERVER_ACK") return "enviado";
+  if (texto === "DELIVERY_ACK") return "entregado";
+  if (texto === "READ") return "leido";
+  if (texto === "PLAYED") return "reproducido";
+  return null;
+}
+
+function rangoEstadoWhatsApp(estadoWhatsApp) {
+  if (estadoWhatsApp === "enviado") return 1;
+  if (estadoWhatsApp === "entregado") return 2;
+  if (estadoWhatsApp === "leido") return 3;
+  if (estadoWhatsApp === "reproducido") return 4;
+  return 0;
+}
+
+function fechaDesdeTimestampWhatsApp(valor) {
+  if (valor === null || valor === undefined) return null;
+
+  let numero = null;
+
+  if (typeof valor === "number") numero = valor;
+  else if (typeof valor === "bigint") numero = Number(valor);
+  else if (typeof valor === "string") numero = Number(valor);
+  else if (typeof valor?.toNumber === "function") numero = valor.toNumber();
+
+  if (!Number.isFinite(numero) || numero <= 0) return null;
+
+  const ms = numero > 1000000000000 ? numero : numero * 1000;
+  const fecha = new Date(ms);
+
+  return Number.isFinite(fecha.getTime()) ? fecha : null;
+}
+
+async function actualizarEstadoMensajeWhatsApp(
+  whatsappMessageId,
+  nuevoEstado,
+  fechaEvento = null
+) {
+  if (!whatsappMessageId || !nuevoEstado || !whatsappQrId) return null;
+
+  const rangoNuevo = rangoEstadoWhatsApp(nuevoEstado);
+  if (!rangoNuevo) return null;
+
+  const fecha =
+    fechaEvento instanceof Date && Number.isFinite(fechaEvento.getTime())
+      ? fechaEvento
+      : new Date();
+
+  const result = await pool.query(
+    `
+    UPDATE conversaciones
+    SET estado_whatsapp = CASE
+          WHEN (
+            CASE COALESCE(estado_whatsapp, '')
+              WHEN 'enviado' THEN 1
+              WHEN 'entregado' THEN 2
+              WHEN 'leido' THEN 3
+              WHEN 'reproducido' THEN 4
+              ELSE 0
+            END
+          ) <= $2
+          THEN $1
+          ELSE estado_whatsapp
+        END,
+        enviado_at = CASE
+          WHEN $1 = 'enviado' THEN COALESCE(enviado_at, $5)
+          ELSE enviado_at
+        END,
+        entregado_at = CASE
+          WHEN $1 = 'entregado' THEN COALESCE(entregado_at, $5)
+          ELSE entregado_at
+        END,
+        leido_whatsapp_at = CASE
+          WHEN $1 = 'leido' THEN COALESCE(leido_whatsapp_at, $5)
+          ELSE leido_whatsapp_at
+        END,
+        reproducido_at = CASE
+          WHEN $1 = 'reproducido' THEN COALESCE(reproducido_at, $5)
+          ELSE reproducido_at
+        END
+    WHERE whatsapp_message_id = $3
+      AND whatsapp_qr_id = $4
+      AND remitente IN ('bot', 'asesor')
+    RETURNING id, cliente_id, estado_whatsapp
+    `,
+    [nuevoEstado, rangoNuevo, String(whatsappMessageId), whatsappQrId, fecha]
+  );
+
+  if (result.rowCount > 0) {
+    const row = result.rows[0];
+    console.log(
+      "WHATSAPP ESTADO:",
+      row.id,
+      "CLIENTE:",
+      row.cliente_id,
+      "MENSAJE:",
+      String(whatsappMessageId),
+      "->",
+      String(row.estado_whatsapp || nuevoEstado).toUpperCase()
+    );
+    return row;
+  }
+
+  return null;
+}
 
 async function cargarIntegracionQr() {
   const key = process.env.WHATSAPP_SESSION_KEY;
@@ -1346,6 +1470,64 @@ sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages
   });
 
   const inicioBotUnix = Math.floor(Date.now() / 1000);
+
+sock.ev.on("messages.update", async (updates = []) => {
+  try {
+    for (const item of updates || []) {
+      const whatsappMessageId = item?.key?.id;
+      const estadoWhatsApp = estadoDesdeWAMessageStatus(item?.update?.status);
+
+      if (!whatsappMessageId || !estadoWhatsApp) continue;
+
+      await actualizarEstadoMensajeWhatsApp(
+        whatsappMessageId,
+        estadoWhatsApp,
+        new Date()
+      );
+    }
+  } catch (error) {
+    console.error(
+      "ERROR ESTADO WHATSAPP messages.update:",
+      error?.message || error
+    );
+  }
+});
+
+sock.ev.on("message-receipt.update", async (updates = []) => {
+  try {
+    for (const item of updates || []) {
+      const whatsappMessageId = item?.key?.id;
+      const receipt = item?.receipt || {};
+
+      if (!whatsappMessageId) continue;
+
+      const fechaPlayed = fechaDesdeTimestampWhatsApp(receipt?.playedTimestamp);
+      const fechaRead = fechaDesdeTimestampWhatsApp(receipt?.readTimestamp);
+
+      if (fechaPlayed) {
+        await actualizarEstadoMensajeWhatsApp(
+          whatsappMessageId,
+          "reproducido",
+          fechaPlayed
+        );
+        continue;
+      }
+
+      if (fechaRead) {
+        await actualizarEstadoMensajeWhatsApp(
+          whatsappMessageId,
+          "leido",
+          fechaRead
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      "ERROR ESTADO WHATSAPP message-receipt.update:",
+      error?.message || error
+    );
+  }
+});
 
 sock.ev.on("messages.upsert", async ({ messages, type }) => {
   if (type !== "notify") {
