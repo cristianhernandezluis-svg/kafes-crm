@@ -27,13 +27,13 @@ type Cliente = {
 
 function etiquetaMensaje(tipo?: string | null, mensaje?: string | null) {
   const etiquetas: Record<string, string> = {
-    image: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¼ Imagen",
-    audio: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¤ Audio",
-    video: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¥ Video",
-    document: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Documento",
-    sticker: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â· Sticker",
-    location: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â Ubicacion",
-    contact: "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¤ Contacto",
+    image: "🖼 Imagen",
+    audio: "🎤 Audio",
+    video: "🎥 Video",
+    document: "📄 Documento",
+    sticker: "🏷 Sticker",
+    location: "📍 Ubicacion",
+    contact: "👤 Contacto",
   };
   return (tipo && etiquetas[tipo]) || mensaje || "Sin mensajes";
 }
@@ -89,9 +89,9 @@ const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
 const [mostrarConversacion, setMostrarConversacion] = useState(false);
   const [enviando, setEnviando] = useState(false);
-const [ventaProducto, setVentaProducto] = useState('');
-const [ventaMonto, setVentaMonto] = useState('');
-const [ventaAdelanto, setVentaAdelanto] = useState('');
+const [ventaProducto, setVentaProducto] = useState("");
+const [ventaMonto, setVentaMonto] = useState("");
+const [ventaAdelanto, setVentaAdelanto] = useState("");
 const [guardandoVenta, setGuardandoVenta] = useState(false);
 const [enviandoArchivo, setEnviandoArchivo] = useState(false);
 
@@ -343,7 +343,6 @@ useEffect(() => {
       });
 
       const data = await res.json();
-
       if (cancelado) return;
 
       if (res.ok && data.venta) {
@@ -415,7 +414,7 @@ const confirmarAdelanto = async () => {
 
     setClienteActivo((actual) =>
       actual
-        ? { ...actual, etapa: "PagÃƒÂ³ Adelanto", bot_paso: "postventa" }
+        ? { ...actual, etapa: "Pag\u00f3 Adelanto", bot_paso: "postventa" }
         : actual
     );
 
@@ -566,38 +565,38 @@ useEffect(() => {
 
   <nav className="flex-1 px-2 space-y-1">
     <Link href="/dashboard" className={"flex items-center gap-3 px-3 py-3 rounded-lg text-sm " + (temaClaro ? "hover:bg-slate-100 text-slate-700" : "hover:bg-slate-800 text-white")}>
-      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  Dashboard
+      📊 Dashboard
     </Link>
 
     <Link href="/chat" className="flex items-center justify-between bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm">
-      <span className="flex items-center gap-3">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¬ Conversaciones</span>
+      <span className="flex items-center gap-3">💬 Conversaciones</span>
       <span className="bg-green-500 text-white text-[11px] px-2 py-0.5 rounded-full">
         {clientes.length}
       </span>
     </Link>
 
     <Link href="/contactos" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¤ Contactos
+      👤 Contactos
     </Link>
 
     <Link href="/kanban" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â§Ãƒâ€šÃ‚Â© Kanban
+      🧩 Kanban
     </Link>
 
     <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Plantillas
+      📄 Plantillas
     </Link>
 
     <Link href="/automatizaciones" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Automatizaciones
+      ⚙️ Automatizaciones
     </Link>
 
     <Link href="/reportes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  Reportes
+      📊 Reportes
     </Link>
 
     <Link href="/ajustes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Ajustes
+      ⚙️ Ajustes
     </Link>
   </nav>
 
@@ -614,12 +613,12 @@ useEffect(() => {
     temaClaro ? "text-slate-700" : "text-slate-300"
   }`}
 >
-        ConexiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n WhatsApp
+        Conexión WhatsApp
       </p>
 
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-xl">
-          ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¢
+          🟢
         </div>
 
         <div>
@@ -646,7 +645,7 @@ useEffect(() => {
   >
     <div className="flex items-center gap-2">
       <span className="text-base">
-        {temaClaro ? "ÃƒÆ’Ã‚Â¢Ãƒâ€¹Ã…â€œÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â" : "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã¢â‚¬â„¢ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢"}
+        {temaClaro ? "☀️" : "🌙"}
       </span>
 
       <span className="text-xs font-semibold text-slate-300">
@@ -677,7 +676,7 @@ useEffect(() => {
     }}
     className="px-4 pb-4 text-left text-slate-400 hover:text-red-400 text-sm"
   >
-    ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â© Cerrar sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n
+    ↩ Cerrar sesión
   </button>
 </aside>
 
@@ -698,10 +697,10 @@ useEffect(() => {
   </h1>
 
   <div className="flex items-center gap-4 text-slate-300">
-    <button className="hover:text-white">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â</button>
+    <button className="hover:text-white">🔍</button>
 
     <div className="relative">
-      <button className="hover:text-white">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â</button>
+      <button className="hover:text-white">🔔</button>
       <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
         3
       </span>
@@ -719,7 +718,7 @@ useEffect(() => {
 >
   Administrador
 </p>
-        <p className="text-[10px] text-green-400">ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂÃƒâ€šÃ‚Â En lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­nea</p>
+        <p className="text-[10px] text-green-400">● En línea</p>
       </div>
     </div>
   </div>
@@ -738,7 +737,7 @@ useEffect(() => {
   className={`text-2xl font-black ${
     temaClaro ? "text-slate-900" : "text-white"
   }`}
->ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¬ Conversaciones</h2>
+>💬 Conversaciones</h2>
 
   <p
   className={`text-sm ${
@@ -766,11 +765,11 @@ useEffect(() => {
     ? "bg-slate-50 border-slate-300"
     : "bg-[#111827] border-slate-700"
 }`}>
-      ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
+      ⚙️
     </button>
 
     <button className="w-10 h-10 bg-green-700 rounded-lg">
-      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+      🔗
     </button>
   </div>
 
@@ -781,7 +780,7 @@ useEffect(() => {
 >
     {[
       { id: "todas", label: "Todas" },
-      { id: "no_leidas", label: "No leÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­das" },
+      { id: "no_leidas", label: "No leídas" },
       { id: "asignadas", label: "Asignadas" },
       { id: "sin_asignar", label: "Sin asignar" },
     ].map((filtro) => (
@@ -844,10 +843,10 @@ useEffect(() => {
     temaClaro ? "text-slate-900" : "text-white"
   }`}
 >
-      {cliente.temperatura === "caliente" ? `ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ ${cliente.nombre || "Sin nombre"}` : (cliente.nombre || "Sin nombre")}
+      {cliente.temperatura === "caliente" ? `🔥 ${cliente.nombre || "Sin nombre"}` : (cliente.nombre || "Sin nombre")}
     </p>
 
-    {cliente.temperatura === "caliente" && <p className="text-xs font-bold text-orange-400 truncate">CALIENTE ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {nombreProductoBot(cliente.bot_producto)} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {cliente.bot_contexto?.ciudad || cliente.ciudad || "Sin ciudad"}</p>}
+    {cliente.temperatura === "caliente" && <p className="text-xs font-bold text-orange-400 truncate">CALIENTE · {nombreProductoBot(cliente.bot_producto)} · {cliente.bot_contexto?.ciudad || cliente.ciudad || "Sin ciudad"}</p>}
 
     <p
   className={`text-sm truncate ${
@@ -920,7 +919,7 @@ useEffect(() => {
   temaClaro ? "text-slate-900" : "text-white"
 }`}
             >
-              ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â
+              ←
             </button>
 
             <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-black text-lg">
@@ -941,13 +940,13 @@ useEffect(() => {
     temaClaro ? "text-slate-500" : "text-slate-400"
   }`}
 >
-                ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â± {clienteActivo.telefono}
+                📱 {clienteActivo.telefono}
               </p>
             </div>
           </div>
 
           <div className="text-green-400 text-sm font-bold">
-            ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂÃƒâ€šÃ‚Â En lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­nea
+            ● En línea
           </div>
         </div>
 
@@ -957,7 +956,7 @@ useEffect(() => {
   }`}
 >
           {conversaciones.length === 0 ? (
-            <p className="text-slate-400">No hay mensajes todavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a.</p>
+            <p className="text-slate-400">No hay mensajes todavía.</p>
           ) : (
             conversaciones.map((msg) => (
               <div
@@ -990,7 +989,7 @@ useEffect(() => {
                     }
                     className="bg-white border rounded-lg p-3 text-left hover:bg-gray-50 text-black"
                   >
-                    <p className="font-bold">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Documento recibido</p>
+                    <p className="font-bold">📄 Documento recibido</p>
                     <p className="text-xs text-slate-400">
                       {msg.filename || "Abrir documento"}
                     </p>
@@ -1013,7 +1012,7 @@ useEffect(() => {
       : "text-slate-300"
   }`}
 >
-                  {msg.remitente} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·{" "}
+                  {msg.remitente} ·{" "}
                   {new Date(msg.created_at).toLocaleString("es-PE")}
                 </p>
               </div>
@@ -1033,7 +1032,7 @@ useEffect(() => {
           <button
             onClick={() => {
               const fecha = prompt("Fecha seguimiento (2026-06-15 10:00)");
-              const observacion = prompt("ObservaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n");
+              const observacion = prompt("Observación");
 
               if (!fecha || !observacion || !clienteActivo) return;
 
@@ -1053,7 +1052,7 @@ useEffect(() => {
             }}
             className="mb-3 bg-yellow-500 text-black px-4 py-2 rounded-xl font-bold"
           >
-            ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Programar seguimiento
+            📅 Programar seguimiento
           </button>
 
           <textarea
@@ -1103,7 +1102,7 @@ useEffect(() => {
               onClick={() => setMostrarPlantillas(!mostrarPlantillas)}
               className="w-10 h-10 flex items-center justify-center bg-yellow-500 hover:bg-yellow-400 rounded-full text-black"
             >
-              ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â
+              📝
             </button>
 
             <button
@@ -1114,7 +1113,7 @@ useEffect(() => {
                   : "bg-green-600 text-white"
               }`}
             >
-              ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¤
+              🎤
             </button>
 
             <button
@@ -1122,7 +1121,7 @@ useEffect(() => {
   disabled={enviando}
   className="ml-auto w-12 h-12 flex items-center justify-center bg-green-600 hover:bg-green-700 rounded-full text-white text-xl disabled:bg-slate-600"
 >
-  {enviando ? "..." : "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¾Ãƒâ€šÃ‚Â¤"}
+  {enviando ? "..." : "➤"}
 </button>
           </div>
         </div>
@@ -1153,7 +1152,7 @@ useEffect(() => {
       ? "text-slate-500 hover:text-slate-900"
       : "text-slate-400 hover:text-white"
   }
->ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â</button>
+>×</button>
   </div>
 
   <div className="p-5">
@@ -1192,7 +1191,7 @@ useEffect(() => {
         <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${
   temaClaro ? "border-slate-300" : "border-slate-700"
 }`}>
-          ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¤
+          👤
         </div>
         <span className="text-[11px]">Perfil</span>
       </button>
@@ -1203,7 +1202,7 @@ useEffect(() => {
     : "text-slate-400 hover:text-white"
 }`}>
         <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
-          ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â·ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
+          🏷️
         </div>
         <span className="text-[11px]">Etiquetas</span>
       </button>
@@ -1216,16 +1215,16 @@ useEffect(() => {
         <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${
   temaClaro ? "border-slate-300" : "border-slate-700"
 }`}>
-          ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â
+          📝
         </div>
         <span className="text-[11px]">Notas</span>
       </button>
 
       <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
         <div className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center">
-          ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹Ãƒâ€šÃ‚Â¯
+          ⋯
         </div>
-        <span className="text-[11px]">MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡s</span>
+        <span className="text-[11px]">Más</span>
       </button>
     </div>
 
@@ -1239,12 +1238,12 @@ useEffect(() => {
     temaClaro ? "text-slate-900" : "text-white"
   }`}
 >
-        InformaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n
+        Información
       </h3>
 
       <div className="space-y-4 text-sm">
         <div>
-          <p className="text-slate-500 text-xs">TelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fono</p>
+          <p className="text-slate-500 text-xs">Teléfono</p>
           <p className={temaClaro ? "text-slate-900" : "text-white"}>
   +51 {clienteActivo.telefono}
 </p>
@@ -1334,10 +1333,11 @@ useEffect(() => {
       onClick={devolverAlBot}
       className="mt-3 w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700"
     >
-      ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ Devolver al bot
+      🤖 Devolver al bot
     </button>
   )}
 </div>
+
         <div
           className={`rounded-xl border p-3 space-y-3 ${
             temaClaro
@@ -1414,10 +1414,8 @@ useEffect(() => {
             {guardandoVenta ? "Guardando..." : "Confirmar adelanto"}
           </button>
         </div>
-
-
         <div>
-          <p className="text-slate-500 text-xs">ÃƒÆ’Ã†â€™Ãƒâ€¦Ã‚Â¡ltima actividad</p>
+          <p className="text-slate-500 text-xs">Última actividad</p>
           <p className={temaClaro ? "text-slate-900" : "text-white"}>
   Hoy
 </p>
@@ -1497,7 +1495,7 @@ useEffect(() => {
           Cliente interesado en el producto.
         </p>
         <p className="text-slate-500 text-xs mt-2">
-          Hoy ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Administrador
+          Hoy · Administrador
         </p>
       </div>
     </div>
