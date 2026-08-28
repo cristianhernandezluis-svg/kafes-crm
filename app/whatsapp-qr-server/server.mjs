@@ -720,14 +720,23 @@ async function procesarSeguimientosSilencio() {
           THEN (c.bot_contexto->>'seguimiento_silencio_intento')::int
           ELSE 0
         END AS intento,
-        ult.remitente AS ultimo_remitente
+        ult.remitente AS ultimo_remitente,
+        ult.estado_whatsapp AS ultimo_estado_whatsapp,
+        ult.entregado_at AS ultimo_entregado_at,
+        ult.leido_whatsapp_at AS ultimo_leido_whatsapp_at,
+        ult.created_at AS ultimo_mensaje_at
       FROM clientes c
       JOIN clientes_whatsapp_qr cwq
         ON cwq.cliente_id = c.id
        AND cwq.empresa_id = c.empresa_id
        AND cwq.whatsapp_qr_id = $2
       LEFT JOIN LATERAL (
-        SELECT conv.remitente
+        SELECT
+          conv.remitente,
+          conv.estado_whatsapp,
+          conv.entregado_at,
+          conv.leido_whatsapp_at,
+          conv.created_at
         FROM conversaciones conv
         WHERE conv.cliente_id = c.id
           AND conv.whatsapp_qr_id = $2
@@ -773,6 +782,90 @@ async function procesarSeguimientosSilencio() {
             cliente.ultimo_remitente || "sin remitente"
           );
           continue;
+        }
+
+        const estadoUltimoWhatsApp = String(
+          cliente.ultimo_estado_whatsapp || ""
+        ).toLowerCase();
+
+        const ultimoFueLeido =
+          estadoUltimoWhatsApp === "leido" ||
+          estadoUltimoWhatsApp === "reproducido";
+
+        const ultimoFueEntregado =
+          estadoUltimoWhatsApp === "entregado" ||
+          ultimoFueLeido;
+
+        const estadoWhatsAppConocido = [
+          "enviado",
+          "entregado",
+          "leido",
+          "reproducido",
+        ].includes(estadoUltimoWhatsApp);
+
+        if (!ultimoFueLeido && estadoWhatsAppConocido) {
+          let esperarWhatsApp = true;
+          let motivoEspera = "NO ENTREGADO";
+
+          if (ultimoFueEntregado) {
+            motivoEspera = "ENTREGADO SIN LEER";
+
+            const referenciaEntrega =
+              cliente.ultimo_entregado_at || cliente.ultimo_mensaje_at;
+
+            const fechaEntrega = referenciaEntrega
+              ? new Date(referenciaEntrega)
+              : null;
+
+            const limiteSinLecturaMs =
+              FOLLOWUP_2_HORAS * 60 * 60 * 1000;
+
+            if (
+              fechaEntrega &&
+              Number.isFinite(fechaEntrega.getTime()) &&
+              Date.now() - fechaEntrega.getTime() >= limiteSinLecturaMs
+            ) {
+              esperarWhatsApp = false;
+
+              console.log(
+                "SEGUIMIENTO SILENCIO SIN CONFIRMACION DE LECTURA -> CONTINUA:",
+                clienteId,
+                "HORAS:",
+                FOLLOWUP_2_HORAS
+              );
+            }
+          }
+
+          if (esperarWhatsApp) {
+            const proximaRevision = fechaDesdeAhora(
+              FOLLOWUP_1_MIN * 60 * 1000
+            );
+
+            await pool.query(
+              `
+              UPDATE clientes
+              SET proximo_seguimiento = $2
+              WHERE id = $1
+                AND COALESCE(
+                  bot_contexto->>'seguimiento_silencio_activo',
+                  'false'
+                ) = 'true'
+              `,
+              [clienteId, proximaRevision]
+            );
+
+            console.log(
+              "SEGUIMIENTO SILENCIO ESPERA WHATSAPP:",
+              clienteId,
+              motivoEspera,
+              "ESTADO:",
+              estadoUltimoWhatsApp,
+              "REVISION:",
+              proximaRevision.toISOString()
+            );
+
+            continue;
+          }
         }
 
         if (intento >= 3) {
