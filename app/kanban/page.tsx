@@ -380,7 +380,7 @@ useEffect(() => {
           </div>
         )}
 
-        <div className="p-6 overflow-x-auto">
+        <div className="p-6 overflow-auto h-[calc(100vh-170px)]">
           {cargando ? (
             <p className="text-slate-400">Cargando Kanban...</p>
           ) : (
