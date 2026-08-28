@@ -30,6 +30,8 @@ export async function GET(request: Request) {
         ciudad,
         etapa,
         asesor,
+        requiere_closer,
+        handoff_motivo,
         observacion,
         proximo_seguimiento,
         ultima_gestion,
