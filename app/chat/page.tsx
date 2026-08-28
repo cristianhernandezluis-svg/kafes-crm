@@ -495,16 +495,35 @@ const detenerGrabacion = () => {
   cargarClientes();
   cargarPlantillas();
 
-    const intervalo = setInterval(() => {
-      cargarClientes();
+  const intervalo = setInterval(async () => {
+    cargarClientes();
 
-      if (clienteActivo) {
-        abrirConversacion(clienteActivo);
+    if (clienteActivo && whatsappQrId) {
+      await fetch("/api/chats", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cliente_id: clienteActivo.id,
+          whatsapp_qr_id: whatsappQrId,
+          accion: "tomar",
+        }),
+      });
+
+      const res = await fetch(
+        `/api/conversaciones/${clienteActivo.id}?whatsapp_qr_id=${whatsappQrId}`,
+        { cache: "no-store" }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        setConversaciones(data.conversaciones);
       }
-    }, 5000);
+    }
+  }, 5000);
 
-    return () => clearInterval(intervalo);
-  }, [clienteActivo]);
+  return () => clearInterval(intervalo);
+}, [clienteActivo?.id, whatsappQrId]);
 useEffect(() => {
   if (clientes.length === 0 || clienteActivo) return;
 
