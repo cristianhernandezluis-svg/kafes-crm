@@ -564,14 +564,18 @@ async function procesarSeguimientosExplicitos() {
             tipo,
             empresa_id,
             whatsapp_qr_id,
+            estado_whatsapp,
+            enviado_at,
             canal
           )
-          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'qr')
+          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'enviado', NOW(), 'qr')
           ON CONFLICT (whatsapp_message_id)
           WHERE whatsapp_message_id IS NOT NULL
           DO UPDATE SET
             mensaje = EXCLUDED.mensaje,
-            remitente = 'bot'
+            remitente = 'bot',
+            estado_whatsapp = COALESCE(conversaciones.estado_whatsapp, EXCLUDED.estado_whatsapp),
+            enviado_at = COALESCE(conversaciones.enviado_at, EXCLUDED.enviado_at)
           `,
           [
             clienteId,
@@ -819,14 +823,18 @@ async function procesarSeguimientosSilencio() {
             tipo,
             empresa_id,
             whatsapp_qr_id,
+            estado_whatsapp,
+            enviado_at,
             canal
           )
-          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'qr')
+          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'enviado', NOW(), 'qr')
           ON CONFLICT (whatsapp_message_id)
           WHERE whatsapp_message_id IS NOT NULL
           DO UPDATE SET
             mensaje = EXCLUDED.mensaje,
-            remitente = 'bot'
+            remitente = 'bot',
+            estado_whatsapp = COALESCE(conversaciones.estado_whatsapp, EXCLUDED.estado_whatsapp),
+            enviado_at = COALESCE(conversaciones.enviado_at, EXCLUDED.enviado_at)
           `,
           [
             clienteId,
@@ -1114,22 +1122,26 @@ async function procesarLoteBot(lote) {
   await pool.query(
     `
     INSERT INTO conversaciones (
-      cliente_id,
-      telefono,
-      whatsapp_message_id,
-      mensaje,
-      remitente,
-      tipo,
-      empresa_id,
-      whatsapp_qr_id,
-      canal
-     )
-    VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'qr')
+            cliente_id,
+            telefono,
+            whatsapp_message_id,
+            mensaje,
+            remitente,
+            tipo,
+            empresa_id,
+            whatsapp_qr_id,
+            estado_whatsapp,
+            enviado_at,
+            canal
+          )
+          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'enviado', NOW(), 'qr')
     ON CONFLICT (whatsapp_message_id)
     WHERE whatsapp_message_id IS NOT NULL
     DO UPDATE SET
       mensaje = EXCLUDED.mensaje,
-      remitente = 'bot'
+            remitente = 'bot',
+            estado_whatsapp = COALESCE(conversaciones.estado_whatsapp, EXCLUDED.estado_whatsapp),
+            enviado_at = COALESCE(conversaciones.enviado_at, EXCLUDED.enviado_at)
     `,
     [
       clienteId,
@@ -1894,7 +1906,7 @@ app.post("/send", async (req, res) => {
       return res.status(400).json({ error: "WhatsApp no iniciado" });
     }
 
-    await sock.sendMessage(`${telefono}@s.whatsapp.net`, {
+    const enviadoAsesor = await sock.sendMessage(`${telefono}@s.whatsapp.net`, {
   text: mensaje,
 });
 
@@ -1920,16 +1932,26 @@ if (cliente.rows.length > 0) {
     INSERT INTO conversaciones (
       cliente_id,
       telefono,
+      whatsapp_message_id,
       mensaje,
       remitente,
       tipo,
       empresa_id,
       whatsapp_qr_id,
+      estado_whatsapp,
+      enviado_at,
       canal
     )
-    VALUES ($1, $2, $3, 'asesor', 'text', $4, $5, 'qr')
+    VALUES ($1, $2, $3, $4, 'asesor', 'text', $5, $6, 'enviado', NOW(), 'qr')
     `,
-    [cliente.rows[0].id, telefono, mensaje, empresaQrId, whatsappQrId]
+    [
+      cliente.rows[0].id,
+      telefono,
+      enviadoAsesor?.key?.id || null,
+      mensaje,
+      empresaQrId,
+      whatsappQrId,
+    ]
   );
 }
 
