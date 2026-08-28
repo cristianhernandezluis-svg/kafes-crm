@@ -17,7 +17,11 @@ type Cliente = {
   requiere_closer?: boolean;
   bot_producto?: string | null;
   bot_paso?: string | null;
-  bot_contexto?: { uso?: string; ciudad?: string } | null;
+  bot_contexto?: {
+    uso?: string;
+    ciudad?: string;
+    adelanto_detectado?: number;
+  } | null;
   created_at: string;
   ultimo_mensaje?: string | null;
   ultimo_tipo?: string | null;
@@ -352,7 +356,16 @@ useEffect(() => {
       } else {
         setVentaProducto(clienteActivo?.bot_producto || "");
         setVentaMonto("");
-        setVentaAdelanto("");
+
+        const adelantoDetectado =
+          clienteActivo?.bot_contexto?.adelanto_detectado;
+
+        setVentaAdelanto(
+          Number.isFinite(Number(adelantoDetectado)) &&
+            Number(adelantoDetectado) > 0
+            ? String(adelantoDetectado)
+            : ""
+        );
       }
     } catch (error) {
       console.error("Error cargando venta:", error);
@@ -1397,7 +1410,7 @@ useEffect(() => {
                 step="0.01"
                 value={ventaMonto}
                 onChange={(e) => setVentaMonto(e.target.value)}
-                placeholder="235"
+                placeholder="Monto total"
                 className={`mt-1 w-full rounded-lg border px-3 py-2 text-xs outline-none ${
                   temaClaro
                     ? "bg-white border-slate-300 text-slate-900"
@@ -1414,7 +1427,7 @@ useEffect(() => {
                 step="0.01"
                 value={ventaAdelanto}
                 onChange={(e) => setVentaAdelanto(e.target.value)}
-                placeholder="30"
+                placeholder="Monto detectado"
                 className={`mt-1 w-full rounded-lg border px-3 py-2 text-xs outline-none ${
                   temaClaro
                     ? "bg-white border-slate-300 text-slate-900"

@@ -26,7 +26,7 @@ export async function analizarImagen(ruta, mimeType = "image/jpeg") {
     input: [{
       role: "user",
       content: [
-        { type: "input_text", text: "Describe brevemente esta imagen para dar contexto a un asesor de ventas por WhatsApp. Identifica productos, texto visible, comprobantes u objetos relevantes. No inventes marcas, modelos, pagos confirmados ni datos que no sean visibles. Si no estas seguro, indicalo." },
+        { type: "input_text", text: "Describe brevemente esta imagen para dar contexto a un asesor de ventas por WhatsApp. Identifica productos, texto visible, comprobantes u objetos relevantes. No inventes marcas, modelos, pagos confirmados ni datos que no sean visibles. Si no estas seguro, indicalo. Si la imagen es claramente un comprobante de pago y el monto pagado es legible, agrega al FINAL una linea exacta con el formato COMPROBANTE_MONTO: 30.00 usando solo numeros y punto decimal. Si no es un comprobante claro o el monto no es seguro, agrega COMPROBANTE_MONTO: null. No interpretes el monto como pago confirmado." },
         { type: "input_image", image_url: dataUrl, detail: "low" }
       ]
     }]

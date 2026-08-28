@@ -64,6 +64,23 @@ async function cargarIntegracionQr() {
 
 function normalizarTexto(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
 
+function extraerMontoComprobante(analisis) {
+  const texto = String(analisis || "");
+  const match = texto.match(/COMPROBANTE_MONTO:\s*([0-9]+(?:\.[0-9]{1,2})?|null)/i);
+
+  if (!match || String(match[1]).toLowerCase() === "null") {
+    return null;
+  }
+
+  const monto = Number(match[1]);
+
+  if (!Number.isFinite(monto) || monto <= 0 || monto > 100000) {
+    return null;
+  }
+
+  return monto;
+}
+
 function detectarMotivoHandoff(textoAccion,textoBot){const accion=normalizarTexto(textoAccion);const completo=normalizarTexto(textoBot);const archivo=String(textoBot||'').includes('[ANALISIS INTERNO DEL ARCHIVO');if(archivo&&/\b(comprobante|voucher|constancia|pago realizado|transferencia realizada|deposito realizado)\b/.test(completo))return 'validar_pago';if(/\b(asesor|persona|humano|vendedor)\b/.test(accion))return 'pide_humano';return 'bot_no_puede';}
 
 const ETAPAS_AUTOMATICAS = new Set([
@@ -642,6 +659,32 @@ sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages
       );
 
       const clienteId = cliente.rows[0].id;
+
+  if (!esMio && tipoMensaje === "image" && mediaAnalisis) {
+    const montoComprobante = extraerMontoComprobante(mediaAnalisis);
+
+    if (montoComprobante !== null) {
+      await pool.query(
+        `
+        UPDATE clientes
+        SET bot_contexto = jsonb_set(
+          COALESCE(bot_contexto, '{}'::jsonb),
+          '{adelanto_detectado}',
+          to_jsonb($2::numeric),
+          true
+        )
+        WHERE id = $1
+        `,
+        [clienteId, montoComprobante]
+      );
+
+      console.log(
+        "ADELANTO DETECTADO EN COMPROBANTE:",
+        clienteId,
+        montoComprobante
+      );
+    }
+  }
 
 
       await pool.query(
