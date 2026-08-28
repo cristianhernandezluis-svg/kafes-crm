@@ -66,6 +66,73 @@ function normalizarTexto(t){return String(t||'').normalize('NFD').replace(/[\u03
 
 function detectarMotivoHandoff(textoAccion,textoBot){const accion=normalizarTexto(textoAccion);const completo=normalizarTexto(textoBot);const archivo=String(textoBot||'').includes('[ANALISIS INTERNO DEL ARCHIVO');if(archivo&&/\b(comprobante|voucher|constancia|pago realizado|transferencia realizada|deposito realizado)\b/.test(completo))return 'validar_pago';if(/\b(asesor|persona|humano|vendedor)\b/.test(accion))return 'pide_humano';return 'bot_no_puede';}
 
+const ETAPAS_AUTOMATICAS = new Set([
+  "mantener",
+  "Nuevo",
+  "Interesado",
+  "Calificado",
+  "Seguimiento",
+  "Pago por validar",
+  "Descartado",
+]);
+
+function resolverEtapaAutomatica(etapaActual, etapaSugerida) {
+  const actual = String(etapaActual || "").trim();
+  const sugerida = String(etapaSugerida || "").trim();
+
+  if (!ETAPAS_AUTOMATICAS.has(sugerida) || sugerida === "mantener") {
+    return null;
+  }
+
+  if (["Pag\u00f3 Adelanto", "Enviado", "Entregado"].includes(actual)) {
+    return null;
+  }
+
+  // Un comprobante pendiente queda aqui hasta validacion humana.
+  if (actual === "Pago por validar") {
+    return null;
+  }
+
+  // Nunca retroceder a Nuevo.
+  if (sugerida === "Nuevo") {
+    return !actual || actual === "Nuevo" ? "Nuevo" : null;
+  }
+
+  // Estados disparados por senal explicita del mensaje actual.
+  if (
+    sugerida === "Pago por validar" ||
+    sugerida === "Seguimiento" ||
+    sugerida === "Descartado"
+  ) {
+    return sugerida;
+  }
+
+  // Una oportunidad puede reactivarse si vuelve con interes real.
+  if (["Descartado", "Seguimiento", "No Responde"].includes(actual)) {
+    return ["Interesado", "Calificado"].includes(sugerida)
+      ? sugerida
+      : null;
+  }
+
+  const rango = {
+    Nuevo: 0,
+    Interesado: 1,
+    Calificado: 2,
+  };
+
+  const actualRango = Object.prototype.hasOwnProperty.call(rango, actual)
+    ? rango[actual]
+    : -1;
+
+  const sugeridoRango = Object.prototype.hasOwnProperty.call(rango, sugerida)
+    ? rango[sugerida]
+    : -1;
+
+  if (sugeridoRango < 0) return null;
+
+  return sugeridoRango >= actualRango ? sugerida : null;
+}
+
 function calificarMensajeCliente(texto){const t=normalizarTexto(texto);const senales=[];if(/\b(precio|cuanto|costo|vale)\b/.test(t))senales.push('precio');if(/\b(envio|envios|delivery|entrega|entregas|llega|llegan|agencia|agencias|shalom|olva)\b/.test(t))senales.push('envio');if(/\b(ciudad|distrito|provincia|departamento|direccion|soy de|vivo en)\b/.test(t))senales.push('ubicacion');if(/\b(garantia)\b/.test(t))senales.push('garantia');if(/\b(yape|plin|transferencia|transferir|deposito|depositar|pago|pagos|pagar)\b/.test(t))senales.push('pago');if(/\b(quiero|compro|comprar|separar|separame|reservar|pedido|quiero uno)\b/.test(t))senales.push('intencion_compra');if(/\b(hoy|ahora|ya mismo)\b/.test(t))senales.push('urgencia');return {senales};}
 
 const PESOS_SENALES={precio:5,envio:10,ubicacion:10,garantia:5,pago:30,intencion_compra:60,urgencia:10};
@@ -161,8 +228,49 @@ async function procesarLoteBot(lote) {
     historial,
   });
 
-  if (respuestaBot?.handoff) {
-    const handoffMotivo = detectarMotivoHandoff(textoAccion, textoBot);
+  const analisisCRM = respuestaBot?.analisis || null;
+
+  const etapaAutomatica = resolverEtapaAutomatica(
+    memoria?.etapa,
+    analisisCRM?.etapa_sugerida
+  );
+
+  if (etapaAutomatica && etapaAutomatica !== memoria?.etapa) {
+    await pool.query(
+      `
+      UPDATE clientes
+      SET etapa = $2
+      WHERE id = $1
+      `,
+      [clienteId, etapaAutomatica]
+    );
+
+    memoria.etapa = etapaAutomatica;
+
+    console.log(
+      "ETAPA CRM BOT:",
+      clienteId,
+      "->",
+      etapaAutomatica,
+      "|",
+      analisisCRM?.motivo_etapa || "sin motivo"
+    );
+  }
+
+  const requiereCloserIA =
+    respuestaBot?.handoff === true ||
+    analisisCRM?.requiere_closer === true ||
+    etapaAutomatica === "Pago por validar";
+
+  if (requiereCloserIA) {
+    const motivoIA = String(analisisCRM?.motivo_closer || "").trim();
+
+    const handoffMotivo =
+      etapaAutomatica === "Pago por validar"
+        ? "validar_pago"
+        : motivoIA && motivoIA !== "ninguno"
+        ? motivoIA
+        : detectarMotivoHandoff(textoAccion, textoBot);
 
     const asesorResult = await pool.query(
       `
@@ -182,20 +290,19 @@ async function procesarLoteBot(lote) {
     await pool.query(
       `
       UPDATE clientes
-      SET score = CASE WHEN $4 THEN score ELSE 100 END,
-          temperatura = CASE WHEN $4 THEN temperatura ELSE 'caliente' END,
-          requiere_closer = true,
-          etapa = CASE WHEN $4 THEN etapa ELSE 'Calificado' END,
+      SET requiere_closer = true,
           handoff_motivo = $3,
           asesor = COALESCE($2, asesor)
       WHERE id = $1
       `,
-      [clienteId, asesor, handoffMotivo, memoria?.paso === "postventa"]
+      [clienteId, asesor, handoffMotivo]
     );
 
     console.log(
-      "HANDOFF A CLOSER:",
+      "ALERTA CLOSER:",
       clienteId,
+      "MOTIVO:",
+      handoffMotivo,
       "ASESOR:",
       asesor || "SIN ASESOR"
     );

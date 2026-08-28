@@ -12,6 +12,8 @@ type Cliente = {
   asesor: string | null;
   observacion?: string | null;
   canal?: string | null;
+  requiere_closer?: boolean;
+  handoff_motivo?: string | null;
 };
 
 const etapas = [
@@ -19,11 +21,27 @@ const etapas = [
   "Interesado",
   "Calificado",
   "Seguimiento",
+  "Pago por validar",
   "Pagó Adelanto",
   "Enviado",
   "Entregado",
   "No Responde",
+  "Descartado",
 ];
+
+
+function etiquetaMotivoCloser(motivo?: string | null) {
+  const etiquetas: Record<string, string> = {
+    validar_pago: "Validar comprobante de pago",
+    pide_humano: "Cliente pidio hablar con una persona",
+    bot_no_puede: "El bot necesita apoyo humano",
+    reclamo_postventa: "Reclamo o incidencia postventa",
+    intervencion_manual: "Conversacion tomada por un asesor",
+    otro: "Requiere revision humana",
+  };
+
+  return etiquetas[String(motivo || "")] || "Requiere revision humana";
+}
 
 export default function KanbanPage() {
 const [temaClaro, setTemaClaro] = useState(false);
@@ -63,6 +81,12 @@ useEffect(() => {
 
   useEffect(() => {
     cargarClientes();
+
+    const intervalo = setInterval(() => {
+      cargarClientes();
+    }, 5000);
+
+    return () => clearInterval(intervalo);
   }, []);
 
   const moverEtapa = async (cliente: Cliente, nuevaEtapa: string) => {
@@ -336,6 +360,26 @@ useEffect(() => {
   </div>
 </div>
 
+        {clientes.some((c) => c.requiere_closer) && (
+          <div className="mx-6 mt-6 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-black text-red-400">
+                Atencion humana pendiente
+              </p>
+              <p className={`text-xs mt-1 ${temaClaro ? "text-slate-600" : "text-slate-300"}`}>
+                {clientes.filter((c) => c.requiere_closer).length} conversacion(es) requieren un asesor.
+              </p>
+            </div>
+
+            <Link
+              href="/chat"
+              className="shrink-0 rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white hover:bg-red-700"
+            >
+              Ir a conversaciones
+            </Link>
+          </div>
+        )}
+
         <div className="p-6 overflow-x-auto">
           {cargando ? (
             <p className="text-slate-400">Cargando Kanban...</p>
@@ -457,6 +501,17 @@ useEffect(() => {
                               {cliente.canal || "crm"}
                             </span>
                           </div>
+                          {cliente.requiere_closer && (
+                            <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2">
+                              <p className="text-[11px] font-black text-red-400">
+                                REQUIERE ASESOR
+                              </p>
+                              <p className={`text-[11px] mt-1 ${temaClaro ? "text-slate-600" : "text-slate-300"}`}>
+                                {etiquetaMotivoCloser(cliente.handoff_motivo)}
+                              </p>
+                            </div>
+                          )}
+
 
                           <div
   className={`mt-3 text-xs ${
