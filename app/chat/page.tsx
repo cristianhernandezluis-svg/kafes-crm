@@ -1395,7 +1395,9 @@ useEffect(() => {
               temaClaro ? "text-orange-600" : "text-orange-300/80"
             }`}
           >
-            El bot sigue atendiendo. Esta alerta no significa que requiera closer.
+            {clienteActivo.bot_activo === false
+              ? "Estás atendiendo esta conversación. El bot se reanudará al salir."
+              : "El bot sigue atendiendo. Puedes llamar para apoyar el cierre."}
           </p>
         </div>
       </div>

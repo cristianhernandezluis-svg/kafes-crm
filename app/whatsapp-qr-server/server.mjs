@@ -317,8 +317,7 @@ async function actualizarCalificacionCliente(clienteId,texto){
      SET bot_activo=true, humano_hasta=NULL
      WHERE id=$1
        AND bot_activo=false
-       AND humano_hasta IS NOT NULL
-       AND humano_hasta <= NOW()`
+       AND (humano_hasta IS NULL OR humano_hasta <= NOW())`
 ,    [clienteId]
   );
 

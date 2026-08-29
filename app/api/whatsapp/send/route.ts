@@ -137,6 +137,7 @@ export async function POST(req: Request) {
       UPDATE clientes
       SET bot_activo = false,
           requiere_closer = false,
+          humano_hasta = NOW() + INTERVAL '90 seconds',
           handoff_motivo = CASE
             WHEN handoff_motivo = 'validar_pago' THEN 'validar_pago'
             WHEN handoff_motivo IN ('pide_humano', 'bot_no_puede') THEN handoff_motivo
