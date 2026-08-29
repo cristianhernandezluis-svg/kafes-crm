@@ -60,6 +60,7 @@ let qrActual = null;
 let estado = "desconectado";
 let whatsappQrId = null;
 let empresaQrId = null;
+let productoQrSlug = null;
 const telefonoPorLidHistorial = new Map();
 
 function estadoDesdeWAMessageStatus(status) {
@@ -179,11 +180,19 @@ async function actualizarEstadoMensajeWhatsApp(
 async function cargarIntegracionQr() {
   const key = process.env.WHATSAPP_SESSION_KEY;
   if (!key) throw new Error("WHATSAPP_SESSION_KEY no configurado");
-  const r = await pool.query("SELECT id, empresa_id FROM integraciones_whatsapp_qr WHERE session_key=$1 LIMIT 1", [key]);
+  const r = await pool.query(
+  "SELECT id, empresa_id, producto_slug FROM integraciones_whatsapp_qr WHERE session_key=$1 LIMIT 1",
+  [key]
+);
   if (!r.rows[0]) throw new Error("Integracion QR no encontrada");
   whatsappQrId = r.rows[0].id;
   empresaQrId = r.rows[0].empresa_id;
-  console.log("Integracion QR cargada:", { whatsappQrId, empresaQrId });
+productoQrSlug = r.rows[0].producto_slug || null;
+  console.log("Integracion QR cargada:", {
+  whatsappQrId,
+  empresaQrId,
+  productoQrSlug,
+});
 }
 
 function normalizarTexto(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
@@ -1048,13 +1057,14 @@ async function procesarLoteBot(lote) {
   const historial = await obtenerHistorialReciente(pool, clienteId, primerId);
 
   const respuestaBot = await decidirRespuestaBot({
-    texto: textoBot,
-    textoAccion: textoAccion || "",
-    calificacion,
-    memoria,
-    historial,
-      empresaId: empresaQrId,
-  });
+  texto: textoBot,
+  textoAccion: textoAccion || "",
+  calificacion,
+  memoria,
+  historial,
+  empresaId: empresaQrId,
+  productoPrincipal: productoQrSlug,
+});
 
   const analisisCRM = respuestaBot?.analisis || null;
 

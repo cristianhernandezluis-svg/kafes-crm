@@ -154,6 +154,7 @@ export async function decidirRespuestaBot({
   memoria = {},
   historial = [],
   empresaId = null,
+  productoPrincipal = null,
 }) {
   if (!texto || !texto.trim()) {
     return null;
@@ -161,11 +162,12 @@ export async function decidirRespuestaBot({
 
   try {
     const analisis = await consultarIA({
-      mensaje: texto,
-      memoria,
-      historial,
-      empresaId,
-    });
+  mensaje: texto,
+  memoria,
+  historial,
+  empresaId,
+  productoPrincipal,
+});
 
     if (!analisis) {
       return await respuestaRespaldo(texto, memoria, empresaId);
@@ -273,7 +275,7 @@ const mensajeFinal = datosPago
       handoff,
       memoria: {
         producto,
-        paso: memoria.paso === "postventa" ? "postventa" : "conversacion",
+        paso: analisis.fase_venta === "postventa" ? "postventa" : "conversacion",
         contexto,
       },
       analisis,

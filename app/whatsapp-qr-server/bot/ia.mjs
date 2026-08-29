@@ -70,9 +70,14 @@ export async function consultarIA(input) {
       ? input?.historial || []
       : [];
 
-  const empresaId =
+    const empresaId =
     typeof input === "object"
       ? Number(input?.empresaId || input?.empresa_id || 0) || null
+      : null;
+
+  const productoPrincipal =
+    typeof input === "object"
+      ? input?.productoPrincipal || null
       : null;
 
   const catalogoEmpresa = await obtenerCatalogoEmpresa(empresaId);
@@ -100,6 +105,15 @@ Zona horaria: America/Lima (UTC-05:00)
 
 CATALOGO REAL:
 ${JSON.stringify(prepararCatalogo(catalogoEmpresa), null, 2)}
+
+PRODUCTO PRINCIPAL DE ESTE NUMERO DE WHATSAPP:
+${productoPrincipal || "ninguno"}
+
+REGLA DE PRODUCTO PRINCIPAL:
+- Si el mensaje actual es ambiguo, corto o generico, por ejemplo: "precio", "info", "informacion", "me interesa", "cuanto", "hola", "quiero saber", asume que se refiere al PRODUCTO PRINCIPAL DE ESTE NUMERO DE WHATSAPP.
+- Si el cliente menciona explicitamente otro producto, prioriza el producto mencionado en el MENSAJE ACTUAL.
+- La memoria o una compra anterior NO deben reemplazar al producto principal cuando el mensaje actual es una consulta comercial nueva y ambigua.
+- Usa la memoria e historial como contexto, pero no permitas que un producto antiguo domine una consulta nueva.
 
 POLITICAS COMERCIALES REALES:
 ${JSON.stringify(obtenerPoliticasComerciales(), null, 2)}
@@ -191,10 +205,21 @@ REGLAS POSTVENTA:
 - No hagas handoff_closer si puedes responder correctamente con los datos reales disponibles.
 `;
 
-  const promptActivo =
-    memoria?.paso === "postventa"
-      ? PROMPT_POSTVENTA
-      : PROMPT_VENDEDOR;
+  const mensajeActualNormalizado = String(mensaje || "")
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase()
+  .trim();
+
+const consultaPostventaActual =
+  /\b(mi pedido|mi compra|mi envio|mi guia|numero de guia|donde esta mi pedido|cuando llega mi pedido|cuanto debo|cuanto me falta pagar|saldo pendiente|adelanto que pague|ya pague)\b/.test(
+    mensajeActualNormalizado
+  );
+
+const promptActivo =
+  consultaPostventaActual
+    ? PROMPT_POSTVENTA
+    : PROMPT_VENDEDOR;
 
   const response = await client.responses.parse({
     model: "gpt-5.6-terra",
