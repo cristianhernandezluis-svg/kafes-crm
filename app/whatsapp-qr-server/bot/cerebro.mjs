@@ -114,7 +114,7 @@ function respuestaRespaldo(texto, memoria = {}) {
       return {
         tipo: "respaldo_precio",
         producto: producto.slug,
-        mensaje: `${producto.nombre} está a S/${producto.precio}. ¿Deseas más información?`,
+        mensaje: `${producto.nombre} está a S/${producto.precio}. Si quieres, te muestro cómo viene y qué incluye.`,
         memoria: {
           producto: producto.slug,
           paso: memoria.paso || "conversacion",
@@ -126,7 +126,7 @@ function respuestaRespaldo(texto, memoria = {}) {
     return {
       tipo: "respaldo_producto",
       producto: producto.slug,
-      mensaje: `Sí, tenemos ${producto.nombre} a S/${producto.precio}. ¿Qué deseas saber?`,
+      mensaje: `Claro 👋 Te cuento sobre ${producto.nombre}. Está a S/${producto.precio}.`,
       memoria: {
         producto: producto.slug,
         paso: memoria.paso || "conversacion",
@@ -138,7 +138,7 @@ function respuestaRespaldo(texto, memoria = {}) {
   return {
     tipo: "respaldo_general",
     mensaje:
-      "Claro, te ayudo. ¿Qué producto te interesa?",
+      "Claro 👋 Dime qué producto viste y te paso la información.",
     memoria: {
       producto: memoria.producto || null,
       paso: memoria.paso || "conversacion",
@@ -179,6 +179,41 @@ export async function decidirRespuestaBot({
 
     if (analisis.ciudad) {
       contexto.ciudad = analisis.ciudad;
+    }
+
+    const senalesCalificacion = Array.isArray(calificacion?.senales)
+      ? calificacion.senales
+      : [];
+
+    const scoreCalificacion = Number(calificacion?.score || 0);
+
+    const senalCompraFuerte =
+      senalesCalificacion.includes("intencion_compra") ||
+      senalesCalificacion.includes("pago") ||
+      scoreCalificacion >= 40 ||
+      calificacion?.temperatura === "caliente";
+
+    let faseVentaFinal = analisis.fase_venta || "descubrimiento";
+
+    if (faseVentaFinal === "cierre" && !senalCompraFuerte) {
+      faseVentaFinal = "descubrimiento";
+    }
+
+    contexto.fase_venta = faseVentaFinal;
+
+    const llamarAhoraFinal =
+      analisis.llamar_ahora === true &&
+      senalCompraFuerte &&
+      analisis.etapa_sugerida !== "Descartado" &&
+      analisis.accion !== "handoff_closer";
+
+    if (llamarAhoraFinal) {
+      contexto.llamar_ahora = true;
+      contexto.motivo_llamada =
+        analisis.motivo_llamada || "Interes comercial alto";
+    } else if (analisis.etapa_sugerida === "Descartado") {
+      contexto.llamar_ahora = false;
+      delete contexto.motivo_llamada;
     }
 
     const producto =
@@ -225,8 +260,14 @@ const mensajeFinal = datosPago
       objecion: analisis.objecion,
       nivelInteres: analisis.nivel_interes,
       accion: analisis.accion,
+      apertura: analisis.apertura || null,
       mensaje: mensajeFinal,
       multimedia: analisis.multimedia || "ninguno",
+      faseVenta: faseVentaFinal,
+      llamarAhora: llamarAhoraFinal,
+      motivoLlamada: llamarAhoraFinal
+        ? analisis.motivo_llamada || "Interes comercial alto"
+        : null,
       handoff,
       memoria: {
         producto,

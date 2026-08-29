@@ -41,6 +41,7 @@ export const AnalisisVenta = z.object({
     "foto",
     "video",
     "audio",
+    "presentacion",
   ]),
 
   etapa_sugerida: z.enum([
@@ -71,6 +72,22 @@ export const AnalisisVenta = z.object({
   seguimiento_para: z.string().nullable(),
   seguimiento_fecha: z.string().nullable(),
   precio_acordado: z.number().nullable(),
+
+  apertura: z.string().nullable(),
+
+  fase_venta: z.enum([
+    "descubrimiento",
+    "presentacion",
+    "demostracion",
+    "valor",
+    "objecion",
+    "cierre",
+    "seguimiento",
+    "postventa",
+  ]),
+
+  llamar_ahora: z.boolean(),
+  motivo_llamada: z.string().nullable(),
 
   respuesta: z.string(),
 });

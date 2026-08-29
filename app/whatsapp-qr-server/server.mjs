@@ -1161,49 +1161,152 @@ async function procesarLoteBot(lote) {
   } catch {}
 
   const multimediaSolicitada = respuestaBot?.multimedia || "ninguno";
-  const archivosMultimedia =
-    multimediaSolicitada !== "ninguno" && respuestaBot?.producto
-      ? obtenerMultimediaProducto(respuestaBot.producto, multimediaSolicitada)
-      : [];
 
-  if (archivosMultimedia.length > 0) {
-    const limite = multimediaSolicitada === "foto" ? 2 : 1;
+  const pausaMultimedia = () =>
+    new Promise((resolve) =>
+      setTimeout(resolve, 700 + Math.floor(Math.random() * 700))
+    );
 
-    for (const archivo of archivosMultimedia.slice(0, limite)) {
+  const enviarMultimediaBot = async ({
+    archivo,
+    tipo,
+    caption = undefined,
+  }) => {
+    const bufferArchivo = await readFile(archivo);
+
+    if (tipo === "foto") {
+      await sock.sendMessage(jidRespuesta, {
+        image: bufferArchivo,
+        ...(caption ? { caption } : {}),
+      });
+    } else if (tipo === "video") {
+      await sock.sendMessage(jidRespuesta, {
+        video: bufferArchivo,
+        ...(caption ? { caption } : {}),
+      });
+    } else if (tipo === "audio") {
+      const ruta = String(archivo).toLowerCase();
+      const mimetype = ruta.endsWith(".ogg")
+        ? "audio/ogg; codecs=opus"
+        : ruta.endsWith(".m4a") || ruta.endsWith(".mp4")
+          ? "audio/mp4"
+          : "audio/mpeg";
+
+      await sock.sendMessage(jidRespuesta, {
+        audio: bufferArchivo,
+        mimetype,
+        ptt: false,
+      });
+    }
+
+    console.log("MULTIMEDIA BOT ENVIADO:", {
+      clienteId,
+      producto: respuestaBot.producto,
+      tipo,
+      archivo,
+    });
+  };
+
+  if (
+    multimediaSolicitada === "presentacion" &&
+    respuestaBot?.producto
+  ) {
+    const fotos = obtenerMultimediaProducto(respuestaBot.producto, "foto");
+    const videos = obtenerMultimediaProducto(respuestaBot.producto, "video");
+
+    const secuencia = [];
+    if (fotos[0]) secuencia.push({ tipo: "foto", archivo: fotos[0] });
+    if (videos[0]) secuencia.push({ tipo: "video", archivo: videos[0] });
+
+    const apertura = String(respuestaBot?.apertura || "").trim();
+    let aperturaUsada = false;
+    let enviadosPresentacion = 0;
+
+    for (let i = 0; i < secuencia.length; i += 1) {
+      const item = secuencia[i];
+
       try {
-        const bufferArchivo = await readFile(archivo);
+        const caption =
+          !aperturaUsada && apertura && item.tipo !== "audio"
+            ? apertura
+            : undefined;
 
-        if (multimediaSolicitada === "foto") {
-          await sock.sendMessage(jidRespuesta, { image: bufferArchivo });
-        } else if (multimediaSolicitada === "video") {
-          await sock.sendMessage(jidRespuesta, { video: bufferArchivo });
-        } else if (multimediaSolicitada === "audio") {
-          const ruta = String(archivo).toLowerCase();
-          const mimetype = ruta.endsWith(".ogg")
-            ? "audio/ogg; codecs=opus"
-            : ruta.endsWith(".m4a") || ruta.endsWith(".mp4")
-              ? "audio/mp4"
-              : "audio/mpeg";
-
-          await sock.sendMessage(jidRespuesta, {
-            audio: bufferArchivo,
-            mimetype,
-            ptt: false,
-          });
-        }
-
-        console.log("MULTIMEDIA BOT ENVIADO:", {
-          clienteId,
-          producto: respuestaBot.producto,
-          tipo: multimediaSolicitada,
-          archivo,
+        await enviarMultimediaBot({
+          archivo: item.archivo,
+          tipo: item.tipo,
+          caption,
         });
+
+        if (caption) aperturaUsada = true;
+        enviadosPresentacion += 1;
+
+        if (i < secuencia.length - 1) {
+          await pausaMultimedia();
+        }
       } catch (error) {
         console.error(
-          "ERROR ENVIANDO MULTIMEDIA BOT:",
-          archivo,
+          "ERROR ENVIANDO PRESENTACION BOT:",
+          item.archivo,
           error?.message || error
         );
+      }
+    }
+
+    if (enviadosPresentacion > 0) {
+      await pool.query(
+        `
+        UPDATE clientes
+        SET bot_contexto = jsonb_set(
+              jsonb_set(
+                COALESCE(bot_contexto, '{}'::jsonb),
+                '{presentacion_enviada}',
+                'true'::jsonb,
+                true
+              ),
+              '{presentacion_enviada_at}',
+              to_jsonb(NOW()::text),
+              true
+            )
+        WHERE id = $1
+        `,
+        [clienteId]
+      );
+
+      console.log(
+        "PRESENTACION COMERCIAL BOT ENVIADA:",
+        clienteId,
+        respuestaBot.producto,
+        "ARCHIVOS:",
+        enviadosPresentacion
+      );
+
+      await pausaMultimedia();
+    }
+  } else {
+    const archivosMultimedia =
+      multimediaSolicitada !== "ninguno" && respuestaBot?.producto
+        ? obtenerMultimediaProducto(
+            respuestaBot.producto,
+            multimediaSolicitada
+          )
+        : [];
+
+    if (archivosMultimedia.length > 0) {
+      const limite = multimediaSolicitada === "foto" ? 2 : 1;
+
+      for (const archivo of archivosMultimedia.slice(0, limite)) {
+        try {
+          await enviarMultimediaBot({
+            archivo,
+            tipo: multimediaSolicitada,
+          });
+        } catch (error) {
+          console.error(
+            "ERROR ENVIANDO MULTIMEDIA BOT:",
+            archivo,
+            error?.message || error
+          );
+        }
       }
     }
   }

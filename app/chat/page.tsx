@@ -22,6 +22,10 @@ type Cliente = {
     ciudad?: string;
     adelanto_detectado?: number;
     precio_acordado?: number;
+    fase_venta?: string;
+    presentacion_enviada?: boolean;
+    llamar_ahora?: boolean;
+    motivo_llamada?: string;
   } | null;
   created_at: string;
   ultimo_mensaje?: string | null;
@@ -921,10 +925,22 @@ useEffect(() => {
     temaClaro ? "text-slate-900" : "text-white"
   }`}
 >
-      {cliente.temperatura === "caliente" ? `🔥 ${cliente.nombre || "Sin nombre"}` : (cliente.nombre || "Sin nombre")}
+      {cliente.bot_contexto?.llamar_ahora === true
+        ? `📞 ${cliente.nombre || "Sin nombre"}`
+        : cliente.temperatura === "caliente"
+          ? `🔥 ${cliente.nombre || "Sin nombre"}`
+          : (cliente.nombre || "Sin nombre")}
     </p>
 
-    {cliente.temperatura === "caliente" && <p className="text-xs font-bold text-orange-400 truncate">CALIENTE · {nombreProductoBot(cliente.bot_producto)} · {cliente.bot_contexto?.ciudad || cliente.ciudad || "Sin ciudad"}</p>}
+    {cliente.bot_contexto?.llamar_ahora === true ? (
+      <p className="text-xs font-black text-orange-400 truncate">
+        🔥 LLAMAR AHORA · {nombreProductoBot(cliente.bot_producto)} · {cliente.bot_contexto?.ciudad || cliente.ciudad || "Sin ciudad"}
+      </p>
+    ) : cliente.temperatura === "caliente" ? (
+      <p className="text-xs font-bold text-orange-400 truncate">
+        CALIENTE · {nombreProductoBot(cliente.bot_producto)} · {cliente.bot_contexto?.ciudad || cliente.ciudad || "Sin ciudad"}
+      </p>
+    ) : null}
 
     <p
   className={`text-sm truncate ${
@@ -1348,7 +1364,45 @@ useEffect(() => {
       : "bg-slate-900/60 border-slate-700"
   }`}
 >
-  <p
+    {clienteActivo.bot_contexto?.llamar_ahora === true && (
+    <div
+      className={`mb-3 rounded-xl border p-3 ${
+        temaClaro
+          ? "border-orange-300 bg-orange-50"
+          : "border-orange-500/40 bg-orange-500/10"
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <span className="text-lg leading-none">📞</span>
+        <div className="min-w-0">
+          <p
+            className={`text-xs font-black ${
+              temaClaro ? "text-orange-700" : "text-orange-300"
+            }`}
+          >
+            🔥 LLAMAR AHORA
+          </p>
+          <p
+            className={`mt-1 text-xs leading-relaxed ${
+              temaClaro ? "text-orange-800" : "text-orange-100"
+            }`}
+          >
+            {clienteActivo.bot_contexto?.motivo_llamada ||
+              "Oportunidad comercial detectada por el bot."}
+          </p>
+          <p
+            className={`mt-1 text-[11px] ${
+              temaClaro ? "text-orange-600" : "text-orange-300/80"
+            }`}
+          >
+            El bot sigue atendiendo. Esta alerta no significa que requiera closer.
+          </p>
+        </div>
+      </div>
+    </div>
+  )}
+
+<p
     className={`text-xs font-bold ${
       temaClaro ? "text-slate-900" : "text-white"
     }`}
