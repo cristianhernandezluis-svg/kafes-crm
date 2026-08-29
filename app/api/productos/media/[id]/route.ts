@@ -1,6 +1,5 @@
 import { Pool } from "pg";
 import { readFile } from "node:fs/promises";
-import path from "node:path";
 
 export const runtime = "nodejs";
 
@@ -8,12 +7,16 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-const STORAGE_DIR =
-  process.env.CATALOGO_STORAGE_DIR ||
-  path.join(process.cwd(), "storage", "catalogo");
+const STORAGE_DIR = String(
+  process.env.CATALOGO_STORAGE_DIR || "storage/catalogo"
+)
+  .replace(/\\/g, "/")
+  .replace(/\/+$/, "");
 
 function mimeDesdeRuta(ruta: string, tipo: string) {
-  const ext = path.extname(ruta || "").toLowerCase();
+  const rutaLimpia = String(ruta || "").toLowerCase().split("?")[0];
+  const punto = rutaLimpia.lastIndexOf(".");
+  const ext = punto >= 0 ? rutaLimpia.slice(punto) : "";
 
   const mapa: Record<string, string> = {
     ".jpg": "image/jpeg",
@@ -68,18 +71,25 @@ export async function GET(
     }
 
     const media = result.rows[0];
-    const rutaRelativa = String(media.url || "").replace(/^[/\\]+/, "");
-    const rutaAbsoluta = path.resolve(STORAGE_DIR, rutaRelativa);
-    const raizAbsoluta = path.resolve(STORAGE_DIR);
+    const rutaRelativa = String(media.url || "")
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+
+    const partesRuta = rutaRelativa
+      .split("/")
+      .filter((parte) => parte && parte !== ".");
 
     if (
-      rutaAbsoluta !== raizAbsoluta &&
-      !rutaAbsoluta.startsWith(raizAbsoluta + path.sep)
+      !rutaRelativa ||
+      rutaRelativa.includes("\\0") ||
+      partesRuta.some((parte) => parte === "..")
     ) {
       return new Response("Ruta inválida", { status: 400 });
     }
 
-    const buffer = await readFile(rutaAbsoluta);
+    const rutaSegura = partesRuta.join("/");
+    const rutaAbsoluta = `${STORAGE_DIR}/${rutaSegura}`;
+    const buffer = await readFile(/* turbopackIgnore: true */ rutaAbsoluta);
 
     return new Response(new Uint8Array(buffer), {
       status: 200,

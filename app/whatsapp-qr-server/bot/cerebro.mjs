@@ -86,7 +86,7 @@ function construirDatosPago(texto) {
   return `${nombres[metodo]}: ${valor}${titular}`;
 }
 
-function respuestaRespaldo(texto, memoria = {}) {
+async function respuestaRespaldo(texto, memoria = {}, empresaId = null) {
   const t = normalizar(texto);
 
   if (memoria.paso === "postventa") {
@@ -106,8 +106,8 @@ function respuestaRespaldo(texto, memoria = {}) {
   }
 
   const producto =
-    buscarProducto(texto) ||
-    buscarProductoPorSlug(memoria.producto);
+    (await buscarProducto(texto, empresaId)) ||
+    (await buscarProductoPorSlug(memoria.producto, empresaId));
 
   if (producto) {
     if (/\b(precio|cuanto|costo|vale)\b/.test(t)) {
@@ -153,6 +153,7 @@ export async function decidirRespuestaBot({
   calificacion,
   memoria = {},
   historial = [],
+  empresaId = null,
 }) {
   if (!texto || !texto.trim()) {
     return null;
@@ -163,10 +164,11 @@ export async function decidirRespuestaBot({
       mensaje: texto,
       memoria,
       historial,
+      empresaId,
     });
 
     if (!analisis) {
-      return respuestaRespaldo(texto, memoria);
+      return await respuestaRespaldo(texto, memoria, empresaId);
     }
 
     const contexto = {
@@ -282,6 +284,6 @@ const mensajeFinal = datosPago
       error?.message || error
     );
 
-    return respuestaRespaldo(texto, memoria);
+    return await respuestaRespaldo(texto, memoria, empresaId);
   }
 }

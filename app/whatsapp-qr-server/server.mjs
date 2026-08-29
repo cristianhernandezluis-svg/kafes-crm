@@ -1053,6 +1053,7 @@ async function procesarLoteBot(lote) {
     calificacion,
     memoria,
     historial,
+      empresaId: empresaQrId,
   });
 
   const analisisCRM = respuestaBot?.analisis || null;
@@ -1210,8 +1211,16 @@ async function procesarLoteBot(lote) {
     multimediaSolicitada === "presentacion" &&
     respuestaBot?.producto
   ) {
-    const fotos = obtenerMultimediaProducto(respuestaBot.producto, "foto");
-    const videos = obtenerMultimediaProducto(respuestaBot.producto, "video");
+    const fotos = await obtenerMultimediaProducto(
+      respuestaBot.producto,
+      "foto",
+      empresaQrId
+    );
+    const videos = await obtenerMultimediaProducto(
+      respuestaBot.producto,
+      "video",
+      empresaQrId
+    );
 
     const secuencia = [];
     if (fotos[0]) secuencia.push({ tipo: "foto", archivo: fotos[0] });
@@ -1284,9 +1293,10 @@ async function procesarLoteBot(lote) {
   } else {
     const archivosMultimedia =
       multimediaSolicitada !== "ninguno" && respuestaBot?.producto
-        ? obtenerMultimediaProducto(
+        ? await obtenerMultimediaProducto(
             respuestaBot.producto,
-            multimediaSolicitada
+            multimediaSolicitada,
+            empresaQrId
           )
         : [];
 

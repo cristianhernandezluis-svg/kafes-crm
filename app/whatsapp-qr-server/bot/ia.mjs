@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { PROMPT_VENDEDOR, PROMPT_POSTVENTA } from "./prompt.mjs";
 import { AnalisisVenta } from "./esquema.mjs";
-import { PRODUCTOS } from "./catalogo.mjs";
+import { obtenerCatalogoEmpresa } from "./catalogo.mjs";
 import { obtenerPoliticasComerciales } from "./politicas.mjs";
 
 const client = new OpenAI({
@@ -30,8 +30,8 @@ function obtenerFechaHoraPeru() {
   return `${valores.year}-${valores.month}-${valores.day}T${valores.hour}:${valores.minute}:${valores.second}-05:00`;
 }
 
-function prepararCatalogo() {
-  return PRODUCTOS.map((p) => ({
+function prepararCatalogo(productos = []) {
+  return productos.map((p) => ({
     slug: p.slug,
     nombre: p.nombre,
     aliases: p.aliases,
@@ -39,6 +39,12 @@ function prepararCatalogo() {
     precioAntes: p.precioAntes,
     descripcion: p.descripcion,
     beneficios: p.beneficios,
+    caracteristicas: p.caracteristicas || [],
+    usos: p.usos || [],
+    incluye: p.incluye || [],
+    garantia: p.garantia || null,
+    stock: p.stock ?? null,
+    promociones: p.promociones || [],
     multimediaDisponible: {
       fotos: Array.isArray(p.multimedia?.fotos) ? p.multimedia.fotos.length : 0,
       videos: Array.isArray(p.multimedia?.videos) ? p.multimedia.videos.length : 0,
@@ -64,6 +70,13 @@ export async function consultarIA(input) {
       ? input?.historial || []
       : [];
 
+  const empresaId =
+    typeof input === "object"
+      ? Number(input?.empresaId || input?.empresa_id || 0) || null
+      : null;
+
+  const catalogoEmpresa = await obtenerCatalogoEmpresa(empresaId);
+
   const venta = memoria?.venta || null;
 
   const datosPostventa = {
@@ -86,7 +99,7 @@ ${fechaHoraPeru}
 Zona horaria: America/Lima (UTC-05:00)
 
 CATALOGO REAL:
-${JSON.stringify(prepararCatalogo(), null, 2)}
+${JSON.stringify(prepararCatalogo(catalogoEmpresa), null, 2)}
 
 POLITICAS COMERCIALES REALES:
 ${JSON.stringify(obtenerPoliticasComerciales(), null, 2)}
