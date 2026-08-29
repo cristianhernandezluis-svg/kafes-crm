@@ -161,13 +161,31 @@ export async function decidirRespuestaBot({
   }
 
   try {
+    const textoNormalizado = String(texto || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+    const consultaGenericaProducto =
+      /^(precio|info|informacion|me interesa|hola|quiero saber|cuanto|cuanto cuesta|cuanto cuestan)(\s.*)?$/.test(textoNormalizado);
+
+    const memoriaParaIA =
+      consultaGenericaProducto && productoPrincipal
+        ? {
+            ...memoria,
+            producto: productoPrincipal,
+            paso: 'conversacion',
+          }
+        : memoria;
+
     const analisis = await consultarIA({
-  mensaje: texto,
-  memoria,
-  historial,
-  empresaId,
-  productoPrincipal,
-});
+      mensaje: texto,
+      memoria: memoriaParaIA,
+      historial,
+      empresaId,
+      productoPrincipal,
+    });
 
     if (!analisis) {
       return await respuestaRespaldo(texto, memoria, empresaId);
