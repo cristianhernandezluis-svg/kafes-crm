@@ -168,7 +168,7 @@ export async function decidirRespuestaBot({
       .trim();
 
     const consultaGenericaProducto =
-      /^(precio|info|informacion|me interesa|hola|quiero saber|cuanto|cuanto cuesta|cuanto cuestan)(\s.*)?$/.test(textoNormalizado);
+      /^(precio|info|informacion|me interesa|hola|quiero saber|cuanto|cuanto cuesta|cuanto cuestan)$/.test(textoNormalizado);
 
     const memoriaParaIA =
       consultaGenericaProducto && productoPrincipal
