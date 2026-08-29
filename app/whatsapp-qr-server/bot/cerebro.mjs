@@ -179,6 +179,8 @@ export async function decidirRespuestaBot({
           }
         : memoria;
 
+    console.log('DEBUG PRODUCTO PRINCIPAL:', { texto, productoPrincipal, consultaGenericaProducto, memoriaProducto: memoria?.producto, memoriaParaIAProducto: memoriaParaIA?.producto, memoriaPaso: memoria?.paso, memoriaParaIAPaso: memoriaParaIA?.paso });
+
     const analisis = await consultarIA({
       mensaje: texto,
       memoria: memoriaParaIA,
