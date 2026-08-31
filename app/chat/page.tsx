@@ -127,12 +127,23 @@ const cargarClientes = async () => {
   const qrId = qrData.whatsapp_qr_id;
 
   if (!qrId) {
-    setWhatsappQrId(null);
-    setClientes([]);
-    return;
-  }
+  setWhatsappQrId(null);
+  setClientes([]);
+  setClienteActivo(null);
+  setConversaciones([]);
+  setMostrarConversacion(false);
+  return;
+}
 
-  setWhatsappQrId(Number(qrId));
+  const nuevoQrId = Number(qrId);
+
+if (whatsappQrId !== null && whatsappQrId !== nuevoQrId) {
+  setClienteActivo(null);
+  setConversaciones([]);
+  setMostrarConversacion(false);
+}
+
+setWhatsappQrId(nuevoQrId);
   const res = await fetch(`/api/chats?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${qrId}`, {
     cache: "no-store",
   });
@@ -143,7 +154,7 @@ const cargarClientes = async () => {
     setClientes(data.chats);
     setClienteActivo((actual) => {
       if (!actual) return actual;
-      return data.chats.find((c: Cliente) => c.id === actual.id) || actual;
+      return data.chats.find((c: Cliente) => c.id === actual.id) || null;
     });
   }
 };

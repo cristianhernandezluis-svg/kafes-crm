@@ -61,6 +61,8 @@ let estado = "desconectado";
 let whatsappQrId = null;
 let empresaQrId = null;
 let productoQrSlug = null;
+let numeroWhatsappActual = null;
+let resolviendoCanalPromise = null;
 const telefonoPorLidHistorial = new Map();
 
 function estadoDesdeWAMessageStatus(status) {
@@ -179,20 +181,145 @@ async function actualizarEstadoMensajeWhatsApp(
 
 async function cargarIntegracionQr() {
   const key = process.env.WHATSAPP_SESSION_KEY;
-  if (!key) throw new Error("WHATSAPP_SESSION_KEY no configurado");
+
+  if (!key) {
+    throw new Error("WHATSAPP_SESSION_KEY no configurado");
+  }
+
   const r = await pool.query(
-  "SELECT id, empresa_id, producto_slug FROM integraciones_whatsapp_qr WHERE session_key=$1 LIMIT 1",
-  [key]
-);
-  if (!r.rows[0]) throw new Error("Integracion QR no encontrada");
-  whatsappQrId = r.rows[0].id;
+    `
+    SELECT
+      id,
+      empresa_id,
+      whatsapp_qr_id_activo
+    FROM whatsapp_qr_sesiones
+    WHERE session_key = $1
+    LIMIT 1
+    `,
+    [key]
+  );
+
+  if (!r.rows[0]) {
+    throw new Error("Sesion QR no encontrada");
+  }
+
   empresaQrId = r.rows[0].empresa_id;
-productoQrSlug = r.rows[0].producto_slug || null;
-  console.log("Integracion QR cargada:", {
-  whatsappQrId,
-  empresaQrId,
-  productoQrSlug,
-});
+
+  whatsappQrId = null;
+  productoQrSlug = null;
+  numeroWhatsappActual = null;
+
+  console.log("Sesion QR cargada:", {
+    sessionKey: key,
+    empresaQrId,
+    whatsappQrId,
+  });
+}
+
+async function resolverIntegracionPorNumero(numeroWhatsapp) {
+  if (!empresaQrId) {
+    throw new Error("empresaQrId no disponible");
+  }
+
+  if (!numeroWhatsapp) {
+    throw new Error("Numero de WhatsApp no disponible");
+  }
+
+  const existente = await pool.query(
+    `
+    SELECT id, empresa_id, numero_whatsapp, producto_slug
+    FROM integraciones_whatsapp_qr
+    WHERE empresa_id = $1
+      AND numero_whatsapp = $2
+    LIMIT 1
+    `,
+    [empresaQrId, numeroWhatsapp]
+  );
+
+  let integracion;
+
+  if (existente.rows[0]) {
+    integracion = existente.rows[0];
+  } else {
+    const creada = await pool.query(
+      `
+      INSERT INTO integraciones_whatsapp_qr (
+        empresa_id,
+        nombre,
+        numero_whatsapp,
+        session_key,
+        estado
+      )
+      VALUES ($1, $2, $3, NULL, 'conectado')
+      RETURNING id, empresa_id, numero_whatsapp, producto_slug
+      `,
+      [
+        empresaQrId,
+        `WhatsApp ${numeroWhatsapp}`,
+        numeroWhatsapp,
+      ]
+    );
+
+    integracion = creada.rows[0];
+  }
+
+  whatsappQrId = integracion.id;
+  productoQrSlug = integracion.producto_slug || null;
+
+  await pool.query(
+    `
+    UPDATE integraciones_whatsapp_qr
+    SET estado = 'conectado',
+        updated_at = NOW()
+    WHERE id = $1
+    `,
+    [whatsappQrId]
+  );
+
+  await pool.query(
+    `
+    UPDATE whatsapp_qr_sesiones
+    SET whatsapp_qr_id_activo = $1,
+        estado = 'conectado',
+        updated_at = NOW()
+    WHERE session_key = $2
+    `,
+    [whatsappQrId, process.env.WHATSAPP_SESSION_KEY]
+  );
+
+  console.log("CANAL WHATSAPP RESUELTO:", {
+    whatsappQrId,
+    empresaQrId,
+    numeroWhatsappActual,
+    productoQrSlug,
+  });
+
+  return integracion;
+}
+
+async function esperarCanalWhatsApp(timeoutMs = 5000) {
+  const inicio = Date.now();
+
+  while (!empresaQrId || !whatsappQrId) {
+    if (resolviendoCanalPromise) {
+      try {
+        await resolviendoCanalPromise;
+      } catch (error) {
+        console.error(
+          "ERROR ESPERANDO CANAL WHATSAPP:",
+          error?.message || error
+        );
+      }
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    if (Date.now() - inicio >= timeoutMs) {
+      break;
+    }
+  }
+
+  return Boolean(empresaQrId && whatsappQrId);
 }
 
 function normalizarTexto(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
@@ -1425,6 +1552,13 @@ async function iniciarWhatsApp() {
 sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages = [], lidPnMappings = [] }) => {
   console.log("Sincronizacion WhatsApp:", { contacts: contacts.length, chats: chats.length, messages: messages.length });
 
+const canalHistorialListo = await esperarCanalWhatsApp();
+
+if (!canalHistorialListo) {
+  console.log("HISTORIAL OMITIDO: canal WhatsApp no pudo resolverse");
+  return;
+}
+
   for (const m of lidPnMappings) {
     if (m?.lid && m?.pn) telefonoPorLidHistorial.set(m.lid, m.pn);
   }
@@ -1688,10 +1822,33 @@ sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages
     }
 
     if (connection === "open") {
-      estado = "conectado";
-      qrActual = null;
-      console.log("WhatsApp conectado");
-    }
+  const jidActual = String(sock?.user?.id || "");
+
+  numeroWhatsappActual =
+    jidActual
+      .split("@")[0]
+      .split(":")[0] || null;
+
+  console.log("WHATSAPP NUMERO ACTUAL:", numeroWhatsappActual);
+
+  resolviendoCanalPromise = resolverIntegracionPorNumero(numeroWhatsappActual);
+
+try {
+  await resolviendoCanalPromise;
+} finally {
+  resolviendoCanalPromise = null;
+}
+
+  estado = "conectado";
+  qrActual = null;
+
+  console.log("WhatsApp conectado:", {
+    numeroWhatsappActual,
+    whatsappQrId,
+    empresaQrId,
+    productoQrSlug,
+  });
+}
 
     if (connection === "close") {
       estado = "desconectado";
@@ -1771,6 +1928,12 @@ sock.ev.on("message-receipt.update", async (updates = []) => {
 sock.ev.on("messages.upsert", async ({ messages, type }) => {
   if (type !== "notify") {
     console.log("HISTORIAL IGNORADO:", type);
+    return;
+  }
+  const canalListo = await esperarCanalWhatsApp();
+
+  if (!canalListo) {
+    console.log("MENSAJE OMITIDO: canal WhatsApp no resuelto");
     return;
   }
     for (const msg of messages) {
@@ -2057,6 +2220,7 @@ app.get("/qr", (req, res) => {
     qr: qrActual,
     whatsapp_qr_id: whatsappQrId,
     empresa_id: empresaQrId,
+    numero_whatsapp: numeroWhatsappActual,
   });
 });
 
@@ -2076,8 +2240,34 @@ app.post("/desconectar", async (req, res) => {
 
     await limpiarSesionWhatsApp();
 
-    sock = null;
-    estado = "desconectado";
+if (whatsappQrId) {
+  await pool.query(
+    `
+    UPDATE integraciones_whatsapp_qr
+    SET estado = 'desconectado',
+        updated_at = NOW()
+    WHERE id = $1
+    `,
+    [whatsappQrId]
+  );
+}
+
+await pool.query(
+  `
+  UPDATE whatsapp_qr_sesiones
+  SET whatsapp_qr_id_activo = NULL,
+      estado = 'desconectado',
+      updated_at = NOW()
+  WHERE session_key = $1
+  `,
+  [process.env.WHATSAPP_SESSION_KEY]
+);
+
+sock = null;
+whatsappQrId = null;
+productoQrSlug = null;
+numeroWhatsappActual = null;
+estado = "desconectado";
 
     setTimeout(() => {
       iniciarWhatsApp().catch((error) => {
