@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import qrcode from "qrcode";
 import pg from "pg";
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile, readdir, rm, stat } from "node:fs/promises";
 import { decidirRespuestaBot } from "./bot/cerebro.mjs";
 import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
 import { obtenerHistorialReciente } from "./bot/historial.mjs";
@@ -1392,6 +1392,18 @@ const bufferMensajesBot = crearBufferMensajes({
   procesarLote: procesarLoteBot,
 });
 
+async function limpiarSesionWhatsApp() {
+  const AUTH_DIR = './auth';
+  const items = await readdir(AUTH_DIR, { withFileTypes: true }).catch(() => []);
+
+  for (const item of items) {
+    if (item.name === 'media') continue;
+    await rm(`${AUTH_DIR}/${item.name}`, { recursive: true, force: true });
+  }
+
+  console.log('Sesion WhatsApp limpiada');
+}
+
 async function iniciarWhatsApp() {
   const MEDIA_DIR = "./auth/media";
   await mkdir(MEDIA_DIR, { recursive: true });
@@ -2046,6 +2058,45 @@ app.get("/qr", (req, res) => {
     whatsapp_qr_id: whatsappQrId,
     empresa_id: empresaQrId,
   });
+});
+
+
+app.post("/desconectar", async (req, res) => {
+  try {
+    estado = "desconectando";
+    qrActual = null;
+
+    if (sock) {
+      try {
+        await sock.logout();
+      } catch (error) {
+        console.error("Error cerrando sesion WhatsApp:", error);
+      }
+    }
+
+    await limpiarSesionWhatsApp();
+
+    sock = null;
+    estado = "desconectado";
+
+    setTimeout(() => {
+      iniciarWhatsApp().catch((error) => {
+        console.error("Error reiniciando WhatsApp:", error);
+      });
+    }, 1000);
+
+    res.json({
+      success: true,
+      mensaje: "WhatsApp desconectado. Generando nuevo QR.",
+    });
+  } catch (error) {
+    console.error("Error desconectando WhatsApp:", error);
+
+    res.status(500).json({
+      success: false,
+      error: "No se pudo desconectar WhatsApp",
+    });
+  }
 });
 
 app.post("/sync-contacts", async (req, res) => {
