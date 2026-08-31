@@ -42,7 +42,19 @@ export async function GET(request: Request) {
         AND (
           $2::integer IS NULL
           OR ($3::boolean = true AND EXISTS (SELECT 1 FROM clientes_whatsapp_qr rel WHERE rel.cliente_id = clientes.id AND rel.empresa_id = $1 AND rel.whatsapp_qr_id = $2::integer))
-          OR ($3::boolean = false AND EXISTS (SELECT 1 FROM conversaciones conv WHERE conv.cliente_id = clientes.id AND conv.empresa_id = $1 AND conv.whatsapp_qr_id = $2::integer))
+          OR (
+  $3::boolean = false
+  AND EXISTS (
+    SELECT 1
+    FROM conversaciones conv
+    JOIN integraciones_whatsapp_qr iq
+      ON iq.id = $2::integer
+    WHERE conv.cliente_id = clientes.id
+      AND conv.empresa_id = $1
+      AND conv.whatsapp_qr_id = $2::integer
+      AND conv.created_at >= iq.created_at
+  )
+)
         )
       ORDER BY created_at DESC;
       `,
