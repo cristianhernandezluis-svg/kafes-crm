@@ -225,6 +225,19 @@ async function resolverIntegracionPorNumero(numeroWhatsapp) {
     throw new Error("Numero de WhatsApp no disponible");
   }
 
+const sesionAnterior = await pool.query(
+  `
+  SELECT whatsapp_qr_id_activo
+  FROM whatsapp_qr_sesiones
+  WHERE session_key = $1
+  LIMIT 1
+  `,
+  [process.env.WHATSAPP_SESSION_KEY]
+);
+
+const whatsappQrIdAnterior =
+  sesionAnterior.rows[0]?.whatsapp_qr_id_activo || null;
+
   const existente = await pool.query(
     `
     SELECT id, empresa_id, numero_whatsapp, producto_slug
@@ -265,6 +278,26 @@ async function resolverIntegracionPorNumero(numeroWhatsapp) {
 
   whatsappQrId = integracion.id;
   productoQrSlug = integracion.producto_slug || null;
+
+if (
+  whatsappQrIdAnterior &&
+  whatsappQrIdAnterior !== whatsappQrId
+) {
+  await pool.query(
+    `
+    UPDATE integraciones_whatsapp_qr
+    SET estado = 'desconectado',
+        updated_at = NOW()
+    WHERE id = $1
+    `,
+    [whatsappQrIdAnterior]
+  );
+
+  console.log("CANAL WHATSAPP ANTERIOR DESCONECTADO:", {
+    whatsappQrIdAnterior,
+    whatsappQrIdNuevo: whatsappQrId,
+  });
+}
 
   await pool.query(
     `
