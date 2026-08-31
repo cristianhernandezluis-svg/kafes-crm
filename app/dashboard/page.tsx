@@ -665,6 +665,10 @@ const barraTema = temaClaro
       🧩 Kanban
     </Link>
 
+    <Link href="/catalogo" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
+      {"\uD83D\uDCE6 Cat\u00e1logo IA"}
+    </Link>
+
     <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
       📄 Plantillas
     </Link>
