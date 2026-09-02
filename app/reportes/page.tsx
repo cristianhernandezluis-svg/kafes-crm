@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -22,7 +22,10 @@ export default function ReportesPage() {
   const cambiarTema = () => {
     setTemaClaro((actual) => {
       const nuevoTema = !actual;
-      localStorage.setItem("tema-crm", nuevoTema ? "claro" : "oscuro");
+      localStorage.setItem(
+        "tema-crm",
+        nuevoTema ? "claro" : "oscuro"
+      );
       return nuevoTema;
     });
   };
@@ -116,200 +119,290 @@ export default function ReportesPage() {
     });
 
   return (
-    <div className={`min-h-screen flex ${fondo}`}>
+    <div className={"min-h-screen flex " + fondo}>
+      {/* SIDEBAR_REPORTES_V2 */}
       <aside
-  className={`hidden lg:flex w-60 flex-col h-screen sticky top-0 border-r transition-colors duration-300 ${
-    temaClaro
-      ? "bg-white text-slate-800 border-slate-200"
-      : "bg-[#101820] text-white border-[#1f2a33]"
-  }`}
->
-  <div
-  className={`flex items-center gap-3 px-4 py-4 border-b ${
-    temaClaro ? "border-slate-200" : "border-[#1f2a33]"
-  }`}
->
-    <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
-      K
-    </div>
-    <h1 className="text-xl font-black">
-      Kafes <span className="text-green-400">CRM</span>
-    </h1>
-  </div>
+        className={
+          "hidden lg:flex w-60 flex-col h-screen sticky top-0 border-r transition-colors duration-300 " +
+          (temaClaro
+            ? "bg-white text-slate-800 border-slate-200"
+            : "bg-[#101820] text-white border-[#1f2a33]")
+        }
+      >
+        <div
+          className={
+            "flex items-center gap-3 px-4 py-4 border-b " +
+            (temaClaro ? "border-slate-200" : "border-[#1f2a33]")
+          }
+        >
+          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
+            K
+          </div>
 
-  <div className="px-4 pt-5 pb-2">
-    <p
-  className={`text-[11px] uppercase font-bold ${
-    temaClaro ? "text-slate-500" : "text-slate-400"
-  }`}
->
-  Principal
-</p>
-  </div>
-
-  <nav className="flex-1 px-2 space-y-1">
-    <Link href="/dashboard" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ðŸ“Š Dashboard
-    </Link>
-
-    <Link
-  href="/chat"
-  className={`flex items-center justify-between px-3 py-3 rounded-lg text-sm ${
-    temaClaro
-      ? "hover:bg-slate-100 text-slate-700"
-      : "hover:bg-slate-800 text-white"
-  }`}
->
-      <span className="flex items-center gap-3">ðŸ’¬ Conversaciones</span>
-    </Link>
-
-    <Link href="/contactos" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ðŸ‘¤ Contactos
-    </Link>
-
-    <Link href="/kanban" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ðŸ§© Kanban
-    </Link>
-
-    <Link href="/catalogo" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      {"\uD83D\uDCE6 Cat\u00e1logo IA"}
-    </Link>
-
-    <Link href="/plantillas" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      ðŸ“„ Plantillas
-    </Link>
-
-    <Link href="/automatizaciones" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      âš™ï¸ Automatizaciones
-    </Link>
-
-    <Link href="/reportes" className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm">
-      ðŸ“Š Reportes
-    </Link>
-
-    <Link href="/ajustes" className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800 text-sm">
-      âš™ï¸ Ajustes
-    </Link>
-  </nav>
-
-  <div className="p-3">
-    <div
-  className={`border rounded-xl p-4 transition-colors duration-300 ${
-    temaClaro
-      ? "border-slate-200 bg-slate-50"
-      : "border-[#26323d] bg-[#111c24]"
-  }`}
->
-      <p
-  className={`text-sm font-bold mb-3 ${
-    temaClaro ? "text-slate-700" : "text-slate-300"
-  }`}
->
-        ConexiÃ³n WhatsApp
-      </p>
-
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-xl">
-          ðŸŸ¢
+          <h1 className="text-xl font-black">
+            Kafes <span className="text-green-400">CRM</span>
+          </h1>
         </div>
 
-        <div>
-          <p className="text-green-400 font-bold text-sm">Conectado</p>
-          <p className="text-xs text-slate-400">Cloud API activa</p>
+        <div className="px-4 pt-5 pb-2">
+          <p
+            className={
+              "text-[11px] uppercase font-bold " +
+              (temaClaro ? "text-slate-500" : "text-slate-400")
+            }
+          >
+            Principal
+          </p>
         </div>
+
+        <nav className="flex-1 px-2 space-y-1">
+          <Link
+            href="/dashboard"
+            className={
+              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm " +
+              (temaClaro
+                ? "hover:bg-slate-100 text-slate-700"
+                : "hover:bg-slate-800 text-white")
+            }
+          >
+            {"\uD83D\uDCCA Dashboard"}
+          </Link>
+
+          <Link
+            href="/chat"
+            className={
+              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm " +
+              (temaClaro
+                ? "hover:bg-slate-100 text-slate-700"
+                : "hover:bg-slate-800 text-white")
+            }
+          >
+            {"\uD83D\uDCAC Conversaciones"}
+          </Link>
+
+          <Link
+            href="/contactos"
+            className={
+              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm " +
+              (temaClaro
+                ? "hover:bg-slate-100 text-slate-700"
+                : "hover:bg-slate-800 text-white")
+            }
+          >
+            {"\uD83D\uDC64 Contactos"}
+          </Link>
+
+          <Link
+            href="/kanban"
+            className={
+              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm " +
+              (temaClaro
+                ? "hover:bg-slate-100 text-slate-700"
+                : "hover:bg-slate-800 text-white")
+            }
+          >
+            {"\uD83E\uDDE9 Kanban"}
+          </Link>
+
+          <Link
+            href="/catalogo"
+            className={
+              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm " +
+              (temaClaro
+                ? "hover:bg-slate-100 text-slate-700"
+                : "hover:bg-slate-800 text-white")
+            }
+          >
+            {"\uD83D\uDCE6 Cat\u00e1logo IA"}
+          </Link>
+
+          <Link
+            href="/plantillas"
+            className={
+              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm " +
+              (temaClaro
+                ? "hover:bg-slate-100 text-slate-700"
+                : "hover:bg-slate-800 text-white")
+            }
+          >
+            {"\uD83D\uDCC4 Plantillas"}
+          </Link>
+
+          <Link
+            href="/automatizaciones"
+            className={
+              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm " +
+              (temaClaro
+                ? "hover:bg-slate-100 text-slate-700"
+                : "hover:bg-slate-800 text-white")
+            }
+          >
+            {"\u2699\uFE0F Automatizaciones"}
+          </Link>
+
+          <Link
+            href="/reportes"
+            className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm"
+          >
+            {"\uD83D\uDCCA Reportes"}
+          </Link>
+
+          <Link
+            href="/ajustes"
+            className={
+              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm " +
+              (temaClaro
+                ? "hover:bg-slate-100 text-slate-700"
+                : "hover:bg-slate-800 text-white")
+            }
+          >
+            {"\u2699\uFE0F Ajustes"}
+          </Link>
+        </nav>
+
+        <div className="p-3">
+          <div
+            className={
+              "border rounded-xl p-4 transition-colors duration-300 " +
+              (temaClaro
+                ? "border-slate-200 bg-slate-50"
+                : "border-[#26323d] bg-[#111c24]")
+            }
+          >
+            <p
+              className={
+                "text-sm font-bold mb-3 " +
+                (temaClaro ? "text-slate-700" : "text-slate-300")
+              }
+            >
+              Conexión WhatsApp
+            </p>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-xl">
+                {"\uD83D\uDFE2"}
+              </div>
+
+              <div>
+                <p className="text-green-400 font-bold text-sm">
+                  Conectado
+                </p>
+                <p className="text-xs text-slate-400">
+                  Canal activo
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/configuracion/whatsapp"
+              className="block w-full text-center border border-slate-700 rounded-lg py-2 text-xs font-bold hover:bg-slate-800"
+            >
+              VER QR
+            </Link>
+
+            <div
+              className={
+                "mt-3 pt-3 border-t " +
+                (temaClaro ? "border-slate-200" : "border-[#26323d]")
+              }
+            >
+              <button
+                type="button"
+                onClick={cambiarTema}
+                className="w-full flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">
+                    {temaClaro ? "\u2600\uFE0F" : "\uD83C\uDF19"}
+                  </span>
+
+                  <span
+                    className={
+                      "text-xs font-semibold " +
+                      (temaClaro ? "text-slate-700" : "text-slate-300")
+                    }
+                  >
+                    {temaClaro ? "Modo claro" : "Modo oscuro"}
+                  </span>
+                </div>
+
+                <div
+                  className={
+                    "relative w-10 h-5 rounded-full transition-all duration-300 " +
+                    (temaClaro ? "bg-green-500" : "bg-slate-600")
+                  }
+                >
+                  <div
+                    className={
+                      "absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300 " +
+                      (temaClaro ? "left-[22px]" : "left-0.5")
+                    }
+                  />
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            localStorage.removeItem("usuario");
+            window.location.href = "/login";
+          }}
+          className="px-4 pb-4 text-left text-slate-400 hover:text-red-400 text-sm"
+        >
+          {"\u21A9 Cerrar sesi\u00f3n"}
+        </button>
+      </aside>
+      <div className="flex-1 min-w-0">
+      <div
+        className={
+          "h-12 border-b flex items-center justify-between px-5 shrink-0 transition-colors duration-300 " +
+          (temaClaro
+            ? "bg-white border-slate-200"
+            : "bg-[#0b1218] border-[#1f2a33]")
+        }
+      >
+        <h1
+          className={
+            "text-sm font-bold " +
+            (temaClaro ? "text-slate-900" : "text-white")
+          }
+        >
+          Reportes
+        </h1>
+
+        <Link
+          href="/administracion"
+          className="flex items-center gap-2 hover:bg-slate-800 px-2 py-1 rounded-lg"
+        >
+          <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-black font-black">
+            C
+          </div>
+
+          <div>
+            <p
+              className={
+                "text-xs font-bold " +
+                (temaClaro ? "text-slate-900" : "text-white")
+              }
+            >
+              Administrador
+            </p>
+            <p className="text-[10px] text-green-400">
+              En línea
+            </p>
+          </div>
+        </Link>
       </div>
 
-      <Link
-        href="/configuracion/whatsapp"
-        className="block w-full text-center border border-slate-700 rounded-lg py-2 text-xs font-bold hover:bg-slate-800"
-      >
-        VER QR
-      </Link>
-<div
-  className={`mt-3 pt-3 border-t ${
-    temaClaro ? "border-slate-200" : "border-[#26323d]"
-  }`}
->
-  <button
-    type="button"
-    onClick={cambiarTema}
-    className="w-full flex items-center justify-between gap-3"
-  >
-    <div className="flex items-center gap-2">
-      <span className="text-base">
-        {temaClaro ? "â˜€ï¸" : "ðŸŒ™"}
-      </span>
-
-      <span className="text-xs font-semibold text-slate-300">
-        {temaClaro ? "Modo claro" : "Modo oscuro"}
-      </span>
-    </div>
-
-    <div
-      className={`relative w-10 h-5 rounded-full transition-all duration-300 ${
-        temaClaro ? "bg-green-500" : "bg-slate-600"
-      }`}
-    >
-      <div
-        className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300 ${
-          temaClaro ? "left-[22px]" : "left-0.5"
-        }`}
-      />
-    </div>
-  </button>
-</div>
-    </div>
-  </div>
-
-  <button
-    onClick={() => {
-      localStorage.removeItem("usuario");
-      window.location.href = "/login";
-    }}
-    className="px-4 pb-4 text-left text-slate-400 hover:text-red-400 text-sm"
-  >
-    â†© Cerrar sesiÃ³n
-  </button>
-</aside>
-      <div className="flex-1 min-w-0">
-      <header
-        className={`border-b ${
-          temaClaro
-            ? "bg-white border-slate-200"
-            : "bg-[#0b1218] border-[#1f2a33]"
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-black">
-              Kafes <span className="text-green-400">CRM</span>
-            </h1>
-            <p className={`text-xs ${secundario}`}>Reportes ecommerce</p>
-          </div>
-
-          <div className="flex gap-2">
-            <Link
-              href="/dashboard"
-              className="px-3 py-2 rounded-lg text-sm font-bold border border-slate-700"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/kanban"
-              className="px-3 py-2 rounded-lg text-sm font-bold border border-slate-700"
-            >
-              Kanban
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto p-4 md:p-6">
+      <main className="h-[calc(100vh-48px)] overflow-y-auto">
+        <div className="max-w-7xl mx-auto p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
           <div>
             <h2 className="text-3xl font-black">Rendimiento diario</h2>
             <p className={`${secundario} mt-1`}>
-              Conversaciones, pendientes, cierres, envÃ­os y entregas por dÃ­a.
+              Conversaciones, pendientes, cierres, envíos y entregas por día.
             </p>
           </div>
 
@@ -326,7 +419,7 @@ export default function ReportesPage() {
                     : "bg-[#0f172a] border-slate-700 text-slate-300"
                 }`}
               >
-                {valor} dÃ­as
+                {valor} días
               </button>
             ))}
           </div>
@@ -334,23 +427,23 @@ export default function ReportesPage() {
 
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
           <Tarjeta
-            titulo="Conversaciones del perÃ­odo"
+            titulo="Conversaciones del período"
             valor={resumen.conversaciones}
-            detalle={`Ãšltimos ${dias} dÃ­as`}
+            detalle={`Últimos ${dias} días`}
             panel={panel}
             secundario={secundario}
           />
           <Tarjeta
             titulo="Pendientes hoy"
-            valor={pendientesActuales === null ? "â€”" : pendientesActuales}
-            detalle="Conversaciones del dÃ­a sin cierre"
+            valor={pendientesActuales === null ? "—" : pendientesActuales}
+            detalle="Conversaciones del día sin cierre"
             panel={panel}
             secundario={secundario}
           />
           <Tarjeta
-            titulo="Cierres del perÃ­odo"
+            titulo="Cierres del período"
             valor={resumen.cierres}
-            detalle="PagÃ³ adelanto"
+            detalle="Pagó adelanto"
             panel={panel}
             secundario={secundario}
           />
@@ -362,16 +455,16 @@ export default function ReportesPage() {
             secundario={secundario}
           />
           <Tarjeta
-            titulo="Enviados del perÃ­odo"
+            titulo="Enviados del período"
             valor={resumen.enviados}
-            detalle={`Ãšltimos ${dias} dÃ­as`}
+            detalle={`Últimos ${dias} días`}
             panel={panel}
             secundario={secundario}
           />
           <Tarjeta
-            titulo="Entregados del perÃ­odo"
+            titulo="Entregados del período"
             valor={resumen.entregados}
-            detalle={`Ãšltimos ${dias} dÃ­as`}
+            detalle={`Últimos ${dias} días`}
             panel={panel}
             secundario={secundario}
           />
@@ -383,9 +476,9 @@ export default function ReportesPage() {
               temaClaro ? "border-slate-200" : "border-slate-800"
             }`}
           >
-            <h3 className="font-black">Historial por dÃ­a</h3>
+            <h3 className="font-black">Historial por día</h3>
             <p className={`text-xs mt-1 ${secundario}`}>
-              El cierre cuenta el dÃ­a en que el cliente pasÃ³ a â€œPagÃ³ Adelantoâ€.
+              El cierre cuenta el día en que el cliente pasó a “Pagó Adelanto”.
             </p>
           </div>
 
@@ -427,7 +520,7 @@ export default function ReportesPage() {
                       </td>
                       <td className="p-4 text-right">{fila.conversaciones}</td>
                       <td className="p-4 text-right">
-                        {fila.pendientes === null ? "â€”" : fila.pendientes}
+                        {fila.pendientes === null ? "—" : fila.pendientes}
                       </td>
                       <td className="p-4 text-right font-black text-green-400">
                         {fila.cierres}
@@ -444,11 +537,12 @@ export default function ReportesPage() {
 
         <p className={`text-xs mt-4 ${secundario}`}>
           Nota: el historial de etapas es confiable desde que activamos el
-          seguimiento histÃ³rico. En dÃ­as anteriores, â€œPendientesâ€ puede
-          mostrarse como â€”.
+          seguimiento histórico. En días anteriores, “Pendientes” puede
+          mostrarse como —.
         </p>
+        </div>
       </main>
-    </div>
+      </div>
     </div>
   );
 }
@@ -471,6 +565,6 @@ function Tarjeta({
       <p className={`text-sm font-bold ${secundario}`}>{titulo}</p>
       <p className="text-3xl font-black mt-2">{valor}</p>
       <p className={`text-xs mt-2 ${secundario}`}>{detalle}</p>
- </div>
+    </div>
   );
 }
