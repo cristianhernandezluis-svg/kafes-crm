@@ -12,7 +12,8 @@ function limpiarTelefono(telefono: string) {
 
 export async function POST(req: Request) {
   try {
-    const { cliente_id, telefono, mensaje } = await req.json();
+    const { cliente_id, whatsapp_qr_id, telefono, mensaje } = await req.json();
+    const whatsappQrId = Number(whatsapp_qr_id);
 
     if (!cliente_id || !telefono || !mensaje) {
       return NextResponse.json(
@@ -42,7 +43,31 @@ export async function POST(req: Request) {
 
     const empresaId = cliente.empresa_id;
 
-    const canal = cliente.canal || "cloud";
+    if (whatsappQrId) {
+      const relacionQr = await pool.query(
+        `
+        SELECT rel.id
+        FROM clientes_whatsapp_qr rel
+        JOIN integraciones_whatsapp_qr iq
+          ON iq.id = rel.whatsapp_qr_id
+         AND iq.empresa_id = rel.empresa_id
+        WHERE rel.cliente_id = $1
+          AND rel.empresa_id = $2
+          AND rel.whatsapp_qr_id = $3
+        LIMIT 1
+        `,
+        [cliente_id, empresaId, whatsappQrId]
+      );
+
+      if (relacionQr.rowCount === 0) {
+        return NextResponse.json(
+          { success: false, error: "El cliente no pertenece a este canal de WhatsApp" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const canal = whatsappQrId ? "qr" : cliente.canal || "cloud";
     const telefonoFinal = limpiarTelefono(telefono);
 
     let whatsappMessageId = null;
@@ -59,6 +84,7 @@ export async function POST(req: Request) {
         body: JSON.stringify({
           telefono: telefonoFinal,
           mensaje,
+          whatsapp_qr_id: whatsappQrId,
         }),
       });
 
@@ -132,21 +158,41 @@ export async function POST(req: Request) {
       whatsappMessageId = data.messages?.[0]?.id || null;
     }
 
-    await pool.query(
-      `
-      UPDATE clientes
-      SET bot_activo = false,
-          requiere_closer = false,
-          humano_hasta = NOW() + INTERVAL '90 seconds',
-          handoff_motivo = CASE
-            WHEN handoff_motivo = 'validar_pago' THEN 'validar_pago'
-            WHEN handoff_motivo IN ('pide_humano', 'bot_no_puede') THEN handoff_motivo
-            ELSE 'intervencion_manual'
-          END
-      WHERE id = $1
-      `,
-      [cliente_id]
-    );
+    if (whatsappQrId) {
+      await pool.query(
+        `
+        UPDATE clientes_whatsapp_qr
+        SET bot_activo = false,
+            requiere_closer = false,
+            humano_hasta = NOW() + INTERVAL '90 seconds',
+            handoff_motivo = CASE
+              WHEN handoff_motivo = 'validar_pago' THEN 'validar_pago'
+              WHEN handoff_motivo IN ('pide_humano', 'bot_no_puede') THEN handoff_motivo
+              ELSE 'intervencion_manual'
+            END,
+            updated_at = NOW()
+        WHERE cliente_id = $1
+          AND whatsapp_qr_id = $2
+        `,
+        [cliente_id, whatsappQrId]
+      );
+    } else {
+      await pool.query(
+        `
+        UPDATE clientes
+        SET bot_activo = false,
+            requiere_closer = false,
+            humano_hasta = NOW() + INTERVAL '90 seconds',
+            handoff_motivo = CASE
+              WHEN handoff_motivo = 'validar_pago' THEN 'validar_pago'
+              WHEN handoff_motivo IN ('pide_humano', 'bot_no_puede') THEN handoff_motivo
+              ELSE 'intervencion_manual'
+            END
+        WHERE id = $1
+        `,
+        [cliente_id]
+      );
+    }
 
     if (canal !== "qr") {
   await pool.query(

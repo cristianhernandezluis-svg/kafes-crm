@@ -5,6 +5,7 @@ const MAX_MENSAJES_IA = 10;
 export async function obtenerHistorialReciente(
   pool,
   clienteId,
+  whatsappQrId,
   antesDeId
 ) {
   const result = await pool.query(
@@ -12,15 +13,16 @@ export async function obtenerHistorialReciente(
     SELECT id, remitente, mensaje, media_analisis, created_at
     FROM conversaciones
     WHERE cliente_id = $1
-      AND id < $2
+      AND whatsapp_qr_id = $2
+      AND id < $3
       AND created_at >= NOW() - INTERVAL '24 hours'
       AND remitente IN ('cliente', 'bot', 'asesor')
       AND mensaje IS NOT NULL
       AND TRIM(mensaje) <> ''
     ORDER BY created_at DESC, id DESC
-    LIMIT $3
+    LIMIT $4
     `,
-    [clienteId, antesDeId, MAX_MENSAJES_BUSCADOS]
+    [clienteId, whatsappQrId, antesDeId, MAX_MENSAJES_BUSCADOS]
   );
 
   if (result.rows.length === 0) {

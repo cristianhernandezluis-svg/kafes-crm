@@ -6,6 +6,7 @@ import VerificarSuscripcion from "@/components/VerificarSuscripcion";
 
 type Cliente = {
   id: number;
+  whatsapp_qr_id?: number | null;
   nombre: string;
   telefono: string;
   ciudad: string | null;
@@ -22,7 +23,19 @@ export default function AdelantosPage() {
   const [cargando, setCargando] = useState(true);
 
   const cargarClientes = async () => {
-    const res = await fetch("/api/clientes", { cache: "no-store" });
+    const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+
+    const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
+    const qrData = await qrRes.json();
+    const whatsappQrId = qrData.whatsapp_qr_id;
+
+    if (!whatsappQrId) {
+      setClientes([]);
+      setCargando(false);
+      return;
+    }
+
+    const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}`, { cache: "no-store" });
     const data = await res.json();
 
     if (data.success) {
@@ -57,12 +70,17 @@ export default function AdelantosPage() {
   );
 
   const actualizarEtapa = async (cliente: Cliente, etapa: string) => {
+    const whatsappQrId = cliente.whatsapp_qr_id;
+
+    if (!whatsappQrId) return;
+
     const res = await fetch(`/api/clientes/${cliente.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         etapa,
         ultima_gestion: new Date().toISOString(),
+        whatsapp_qr_id: whatsappQrId,
       }),
     });
 

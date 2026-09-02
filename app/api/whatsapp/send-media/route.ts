@@ -26,6 +26,7 @@ export async function POST(req: Request) {
     const formData = await req.formData();
 
     const clienteId = formData.get("cliente_id") as string;
+    const whatsappQrId = Number(formData.get("whatsapp_qr_id"));
     const telefono = formData.get("telefono") as string;
     const archivo = formData.get("archivo") as File;
 
@@ -39,6 +40,102 @@ export async function POST(req: Request) {
 
     const telefonoFinal = limpiarTelefono(telefono);
     const tipo = detectarTipo(archivo.type);
+
+    const clienteResult = await pool.query(
+      `SELECT empresa_id, canal
+       FROM clientes
+       WHERE id = $1
+       LIMIT 1`,
+      [clienteId]
+    );
+
+    const cliente = clienteResult.rows[0];
+
+    if (!cliente?.empresa_id) {
+      return NextResponse.json(
+        { success: false, error: "Cliente sin empresa_id" },
+        { status: 400 }
+      );
+    }
+
+    const empresaId = cliente.empresa_id;
+
+    if (whatsappQrId) {
+      const relacionQr = await pool.query(
+        `SELECT rel.id
+         FROM clientes_whatsapp_qr rel
+         JOIN integraciones_whatsapp_qr iq
+           ON iq.id = rel.whatsapp_qr_id
+          AND iq.empresa_id = rel.empresa_id
+         WHERE rel.cliente_id = $1
+           AND rel.empresa_id = $2
+           AND rel.whatsapp_qr_id = $3
+         LIMIT 1`,
+        [clienteId, empresaId, whatsappQrId]
+      );
+
+      if (relacionQr.rowCount === 0) {
+        return NextResponse.json(
+          { success: false, error: "El cliente no pertenece a este canal de WhatsApp" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const canal = whatsappQrId ? "qr" : cliente.canal || "cloud";
+
+    if (canal === "qr") {
+      const qrUrl = process.env.WHATSAPP_QR_URL || "http://localhost:4001";
+      const bufferArchivo = Buffer.from(await archivo.arrayBuffer());
+
+      const response = await fetch(`${qrUrl}/send-media`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "x-telefono": telefonoFinal,
+          "x-cliente-id": String(clienteId),
+          "x-whatsapp-qr-id": String(whatsappQrId),
+          "x-mime-type": archivo.type || "application/octet-stream",
+          "x-filename": encodeURIComponent(archivo.name || "archivo"),
+        },
+        body: bufferArchivo,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        console.error("ERROR MEDIA WHATSAPP QR:", data);
+        return NextResponse.json(
+          { success: false, error: data },
+          { status: response.status || 500 }
+        );
+      }
+
+      await pool.query(
+        `UPDATE clientes_whatsapp_qr
+         SET bot_activo = false,
+             requiere_closer = false,
+             humano_hasta = NOW() + INTERVAL '90 seconds',
+             handoff_motivo = CASE
+               WHEN handoff_motivo = 'validar_pago' THEN 'validar_pago'
+               WHEN handoff_motivo IN ('pide_humano', 'bot_no_puede') THEN handoff_motivo
+               ELSE 'intervencion_manual'
+             END,
+             updated_at = NOW()
+         WHERE cliente_id = $1
+           AND whatsapp_qr_id = $2`,
+        [clienteId, whatsappQrId]
+      );
+
+
+      return NextResponse.json({
+        success: true,
+        canal: "qr",
+        tipo: data.tipo || tipo,
+        mediaId: data.mediaId || null,
+        data,
+      });
+    }
 
     const uploadForm = new FormData();
     uploadForm.append("messaging_product", "whatsapp");

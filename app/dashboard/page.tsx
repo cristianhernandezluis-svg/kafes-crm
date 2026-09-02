@@ -44,6 +44,7 @@ type Cliente = {
   ultima_gestion?: string | null;
   cantidad_seguimientos?: number;
   created_at: string;
+  whatsapp_qr_id?: number | null;
 };
 
 type Conversacion = {
@@ -277,7 +278,8 @@ setEditSeguimiento(
 setEditObservacion(cliente.observacion || "");
 
     try {
-      const res = await fetch(`/api/conversaciones/${cliente.id}`, {
+      if (!cliente.whatsapp_qr_id) return;
+      const res = await fetch(`/api/conversaciones/${cliente.id}?whatsapp_qr_id=${cliente.whatsapp_qr_id}`, {
         cache: "no-store",
       });
 
@@ -300,33 +302,6 @@ setEditObservacion(cliente.observacion || "");
 
     return () => clearInterval(intervalo);
   }, []);
-
-  const cambiarEtapa = async (id: number, nuevaEtapa: string) => {
-    try {
-      setClientes((prev) =>
-        prev.map((cliente) =>
-          cliente.id === id ? { ...cliente, etapa: nuevaEtapa } : cliente
-        )
-      );
-
-      const res = await fetch(`/api/clientes/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ etapa: nuevaEtapa }),
-      });
-
-      const data = await res.json();
-
-      if (!data.success) {
-        alert("No se pudo actualizar la etapa");
-        cargarClientes();
-      }
-    } catch (error) {
-      console.error("Error cambiando etapa:", error);
-      alert("Error cambiando etapa");
-      cargarClientes();
-    }
-  };
 
   const crearCliente = async () => {
     if (!form.nombre || !form.telefono) {
@@ -388,6 +363,7 @@ const guardarSeguimiento = async () => {
         observacion: observacionSeguimiento,
         ultima_gestion: new Date().toISOString(),
         etapa: "Seguimiento",
+        whatsapp_qr_id: clienteSeguimiento.whatsapp_qr_id,
       }),
     });
 
@@ -428,6 +404,7 @@ const guardarGestionCliente = async () => {
     observacion: editObservacion,
     proximo_seguimiento: editSeguimiento || null,
     ultima_gestion: new Date().toISOString(),
+    whatsapp_qr_id: clienteActivo.whatsapp_qr_id,
   }),
 });
 

@@ -6,6 +6,7 @@ import VerificarSuscripcion from "@/components/VerificarSuscripcion";
 
 type Cliente = {
   id: number;
+  whatsapp_qr_id?: number | null;
   nombre: string;
   telefono: string;
   ciudad: string | null;
@@ -30,6 +31,13 @@ const guardarNuevoSeguimiento = async () => {
   const nuevaCantidad =
     (clienteSeguimiento.cantidad_seguimientos || 0) + 1;
 
+  const whatsappQrId = clienteSeguimiento.whatsapp_qr_id;
+
+  if (!whatsappQrId) {
+    alert("No se encontro el canal de WhatsApp del cliente");
+    return;
+  }
+
   try {
     const res = await fetch(`/api/clientes/${clienteSeguimiento.id}`, {
       method: "PATCH",
@@ -39,6 +47,7 @@ const guardarNuevoSeguimiento = async () => {
         observacion: observacionSeguimiento,
         ultima_gestion: new Date().toISOString(),
         cantidad_seguimientos: nuevaCantidad,
+        whatsapp_qr_id: whatsappQrId,
         etapa: "Seguimiento",
       }),
     });
@@ -68,7 +77,18 @@ const [observacionSeguimiento, setObservacionSeguimiento] = useState("");
 
   const cargarClientes = async () => {
     try {
-      const res = await fetch("/api/clientes", { cache: "no-store" });
+      const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+
+      const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
+      const qrData = await qrRes.json();
+      const whatsappQrId = qrData.whatsapp_qr_id;
+
+      if (!whatsappQrId) {
+        setClientes([]);
+        return;
+      }
+
+      const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}`, { cache: "no-store" });
       const data = await res.json();
 
       if (data.success) {

@@ -1,14 +1,15 @@
-export async function obtenerMemoriaBot(pool,clienteId){
+export async function obtenerMemoriaBot(pool,clienteId,whatsappQrId){
   const r=await pool.query(
     `SELECT
        bot_producto,
        bot_paso,
        COALESCE(bot_contexto,'{}'::jsonb) AS bot_contexto,
        etapa
-     FROM clientes
-     WHERE id=$1
+     FROM clientes_whatsapp_qr
+     WHERE cliente_id=$1
+       AND whatsapp_qr_id=$2
      LIMIT 1`,
-    [clienteId]
+    [clienteId, whatsappQrId]
   );
 
   if(!r.rows[0]){
@@ -36,9 +37,10 @@ export async function obtenerMemoriaBot(pool,clienteId){
        updated_at
      FROM ventas
      WHERE cliente_id=$1
+       AND whatsapp_qr_id=$2
      ORDER BY id DESC
      LIMIT 1`,
-    [clienteId]
+    [clienteId, whatsappQrId]
   );
 
   const filaVenta=vr.rows[0]||null;
@@ -75,19 +77,23 @@ export async function obtenerMemoriaBot(pool,clienteId){
 export async function guardarMemoriaBot(
   pool,
   clienteId,
+  whatsappQrId,
   {producto,paso,contexto}={}
 ){
   await pool.query(
-    `UPDATE clientes
+    `UPDATE clientes_whatsapp_qr
      SET bot_producto=COALESCE($1,bot_producto),
          bot_paso=COALESCE($2,bot_paso),
-         bot_contexto=COALESCE($3::jsonb,bot_contexto)
-     WHERE id=$4`,
+         bot_contexto=COALESCE($3::jsonb,bot_contexto),
+         updated_at=NOW()
+     WHERE cliente_id=$4
+       AND whatsapp_qr_id=$5`,
     [
       producto??null,
       paso??null,
       contexto!==undefined?JSON.stringify(contexto):null,
-      clienteId
+      clienteId,
+      whatsappQrId
     ]
   );
 
@@ -101,13 +107,15 @@ export async function guardarMemoriaBot(
   }
 }
 
-export async function limpiarMemoriaBot(pool,clienteId){
+export async function limpiarMemoriaBot(pool,clienteId,whatsappQrId){
   await pool.query(
-    `UPDATE clientes
+    `UPDATE clientes_whatsapp_qr
      SET bot_producto=NULL,
          bot_paso=NULL,
-         bot_contexto='{}'::jsonb
-     WHERE id=$1`,
-    [clienteId]
+         bot_contexto='{}'::jsonb,
+         updated_at=NOW()
+     WHERE cliente_id=$1
+       AND whatsapp_qr_id=$2`,
+    [clienteId, whatsappQrId]
   );
 }

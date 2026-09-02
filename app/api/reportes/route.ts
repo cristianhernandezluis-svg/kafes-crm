@@ -38,6 +38,7 @@ export async function GET(request: Request) {
         SELECT MIN((created_at AT TIME ZONE 'America/Lima')::date) AS fecha_inicio
         FROM historial_etapas
         WHERE empresa_id = $1
+          AND whatsapp_qr_id = $2
           AND es_baseline = true
       ),
       conversaciones_por_dia AS (
@@ -71,13 +72,7 @@ export async function GET(request: Request) {
           )::int AS entregados
         FROM historial_etapas h
         WHERE h.empresa_id = $1
-          AND EXISTS (
-            SELECT 1
-            FROM clientes_whatsapp_qr rel
-            WHERE rel.empresa_id = h.empresa_id
-              AND rel.cliente_id = h.cliente_id
-              AND rel.whatsapp_qr_id = $2
-          )
+          AND h.whatsapp_qr_id = $2
         GROUP BY 1
       )
       SELECT
@@ -92,6 +87,7 @@ export async function GET(request: Request) {
               SELECT h.etapa_nueva
               FROM historial_etapas h
               WHERE h.empresa_id = $1
+                AND h.whatsapp_qr_id = $2
                 AND h.cliente_id = c2.cliente_id
                 AND (h.created_at AT TIME ZONE 'America/Lima') < (f.fecha + 1)
               ORDER BY h.created_at DESC

@@ -14,6 +14,7 @@ type Cliente = {
   canal?: string | null;
   requiere_closer?: boolean;
   handoff_motivo?: string | null;
+  whatsapp_qr_id?: number | null;
 };
 
 const etapas = [
@@ -93,7 +94,7 @@ useEffect(() => {
     await fetch(`/api/clientes/${cliente.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ etapa: nuevaEtapa }),
+      body: JSON.stringify({ etapa: nuevaEtapa, whatsapp_qr_id: cliente.whatsapp_qr_id }),
     });
 
     cargarClientes();

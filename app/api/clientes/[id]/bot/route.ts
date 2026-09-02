@@ -11,15 +11,28 @@ export async function PATCH(
 ) {
   try {
     const { id } = await context.params;
+    const body = await request.json();
+    const whatsappQrId = Number(body.whatsapp_qr_id);
+
+    if (!whatsappQrId) {
+      return NextResponse.json(
+        { success: false, error: "Canal de WhatsApp no valido" },
+        { status: 400 }
+      );
+    }
 
     const actual = await pool.query(
-      `SELECT id, etapa FROM clientes WHERE id = $1 LIMIT 1`,
-      [id]
+      `SELECT id, etapa
+       FROM clientes_whatsapp_qr
+       WHERE cliente_id = $1
+         AND whatsapp_qr_id = $2
+       LIMIT 1`,
+      [id, whatsappQrId]
     );
 
     if (!actual.rows[0]) {
       return NextResponse.json(
-        { success: false, error: "Cliente no encontrado" },
+        { success: false, error: "Cliente no encontrado en este canal" },
         { status: 404 }
       );
     }
@@ -39,14 +52,16 @@ export async function PATCH(
 
     const result = await pool.query(
       `
-      UPDATE clientes
+      UPDATE clientes_whatsapp_qr
       SET bot_activo = true,
           requiere_closer = false,
-          bot_paso = 'postventa'
-      WHERE id = $1
+          bot_paso = 'postventa',
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
       RETURNING *
       `,
-      [id]
+      [id, whatsappQrId]
     );
 
     return NextResponse.json({

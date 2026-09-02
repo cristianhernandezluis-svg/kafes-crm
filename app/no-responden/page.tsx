@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 type Cliente = {
   id: number;
+  whatsapp_qr_id?: number | null;
   nombre: string;
   telefono: string;
   ciudad: string;
@@ -21,7 +22,17 @@ export default function NoRespondenPage() {
   async function cargarClientes() {
     const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
 
-    const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}`, {
+    const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
+    const qrData = await qrRes.json();
+    const whatsappQrId = qrData.whatsapp_qr_id;
+
+    if (!whatsappQrId) {
+      setClientes([]);
+      setActivo(null);
+      return;
+    }
+
+    const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}`, {
       cache: "no-store",
     });
 
@@ -41,10 +52,15 @@ export default function NoRespondenPage() {
   }
 
   async function cambiarEtapa(id: number, etapa: string) {
+    const cliente = clientes.find((c) => c.id === id);
+    const whatsappQrId = cliente?.whatsapp_qr_id;
+
+    if (!whatsappQrId) return;
+
     await fetch(`/api/clientes/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ etapa }),
+      body: JSON.stringify({ etapa, whatsapp_qr_id: whatsappQrId }),
     });
 
     await cargarClientes();

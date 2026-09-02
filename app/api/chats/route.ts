@@ -27,15 +27,15 @@ export async function GET(request: Request) {
         c.nombre,
         c.telefono,
         c.ciudad,
-        c.etapa,
-        c.asesor,
-        c.score,
-        c.temperatura,
-        c.bot_activo,
-        c.requiere_closer,
-        c.bot_producto,
-        c.bot_paso,
-        c.bot_contexto,
+        COALESCE(rel.etapa, 'Nuevo') AS etapa,
+        rel.asesor AS asesor,
+        COALESCE(rel.score, 0) AS score,
+        COALESCE(rel.temperatura, 'frio') AS temperatura,
+        COALESCE(rel.bot_activo, true) AS bot_activo,
+        COALESCE(rel.requiere_closer, false) AS requiere_closer,
+        rel.bot_producto AS bot_producto,
+        rel.bot_paso AS bot_paso,
+        COALESCE(rel.bot_contexto, '{}'::jsonb) AS bot_contexto,
         c.created_at,
 
         ult.mensaje AS ultimo_mensaje,
@@ -45,6 +45,11 @@ export async function GET(request: Request) {
         COALESCE(no_leidos.total, 0) AS no_leidos
 
       FROM clientes c
+
+      LEFT JOIN clientes_whatsapp_qr rel
+        ON rel.cliente_id = c.id
+       AND rel.empresa_id = c.empresa_id
+       AND rel.whatsapp_qr_id = $2
 
       LEFT JOIN LATERAL (
         SELECT mensaje, tipo, created_at
@@ -98,13 +103,15 @@ export async function PATCH(req: Request) {
     if (accion === 'liberar') {
       await pool.query(
         `
-        UPDATE clientes
+        UPDATE clientes_whatsapp_qr
         SET bot_activo = true,
-            humano_hasta = NULL
-        WHERE id = $1
+            humano_hasta = NULL,
+            updated_at = NOW()
+        WHERE cliente_id = $1
+          AND whatsapp_qr_id = $2
           AND humano_hasta IS NOT NULL
         `,
-        [cliente_id]
+        [cliente_id, whatsapp_qr_id]
       );
 
       return NextResponse.json({ success: true, liberado: true });
@@ -124,13 +131,15 @@ export async function PATCH(req: Request) {
 
     await pool.query(
       `
-      UPDATE clientes
+      UPDATE clientes_whatsapp_qr
       SET bot_activo = false,
           requiere_closer = false,
-          humano_hasta = NOW() + INTERVAL '90 seconds'
-      WHERE id = $1
+          humano_hasta = NOW() + INTERVAL '90 seconds',
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
       `,
-      [cliente_id]
+      [cliente_id, whatsapp_qr_id]
     );
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -59,13 +59,7 @@ export async function GET(request: Request) {
               h.etapa_nueva = 'PagÃ³ Adelanto'
               AND h.es_baseline = false
               AND (h.created_at AT TIME ZONE 'America/Lima')::date = f.hoy
-              AND EXISTS (
-                SELECT 1
-                FROM clientes_whatsapp_qr rel
-                WHERE rel.empresa_id = h.empresa_id
-                  AND rel.cliente_id = h.cliente_id
-                  AND rel.whatsapp_qr_id = $2
-              )
+              AND h.whatsapp_qr_id = $2
           )::int AS cierres_hoy,
 
           COUNT(DISTINCT h.cliente_id) FILTER (
@@ -73,17 +67,12 @@ export async function GET(request: Request) {
               h.etapa_nueva = 'PagÃ³ Adelanto'
               AND h.es_baseline = false
               AND (h.created_at AT TIME ZONE 'America/Lima')::date = f.hoy - 1
-              AND EXISTS (
-                SELECT 1
-                FROM clientes_whatsapp_qr rel
-                WHERE rel.empresa_id = h.empresa_id
-                  AND rel.cliente_id = h.cliente_id
-                  AND rel.whatsapp_qr_id = $2
-              )
+              AND h.whatsapp_qr_id = $2
           )::int AS cierres_ayer
         FROM historial_etapas h
         CROSS JOIN fechas f
         WHERE h.empresa_id = $1
+          AND h.whatsapp_qr_id = $2
       )
       SELECT
         c.conversaciones_hoy,

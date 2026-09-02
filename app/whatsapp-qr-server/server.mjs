@@ -26,6 +26,8 @@ function extensionMedia(mime = "") {
   return mapa[tipo] || tipo.split("/")[1] || "bin";
 }
 
+const MEDIA_DIR = "./auth/media";
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -478,25 +480,27 @@ function calificarMensajeCliente(texto){const t=normalizarTexto(texto);const sen
 
 const PESOS_SENALES={precio:5,envio:10,ubicacion:10,garantia:5,pago:30,intencion_compra:60,urgencia:10};
 
-async function actualizarCalificacionCliente(clienteId,texto){
+async function actualizarCalificacionCliente(clienteId,whatsappQrId,texto){
   const detectado=calificarMensajeCliente(texto);
 
   await pool.query(
-    `UPDATE clientes
-     SET bot_activo=true, humano_hasta=NULL
-     WHERE id=$1
+    `UPDATE clientes_whatsapp_qr
+     SET bot_activo=true, humano_hasta=NULL, updated_at=NOW()
+     WHERE cliente_id=$1
+       AND whatsapp_qr_id=$2
        AND bot_activo=false
        AND (humano_hasta IS NULL OR humano_hasta <= NOW())`
-,    [clienteId]
+,    [clienteId,whatsappQrId]
   );
 
   const r=await pool.query(
     `SELECT COALESCE(bot_senales,'[]'::jsonb) AS bot_senales,
             COALESCE(bot_activo,true) AS bot_activo
-     FROM clientes
-     WHERE id=$1
+     FROM clientes_whatsapp_qr
+     WHERE cliente_id=$1
+       AND whatsapp_qr_id=$2
      LIMIT 1`,
-    [clienteId]
+    [clienteId,whatsappQrId]
   );
 
   if(!r.rows[0] || r.rows[0].bot_activo===false) return null;
@@ -507,10 +511,11 @@ async function actualizarCalificacionCliente(clienteId,texto){
   const temperatura=score>=80?'caliente':score>=25?'tibio':'frio';
 
   await pool.query(
-    `UPDATE clientes
-     SET bot_senales=$1::jsonb, score=$2, temperatura=$3
-     WHERE id=$4`,
-    [JSON.stringify(senales),score,temperatura,clienteId]
+    `UPDATE clientes_whatsapp_qr
+     SET bot_senales=$1::jsonb, score=$2, temperatura=$3, updated_at=NOW()
+     WHERE cliente_id=$4
+       AND whatsapp_qr_id=$5`,
+    [JSON.stringify(senales),score,temperatura,clienteId,whatsappQrId]
   );
 
   return {senales,score,temperatura,requiereCloser:false};
@@ -540,10 +545,10 @@ function fechaDesdeAhora(ms) {
   return new Date(Date.now() + ms);
 }
 
-async function cancelarSeguimientoSilencio(clienteId) {
+async function cancelarSeguimientoSilencio(clienteId, whatsappQrId) {
   await pool.query(
     `
-    UPDATE clientes
+    UPDATE clientes_whatsapp_qr
     SET proximo_seguimiento = CASE
           WHEN COALESCE(bot_contexto->>'seguimiento_silencio_activo', 'false') = 'true'
             OR COALESCE(bot_contexto->>'seguimiento_explicito_activo', 'false') = 'true'
@@ -557,9 +562,10 @@ async function cancelarSeguimientoSilencio(clienteId) {
             'seguimiento_explicito_activo', false,
             'seguimiento_explicito_para', NULL
           )
-    WHERE id = $1
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $2
     `,
-    [clienteId]
+    [clienteId, whatsappQrId]
   );
 }
 
@@ -588,11 +594,12 @@ function resolverFechaSeguimientoExplicito(analisisCRM) {
 
 async function programarSeguimientoExplicito({
   clienteId,
+  whatsappQrId,
   analisisCRM,
   requiereCloserIA,
 }) {
   if (requiereCloserIA === true) {
-    await cancelarSeguimientoSilencio(clienteId);
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
     return;
   }
 
@@ -601,7 +608,7 @@ async function programarSeguimientoExplicito({
 
   const result = await pool.query(
     `
-    UPDATE clientes
+    UPDATE clientes_whatsapp_qr
     SET etapa = CASE
           WHEN etapa IN ('Nuevo', 'Interesado', 'Calificado', 'Seguimiento')
           THEN 'Seguimiento'
@@ -614,8 +621,10 @@ async function programarSeguimientoExplicito({
             'seguimiento_silencio_intento', 0,
             'seguimiento_explicito_activo', true,
             'seguimiento_explicito_para', NULLIF($3, '')
-          )
-    WHERE id = $1
+          ),
+        updated_at = NOW()
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $4
       AND bot_activo = true
       AND COALESCE(requiere_closer, false) = false
       AND etapa NOT IN (
@@ -627,7 +636,7 @@ async function programarSeguimientoExplicito({
       )
     RETURNING id
     `,
-    [clienteId, fecha, seguimientoPara]
+    [clienteId, fecha, seguimientoPara, whatsappQrId]
   );
 
   if (result.rowCount > 0) {
@@ -661,8 +670,8 @@ async function procesarSeguimientosExplicitos() {
       SELECT
         c.id,
         c.telefono,
-        c.etapa,
-        c.bot_contexto->>'seguimiento_explicito_para' AS seguimiento_para,
+        cwq.etapa,
+        cwq.bot_contexto->>'seguimiento_explicito_para' AS seguimiento_para,
         ult.remitente AS ultimo_remitente
       FROM clientes c
       JOIN clientes_whatsapp_qr cwq
@@ -678,20 +687,20 @@ async function procesarSeguimientosExplicitos() {
         LIMIT 1
       ) ult ON true
       WHERE c.empresa_id = $1
-        AND c.proximo_seguimiento IS NOT NULL
-        AND c.proximo_seguimiento <= NOW()
-        AND COALESCE(c.bot_contexto->>'seguimiento_explicito_activo', 'false') = 'true'
-        AND c.bot_activo = true
-        AND COALESCE(c.requiere_closer, false) = false
-        AND (c.humano_hasta IS NULL OR c.humano_hasta <= NOW())
-        AND c.etapa NOT IN (
+        AND cwq.proximo_seguimiento IS NOT NULL
+        AND cwq.proximo_seguimiento <= NOW()
+        AND COALESCE(cwq.bot_contexto->>'seguimiento_explicito_activo', 'false') = 'true'
+        AND cwq.bot_activo = true
+        AND COALESCE(cwq.requiere_closer, false) = false
+        AND (cwq.humano_hasta IS NULL OR cwq.humano_hasta <= NOW())
+        AND cwq.etapa NOT IN (
           'Pago por validar',
           'Pagó Adelanto',
           'Enviado',
           'Entregado',
           'Descartado'
         )
-      ORDER BY c.proximo_seguimiento ASC
+      ORDER BY cwq.proximo_seguimiento ASC
       LIMIT 20
       `,
       [empresaQrId, whatsappQrId]
@@ -703,12 +712,12 @@ async function procesarSeguimientosExplicitos() {
         const telefono = String(cliente.telefono || "").replace(/\D/g, "");
 
         if (!clienteId || !telefono) {
-          if (clienteId) await cancelarSeguimientoSilencio(clienteId);
+          if (clienteId) await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
           continue;
         }
 
         if (cliente.ultimo_remitente !== "bot") {
-          await cancelarSeguimientoSilencio(clienteId);
+          await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
           console.log(
             "SEGUIMIENTO EXPLICITO CANCELADO POR NUEVA INTERACCION:",
             clienteId,
@@ -759,7 +768,7 @@ async function procesarSeguimientosExplicitos() {
 
         await pool.query(
           `
-          UPDATE clientes
+          UPDATE clientes_whatsapp_qr
           SET proximo_seguimiento = $2,
               cantidad_seguimientos = COALESCE(cantidad_seguimientos, 0) + 1,
               bot_contexto = COALESCE(bot_contexto, '{}'::jsonb) ||
@@ -768,10 +777,12 @@ async function procesarSeguimientosExplicitos() {
                   'seguimiento_explicito_para', NULL,
                   'seguimiento_silencio_activo', true,
                   'seguimiento_silencio_intento', 0
-                )
-          WHERE id = $1
+                ),
+              updated_at = NOW()
+          WHERE cliente_id = $1
+            AND whatsapp_qr_id = $3
           `,
-          [clienteId, siguienteSilencio]
+          [clienteId, siguienteSilencio, whatsappQrId]
         );
 
         console.log(
@@ -800,12 +811,14 @@ async function procesarSeguimientosExplicitos() {
 
 async function programarSeguimientoSilencio({
   clienteId,
+  whatsappQrId,
   analisisCRM,
   requiereCloserIA,
 }) {
   if (analisisCRM?.seguimiento === true) {
     await programarSeguimientoExplicito({
       clienteId,
+      whatsappQrId,
       analisisCRM,
       requiereCloserIA,
     });
@@ -813,7 +826,7 @@ async function programarSeguimientoSilencio({
   }
 
   if (requiereCloserIA === true) {
-    await cancelarSeguimientoSilencio(clienteId);
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
     return;
   }
 
@@ -821,7 +834,7 @@ async function programarSeguimientoSilencio({
 
   const result = await pool.query(
     `
-    UPDATE clientes
+    UPDATE clientes_whatsapp_qr
     SET proximo_seguimiento = $2,
         bot_contexto = jsonb_set(
           jsonb_set(
@@ -833,8 +846,10 @@ async function programarSeguimientoSilencio({
           '{seguimiento_silencio_intento}',
           '0'::jsonb,
           true
-        )
-    WHERE id = $1
+        ),
+        updated_at = NOW()
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $3
       AND bot_activo = true
       AND COALESCE(requiere_closer, false) = false
       AND etapa NOT IN (
@@ -846,7 +861,7 @@ async function programarSeguimientoSilencio({
       )
     RETURNING id
     `,
-    [clienteId, proximaFecha]
+    [clienteId, proximaFecha, whatsappQrId]
   );
 
   if (result.rowCount > 0) {
@@ -882,10 +897,10 @@ async function procesarSeguimientosSilencio() {
       SELECT
         c.id,
         c.telefono,
-        c.etapa,
+        cwq.etapa,
         CASE
-          WHEN COALESCE(c.bot_contexto->>'seguimiento_silencio_intento', '') ~ '^[0-9]+$'
-          THEN (c.bot_contexto->>'seguimiento_silencio_intento')::int
+          WHEN COALESCE(cwq.bot_contexto->>'seguimiento_silencio_intento', '') ~ '^[0-9]+$'
+          THEN (cwq.bot_contexto->>'seguimiento_silencio_intento')::int
           ELSE 0
         END AS intento,
         ult.remitente AS ultimo_remitente,
@@ -912,20 +927,20 @@ async function procesarSeguimientosSilencio() {
         LIMIT 1
       ) ult ON true
       WHERE c.empresa_id = $1
-        AND c.proximo_seguimiento IS NOT NULL
-        AND c.proximo_seguimiento <= NOW()
-        AND COALESCE(c.bot_contexto->>'seguimiento_silencio_activo', 'false') = 'true'
-        AND c.bot_activo = true
-        AND COALESCE(c.requiere_closer, false) = false
-        AND (c.humano_hasta IS NULL OR c.humano_hasta <= NOW())
-        AND c.etapa NOT IN (
+        AND cwq.proximo_seguimiento IS NOT NULL
+        AND cwq.proximo_seguimiento <= NOW()
+        AND COALESCE(cwq.bot_contexto->>'seguimiento_silencio_activo', 'false') = 'true'
+        AND cwq.bot_activo = true
+        AND COALESCE(cwq.requiere_closer, false) = false
+        AND (cwq.humano_hasta IS NULL OR cwq.humano_hasta <= NOW())
+        AND cwq.etapa NOT IN (
           'Pago por validar',
           'Pagó Adelanto',
           'Enviado',
           'Entregado',
           'Descartado'
         )
-      ORDER BY c.proximo_seguimiento ASC
+      ORDER BY cwq.proximo_seguimiento ASC
       LIMIT 20
       `,
       [empresaQrId, whatsappQrId]
@@ -938,12 +953,12 @@ async function procesarSeguimientosSilencio() {
         const intento = Number(cliente.intento || 0);
 
         if (!clienteId || !telefono) {
-          if (clienteId) await cancelarSeguimientoSilencio(clienteId);
+          if (clienteId) await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
           continue;
         }
 
         if (cliente.ultimo_remitente !== "bot") {
-          await cancelarSeguimientoSilencio(clienteId);
+          await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
           console.log(
             "SEGUIMIENTO SILENCIO CANCELADO POR NUEVA INTERACCION:",
             clienteId,
@@ -1011,15 +1026,17 @@ async function procesarSeguimientosSilencio() {
 
             await pool.query(
               `
-              UPDATE clientes
-              SET proximo_seguimiento = $2
-              WHERE id = $1
+              UPDATE clientes_whatsapp_qr
+              SET proximo_seguimiento = $2,
+                  updated_at = NOW()
+              WHERE cliente_id = $1
+                AND whatsapp_qr_id = $3
                 AND COALESCE(
                   bot_contexto->>'seguimiento_silencio_activo',
                   'false'
                 ) = 'true'
               `,
-              [clienteId, proximaRevision]
+              [clienteId, proximaRevision, whatsappQrId]
             );
 
             console.log(
@@ -1039,7 +1056,7 @@ async function procesarSeguimientosSilencio() {
         if (intento >= 3) {
           await pool.query(
             `
-            UPDATE clientes
+            UPDATE clientes_whatsapp_qr
             SET etapa = CASE
                   WHEN etapa IN ('Nuevo', 'Interesado', 'Calificado', 'Seguimiento')
                   THEN 'No Responde'
@@ -1056,10 +1073,12 @@ async function procesarSeguimientosSilencio() {
                   '{seguimiento_silencio_intento}',
                   to_jsonb(3),
                   true
-                )
-            WHERE id = $1
+                ),
+                updated_at = NOW()
+            WHERE cliente_id = $1
+              AND whatsapp_qr_id = $2
             `,
-            [clienteId]
+            [clienteId, whatsappQrId]
           );
 
           console.log(
@@ -1122,7 +1141,7 @@ async function procesarSeguimientosSilencio() {
 
         await pool.query(
           `
-          UPDATE clientes
+          UPDATE clientes_whatsapp_qr
           SET etapa = CASE
                 WHEN etapa IN ('Nuevo', 'Interesado', 'Calificado')
                 THEN 'Seguimiento'
@@ -1140,10 +1159,12 @@ async function procesarSeguimientosSilencio() {
                 '{seguimiento_silencio_intento}',
                 to_jsonb($3::int),
                 true
-              )
-          WHERE id = $1
+              ),
+              updated_at = NOW()
+          WHERE cliente_id = $1
+            AND whatsapp_qr_id = $4
           `,
-          [clienteId, proximaFecha, nuevoIntento]
+          [clienteId, proximaFecha, nuevoIntento, whatsappQrId]
         );
 
         console.log(
@@ -1206,6 +1227,7 @@ async function procesarLoteBot(lote) {
 
   const calificacion = await actualizarCalificacionCliente(
     clienteId,
+    whatsappQrId,
     textoAccion || ""
   );
 
@@ -1213,8 +1235,8 @@ async function procesarLoteBot(lote) {
 
   if (!calificacion || calificacion.requiereCloser) return;
 
-  const memoria = await obtenerMemoriaBot(pool, clienteId);
-  const historial = await obtenerHistorialReciente(pool, clienteId, primerId);
+  const memoria = await obtenerMemoriaBot(pool, clienteId, whatsappQrId);
+  const historial = await obtenerHistorialReciente(pool, clienteId, whatsappQrId, primerId);
 
   const respuestaBot = await decidirRespuestaBot({
   texto: textoBot,
@@ -1236,11 +1258,13 @@ async function procesarLoteBot(lote) {
   if (etapaAutomatica && etapaAutomatica !== memoria?.etapa) {
     await pool.query(
       `
-      UPDATE clientes
-      SET etapa = $2
-      WHERE id = $1
+      UPDATE clientes_whatsapp_qr
+      SET etapa = $2,
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $3
       `,
-      [clienteId, etapaAutomatica]
+      [clienteId, etapaAutomatica, whatsappQrId]
     );
 
     memoria.etapa = etapaAutomatica;
@@ -1287,13 +1311,15 @@ async function procesarLoteBot(lote) {
 
     await pool.query(
       `
-      UPDATE clientes
+      UPDATE clientes_whatsapp_qr
       SET requiere_closer = true,
           handoff_motivo = $3,
-          asesor = COALESCE($2, asesor)
-      WHERE id = $1
+          asesor = COALESCE($2, asesor),
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $4
       `,
-      [clienteId, asesor, handoffMotivo]
+      [clienteId, asesor, handoffMotivo, whatsappQrId]
     );
 
     console.log(
@@ -1307,7 +1333,7 @@ async function procesarLoteBot(lote) {
   }
 
   if (respuestaBot?.memoria) {
-    await guardarMemoriaBot(pool, clienteId, respuestaBot.memoria);
+    await guardarMemoriaBot(pool, clienteId, whatsappQrId, respuestaBot.memoria);
   }
 
   if (!respuestaBot?.mensaje) return;
@@ -1433,7 +1459,7 @@ async function procesarLoteBot(lote) {
     if (enviadosPresentacion > 0) {
       await pool.query(
         `
-        UPDATE clientes
+        UPDATE clientes_whatsapp_qr
         SET bot_contexto = jsonb_set(
               jsonb_set(
                 COALESCE(bot_contexto, '{}'::jsonb),
@@ -1444,10 +1470,12 @@ async function procesarLoteBot(lote) {
               '{presentacion_enviada_at}',
               to_jsonb(NOW()::text),
               true
-            )
-        WHERE id = $1
+            ),
+            updated_at = NOW()
+        WHERE cliente_id = $1
+          AND whatsapp_qr_id = $2
         `,
-        [clienteId]
+        [clienteId, whatsappQrId]
       );
 
       console.log(
@@ -1530,6 +1558,7 @@ async function procesarLoteBot(lote) {
 
   await programarSeguimientoSilencio({
     clienteId,
+    whatsappQrId,
     analisisCRM,
     requiereCloserIA,
   });
@@ -1565,7 +1594,6 @@ async function limpiarSesionWhatsApp() {
 }
 
 async function iniciarWhatsApp() {
-  const MEDIA_DIR = "./auth/media";
   await mkdir(MEDIA_DIR, { recursive: true });
 
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
@@ -1781,33 +1809,6 @@ if (!canalHistorialListo) {
       );
 
       const clienteId = cliente.rows[0].id;
-
-  if (!esMio && tipoMensaje === "image" && mediaAnalisis) {
-    const montoComprobante = extraerMontoComprobante(mediaAnalisis);
-
-    if (montoComprobante !== null) {
-      await pool.query(
-        `
-        UPDATE clientes
-        SET bot_contexto = jsonb_set(
-          COALESCE(bot_contexto, '{}'::jsonb),
-          '{adelanto_detectado}',
-          to_jsonb($2::numeric),
-          true
-        )
-        WHERE id = $1
-        `,
-        [clienteId, montoComprobante]
-      );
-
-      console.log(
-        "ADELANTO DETECTADO EN COMPROBANTE:",
-        clienteId,
-        montoComprobante
-      );
-    }
-  }
-
 
       await pool.query(
         `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
@@ -2145,20 +2146,20 @@ RETURNING id
 
   const clienteId = cliente.rows[0].id;
 
-  if (!esMio) {
-    await cancelarSeguimientoSilencio(clienteId);
-    console.log(
-      "SEGUIMIENTO SILENCIO CANCELADO POR RESPUESTA CLIENTE:",
-      clienteId
-    );
-  }
-
   await pool.query(
     `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
      VALUES ($1, $2, $3, 'mensaje', NOW())
      ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
     [empresaQrId, clienteId, whatsappQrId]
   );
+
+  if (!esMio) {
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+    console.log(
+      "SEGUIMIENTO SILENCIO CANCELADO POR RESPUESTA CLIENTE:",
+      clienteId
+    );
+  }
 
   const mensajeGuardado = await pool.query(
   `
@@ -2387,12 +2388,153 @@ app.post("/sync-contacts", async (req, res) => {
     });
   }
 });
+app.post('/send-media', express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
+  try {
+    const telefono = String(req.headers['x-telefono'] || '').replace(/\D/g, '');
+    const clienteId = Number(req.headers['x-cliente-id']);
+    const esperadoQrId = Number(req.headers['x-whatsapp-qr-id']);
+    const mimeType = String(req.headers['x-mime-type'] || req.headers['content-type'] || 'application/octet-stream');
+    let filename = 'archivo';
+
+    try {
+      filename = decodeURIComponent(String(req.headers['x-filename'] || 'archivo'));
+    } catch {}
+
+    if (!sock || estado !== 'conectado' || !empresaQrId || !whatsappQrId) {
+      return res.status(400).json({ success: false, error: 'WhatsApp no iniciado' });
+    }
+
+    if (!telefono || !clienteId || !esperadoQrId) {
+      return res.status(400).json({ success: false, error: 'Faltan datos del envio' });
+    }
+
+    if (Number(whatsappQrId) !== esperadoQrId) {
+      return res.status(409).json({ success: false, error: 'El canal de WhatsApp activo cambio' });
+    }
+
+    const bufferArchivo = Buffer.isBuffer(req.body)
+      ? req.body
+      : Buffer.from(req.body || []);
+
+    if (!bufferArchivo.length) {
+      return res.status(400).json({ success: false, error: 'Archivo vacio' });
+    }
+
+    const cliente = await pool.query(
+      `SELECT id, telefono
+       FROM clientes
+       WHERE id = $1
+         AND empresa_id = $2
+       LIMIT 1`,
+      [clienteId, empresaQrId]
+    );
+
+    if (!cliente.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
+    }
+
+    await pool.query(
+      `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+       VALUES ($1, $2, $3, 'mensaje', NOW())
+       ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+      [empresaQrId, clienteId, whatsappQrId]
+    );
+
+    let tipo = 'document';
+    let contenido;
+
+    if (mimeType.startsWith('image/')) {
+      tipo = 'image';
+      contenido = { image: bufferArchivo, mimetype: mimeType };
+    } else if (mimeType.startsWith('audio/')) {
+      tipo = 'audio';
+      contenido = { audio: bufferArchivo, mimetype: mimeType, ptt: false };
+    } else {
+      contenido = {
+        document: bufferArchivo,
+        mimetype: mimeType,
+        fileName: filename,
+      };
+    }
+
+    const jid = `${telefono}@s.whatsapp.net`;
+    const enviado = await sock.sendMessage(jid, contenido);
+
+    await mkdir(MEDIA_DIR, { recursive: true });
+    const mediaId = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionMedia(mimeType)}`;
+    await writeFile(`${MEDIA_DIR}/${mediaId}`, bufferArchivo);
+
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+
+    const mensaje =
+      tipo === 'image'
+        ? '[Imagen]'
+        : tipo === 'audio'
+          ? '[Audio]'
+          : '[Documento]';
+
+    await pool.query(
+      `INSERT INTO conversaciones (
+        cliente_id,
+        telefono,
+        whatsapp_message_id,
+        mensaje,
+        remitente,
+        tipo,
+        empresa_id,
+        whatsapp_qr_id,
+        canal,
+        media_id,
+        mime_type,
+        filename,
+        estado_whatsapp,
+        enviado_at
+      )
+      VALUES ($1, $2, $3, $4, 'asesor', $5, $6, $7, 'qr', $8, $9, $10, 'enviado', NOW())
+      ON CONFLICT (whatsapp_message_id)
+      WHERE whatsapp_message_id IS NOT NULL
+      DO NOTHING`,
+      [
+        clienteId,
+        telefono,
+        enviado?.key?.id || null,
+        mensaje,
+        tipo,
+        empresaQrId,
+        whatsappQrId,
+        mediaId,
+        mimeType,
+        filename,
+      ]
+    );
+
+    return res.json({
+      success: true,
+      messageId: enviado?.key?.id || null,
+      mediaId,
+      tipo,
+    });
+  } catch (error) {
+    console.error('ERROR ENVIANDO MEDIA QR:', error);
+    return res.status(500).json({ success: false, error: 'Error enviando archivo' });
+  }
+});
+
 app.post("/send", async (req, res) => {
   try {
-    const { telefono, mensaje } = req.body;
+    const { telefono, mensaje, whatsapp_qr_id } = req.body;
+    const esperadoQrId = Number(whatsapp_qr_id);
 
     if (!sock) {
       return res.status(400).json({ error: "WhatsApp no iniciado" });
+    }
+
+    if (!esperadoQrId) {
+      return res.status(400).json({ error: "Falta whatsapp_qr_id" });
+    }
+
+    if (!empresaQrId || !whatsappQrId || Number(whatsappQrId) !== esperadoQrId) {
+      return res.status(409).json({ error: "El canal de WhatsApp activo cambio" });
     }
 
     const enviadoAsesor = await sock.sendMessage(`${telefono}@s.whatsapp.net`, {
@@ -2410,7 +2552,14 @@ const cliente = await pool.query(
 );
 
 if (cliente.rows.length > 0) {
-  await cancelarSeguimientoSilencio(cliente.rows[0].id);
+  await pool.query(
+    `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+     VALUES ($1, $2, $3, 'mensaje', NOW())
+     ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+    [empresaQrId, cliente.rows[0].id, whatsappQrId]
+  );
+
+  await cancelarSeguimientoSilencio(cliente.rows[0].id, whatsappQrId);
   console.log(
     "SEGUIMIENTO SILENCIO CANCELADO POR MENSAJE MANUAL:",
     cliente.rows[0].id

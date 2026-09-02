@@ -11,10 +11,11 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const clienteId = Number(searchParams.get("cliente_id"));
+    const whatsappQrId = Number(searchParams.get("whatsapp_qr_id"));
 
-    if (!clienteId) {
+    if (!clienteId || !whatsappQrId) {
       return NextResponse.json(
-        { error: "cliente_id requerido" },
+        { error: "cliente_id y whatsapp_qr_id requeridos" },
         { status: 400 }
       );
     }
@@ -24,6 +25,7 @@ export async function GET(req: Request) {
       SELECT
         id,
         cliente_id,
+        whatsapp_qr_id,
         producto,
         estado,
         monto,
@@ -36,10 +38,11 @@ export async function GET(req: Request) {
         updated_at
       FROM ventas
       WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
       ORDER BY id DESC
       LIMIT 1
       `,
-      [clienteId]
+      [clienteId, whatsappQrId]
     );
 
     return NextResponse.json({
@@ -62,13 +65,14 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     const clienteId = Number(body.cliente_id);
+    const whatsappQrId = Number(body.whatsapp_qr_id);
     const producto = String(body.producto || "").trim();
     const monto = Number(body.monto);
     const adelanto = Number(body.adelanto);
 
-    if (!clienteId) {
+    if (!clienteId || !whatsappQrId) {
       return NextResponse.json(
-        { error: "Cliente no valido" },
+        { error: "Cliente o canal de WhatsApp no valido" },
         { status: 400 }
       );
     }
@@ -121,15 +125,40 @@ export async function POST(req: Request) {
 
     const empresaId = clienteResultado.rows[0].empresa_id;
 
+    const relacionResultado = await client.query(
+      `
+      SELECT rel.id
+      FROM clientes_whatsapp_qr rel
+      JOIN integraciones_whatsapp_qr iq
+        ON iq.id = rel.whatsapp_qr_id
+       AND iq.empresa_id = rel.empresa_id
+      WHERE rel.cliente_id = $1
+        AND rel.empresa_id = $2
+        AND rel.whatsapp_qr_id = $3
+      LIMIT 1
+      `,
+      [clienteId, empresaId, whatsappQrId]
+    );
+
+    if (relacionResultado.rowCount === 0) {
+      await client.query("ROLLBACK");
+
+      return NextResponse.json(
+        { error: "El cliente no pertenece a este canal de WhatsApp" },
+        { status: 400 }
+      );
+    }
+
     const ventaActualResultado = await client.query(
       `
       SELECT id, estado
       FROM ventas
       WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
       ORDER BY id DESC
       LIMIT 1
       `,
-      [clienteId]
+      [clienteId, whatsappQrId]
     );
 
     let venta;
@@ -165,6 +194,7 @@ export async function POST(req: Request) {
         `
         INSERT INTO ventas (
           cliente_id,
+          whatsapp_qr_id,
           producto,
           estado,
           monto,
@@ -172,12 +202,13 @@ export async function POST(req: Request) {
           estado_envio,
           empresa_id
         )
-        VALUES ($1, $2, $3, $4, $5, 'Pendiente', $6)
+        VALUES ($1, $2, $3, $4, $5, $6, 'Pendiente', $7)
         RETURNING *,
           GREATEST(monto - adelanto, 0) AS saldo
         `,
         [
           clienteId,
+          whatsappQrId,
           producto,
           ETAPA_PAGO,
           monto,
@@ -191,7 +222,7 @@ export async function POST(req: Request) {
 
     await client.query(
       `
-      UPDATE clientes
+      UPDATE clientes_whatsapp_qr
       SET etapa = $2,
           cerrado_por = CASE
             WHEN cerrado_at IS NULL THEN
@@ -214,10 +245,12 @@ export async function POST(req: Request) {
              AND humano_hasta > NOW()
             THEN false
             ELSE true
-          END
-      WHERE id = $1
+          END,
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $3
       `,
-      [clienteId, ETAPA_PAGO]
+      [clienteId, ETAPA_PAGO, whatsappQrId]
     );
 
     await client.query("COMMIT");

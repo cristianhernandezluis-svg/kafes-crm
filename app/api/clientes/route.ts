@@ -23,22 +23,27 @@ export async function GET(request: Request) {
     const result = await pool.query(
       `
       SELECT
-        id,
-        empresa_id,
-        nombre,
-        telefono,
-        ciudad,
-        etapa,
-        asesor,
-        requiere_closer,
-        handoff_motivo,
-        observacion,
-        proximo_seguimiento,
-        ultima_gestion,
-        cantidad_seguimientos,
-        created_at
+        clientes.id,
+        clientes.empresa_id,
+        clientes.nombre,
+        clientes.telefono,
+        clientes.ciudad,
+        CASE WHEN $2::integer IS NOT NULL THEN COALESCE(rel.etapa, 'Nuevo') ELSE clientes.etapa END AS etapa,
+        CASE WHEN $2::integer IS NOT NULL THEN rel.asesor ELSE clientes.asesor END AS asesor,
+        CASE WHEN $2::integer IS NOT NULL THEN COALESCE(rel.requiere_closer, false) ELSE clientes.requiere_closer END AS requiere_closer,
+        CASE WHEN $2::integer IS NOT NULL THEN COALESCE(rel.handoff_motivo, 'ninguno') ELSE clientes.handoff_motivo END AS handoff_motivo,
+        CASE WHEN $2::integer IS NOT NULL THEN rel.observacion ELSE clientes.observacion END AS observacion,
+        CASE WHEN $2::integer IS NOT NULL THEN rel.proximo_seguimiento ELSE clientes.proximo_seguimiento END AS proximo_seguimiento,
+        CASE WHEN $2::integer IS NOT NULL THEN rel.ultima_gestion ELSE clientes.ultima_gestion END AS ultima_gestion,
+        CASE WHEN $2::integer IS NOT NULL THEN COALESCE(rel.cantidad_seguimientos, 0) ELSE clientes.cantidad_seguimientos END AS cantidad_seguimientos,
+        clientes.created_at,
+        $2::integer AS whatsapp_qr_id
       FROM clientes
-      WHERE empresa_id = $1
+      LEFT JOIN clientes_whatsapp_qr rel
+        ON rel.cliente_id = clientes.id
+       AND rel.empresa_id = clientes.empresa_id
+       AND rel.whatsapp_qr_id = $2::integer
+      WHERE clientes.empresa_id = $1
         AND (
           $2::integer IS NULL
           OR ($3::boolean = true AND EXISTS (SELECT 1 FROM clientes_whatsapp_qr rel WHERE rel.cliente_id = clientes.id AND rel.empresa_id = $1 AND rel.whatsapp_qr_id = $2::integer))
@@ -56,7 +61,7 @@ export async function GET(request: Request) {
   )
 )
         )
-      ORDER BY created_at DESC;
+      ORDER BY clientes.created_at DESC;
       `,
       [empresaId, whatsappQrId || null, incluirContactos]
     );

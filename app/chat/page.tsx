@@ -230,7 +230,7 @@ cargarClientes();
   };
 
   const enviarMensaje = async () => {
-    if (!clienteActivo || !mensajeNuevo.trim()) return;
+    if (!clienteActivo || !whatsappQrId || !mensajeNuevo.trim()) return;
 
     try {
       setEnviando(true);
@@ -242,6 +242,7 @@ cargarClientes();
         },
         body: JSON.stringify({
           cliente_id: clienteActivo.id,
+          whatsapp_qr_id: whatsappQrId,
           telefono: clienteActivo.telefono,
           mensaje: mensajeNuevo,
         }),
@@ -266,13 +267,14 @@ cargarClientes();
   };
 
 const enviarArchivo = async (archivo: File) => {
-  if (!clienteActivo) return;
+  if (!clienteActivo || !whatsappQrId) return;
 
   try {
     setEnviandoArchivo(true);
 
     const formData = new FormData();
     formData.append("cliente_id", String(clienteActivo.id));
+    formData.append("whatsapp_qr_id", String(whatsappQrId));
     formData.append("telefono", clienteActivo.telefono);
     formData.append("archivo", archivo);
 
@@ -353,11 +355,13 @@ useEffect(() => {
 }, [clienteActivo?.id, whatsappQrId]);
 
 const devolverAlBot = async () => {
-  if (!clienteActivo) return;
+  if (!clienteActivo || !whatsappQrId) return;
 
   try {
     const res = await fetch(`/api/clientes/${clienteActivo.id}/bot`, {
       method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ whatsapp_qr_id: whatsappQrId }),
     });
 
     const data = await res.json();
@@ -367,7 +371,17 @@ const devolverAlBot = async () => {
       return;
     }
 
-    setClienteActivo(data.cliente);
+    setClienteActivo((actual) =>
+      actual
+        ? {
+            ...actual,
+            etapa: data.cliente.etapa ?? actual.etapa,
+            bot_activo: data.cliente.bot_activo ?? actual.bot_activo,
+            requiere_closer: data.cliente.requiere_closer ?? actual.requiere_closer,
+            bot_paso: data.cliente.bot_paso ?? actual.bot_paso,
+          }
+        : actual
+    );
     cargarClientes();
   } catch (error) {
     console.error("Error devolviendo al bot:", error);
@@ -378,7 +392,7 @@ const devolverAlBot = async () => {
 useEffect(() => {
   const clienteId = clienteActivo?.id;
 
-  if (!clienteId) {
+  if (!clienteId || !whatsappQrId) {
     setVentaProducto("");
     setVentaMonto("");
     setVentaAdelanto("");
@@ -389,7 +403,7 @@ useEffect(() => {
 
   const cargarVenta = async () => {
     try {
-      const res = await fetch(`/api/ventas?cliente_id=${clienteId}`, {
+      const res = await fetch(`/api/ventas?cliente_id=${clienteId}&whatsapp_qr_id=${whatsappQrId}`, {
         cache: "no-store",
       });
 
@@ -438,10 +452,11 @@ useEffect(() => {
   clienteActivo?.bot_producto,
   clienteActivo?.bot_contexto?.precio_acordado,
   clienteActivo?.bot_contexto?.adelanto_detectado,
+  whatsappQrId,
 ]);
 
 const confirmarAdelanto = async () => {
-  if (!clienteActivo || guardandoVenta) return;
+  if (!clienteActivo || !whatsappQrId || guardandoVenta) return;
 
   const producto = ventaProducto.trim();
   const monto = Number(ventaMonto);
@@ -470,6 +485,7 @@ const confirmarAdelanto = async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         cliente_id: clienteActivo.id,
+        whatsapp_qr_id: whatsappQrId,
         producto,
         monto,
         adelanto,
@@ -1139,7 +1155,7 @@ useEffect(() => {
               const fecha = prompt("Fecha seguimiento (2026-06-15 10:00)");
               const observacion = prompt("Observación");
 
-              if (!fecha || !observacion || !clienteActivo) return;
+              if (!fecha || !observacion || !clienteActivo || !whatsappQrId) return;
 
               fetch(`/api/clientes/${clienteActivo.id}`, {
                 method: "PATCH",
@@ -1150,6 +1166,7 @@ useEffect(() => {
                   observacion,
                   proximo_seguimiento: fecha,
                   etapa: "Seguimiento",
+                  whatsapp_qr_id: whatsappQrId,
                 }),
               }).then(() => {
                 alert("Seguimiento programado");
