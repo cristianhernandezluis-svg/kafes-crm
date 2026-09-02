@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import Sidebar from "../components/Sidebar";
 
 type Cliente = {
   id: number;
@@ -51,6 +52,15 @@ useEffect(() => {
   const temaGuardado = localStorage.getItem("tema-crm");
   setTemaClaro(temaGuardado === "claro");
 }, []);
+
+const cambiarTema = () => {
+  setTemaClaro((actual) => {
+    const nuevoTema = !actual;
+    localStorage.setItem("tema-crm", nuevoTema ? "claro" : "oscuro");
+    return nuevoTema;
+  });
+};
+
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -108,150 +118,7 @@ useEffect(() => {
       : "bg-[#08111f] text-white"
   }`}
 >
-      <aside
-  className={`hidden lg:flex w-[220px] flex-col min-h-screen border-r ${
-    temaClaro
-      ? "bg-white text-slate-800 border-slate-200"
-      : "bg-[#101820] text-white border-[#1f2a33]"
-  }`}
->
-        <Link
-          href="/dashboard"
-          className={`flex items-center gap-3 px-4 py-4 border-b ${
-  temaClaro ? "border-slate-200" : "border-[#1f2a33]"
-}`}
-        >
-          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-black">
-            K
-          </div>
-
-          <h1 className="text-xl font-black">
-            Kafes <span className="text-green-400">CRM</span>
-          </h1>
-        </Link>
-
-        <div className="px-4 pt-5 pb-2">
-          <p className="text-[11px] text-slate-400 uppercase font-bold">
-            Principal
-          </p>
-        </div>
-
-        <nav className="flex-1 px-2 space-y-1">
-          <Link href="/dashboard" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`}>
-            📊 Dashboard
-          </Link>
-
-          <Link
-  href="/chat"
-  className={`flex items-center justify-between px-3 py-3 rounded-lg text-sm ${
-    temaClaro
-      ? "hover:bg-slate-100 text-slate-700"
-      : "hover:bg-slate-800 text-white"
-  }`}
->
-            <span>💬 Conversaciones</span>
-            <span className="bg-green-500 text-white text-[11px] px-2 py-0.5 rounded-full">
-              {clientes.length}
-            </span>
-          </Link>
-
-          <Link href="/contactos" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`}>
-            👤 Contactos
-          </Link>
-
-          <Link href="/kanban" className="flex items-center gap-3 bg-green-700/70 text-white px-3 py-3 rounded-lg font-bold text-sm">
-            🧩 Kanban
-          </Link>
-
-          <Link href="/mensajes" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`}>
-            ✉️ Mensajes
-          </Link>
-
-          <Link href="/plantillas" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`}>
-            📄 Plantillas
-          </Link>
-
-          <Link href="/automatizaciones" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`}>
-            ⚙️ Automatizaciones
-          </Link>
-
-          <Link href="/reportes" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`}>
-            📊 Reportes
-          </Link>
-
-          <Link href="/ajustes" className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm ${
-  temaClaro
-    ? "hover:bg-slate-100 text-slate-700"
-    : "hover:bg-slate-800 text-white"
-}`}>
-            ⚙️ Ajustes
-          </Link>
-        </nav>
-
-        <div className="p-3">
-          <div
-  className={`border rounded-xl p-4 ${
-    temaClaro
-      ? "bg-slate-50 border-slate-200"
-      : "bg-[#111c24] border-[#26323d]"
-  }`}
->
-            <p
-  className={`text-sm font-bold mb-3 ${
-    temaClaro ? "text-slate-700" : "text-slate-300"
-  }`}
->
-              Conexión WhatsApp
-            </p>
-
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-xl">
-                🟢
-              </div>
-
-              <div>
-                <p className="text-green-400 font-bold text-sm">Conectado</p>
-                <p className="text-xs text-slate-400">Cloud API activa</p>
-              </div>
-            </div>
-
-            <Link
-              href="/dashboard/canales"
-              className={`block w-full text-center border rounded-lg py-2 text-xs font-bold ${
-  temaClaro
-    ? "border-slate-300 text-slate-700 hover:bg-slate-100"
-    : "border-slate-700 text-white hover:bg-slate-800"
-}`}
-            >
-              VER QR
-            </Link>
-          </div>
-        </div>
-      </aside>
+      <Sidebar temaClaro={temaClaro} onCambiarTema={cambiarTema} conversacionesCount={clientes.length} />
 
       <main className="flex-1 min-w-0">
         <div
