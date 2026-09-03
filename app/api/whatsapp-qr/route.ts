@@ -25,6 +25,35 @@ export async function GET() {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+
+    const res = await fetch(`${qrUrl}/producto-principal`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        producto_slug: body?.producto_slug || null,
+      }),
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error("Error actualizando producto principal WhatsApp:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "No se pudo actualizar el producto principal",
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST() {
   try {
     const res = await fetch(

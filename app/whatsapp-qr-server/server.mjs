@@ -2264,9 +2264,70 @@ app.get("/qr", (req, res) => {
     whatsapp_qr_id: whatsappQrId,
     empresa_id: empresaQrId,
     numero_whatsapp: numeroWhatsappActual,
+    producto_slug: productoQrSlug,
   });
 });
 
+
+app.patch("/producto-principal", async (req, res) => {
+  try {
+    if (!whatsappQrId || !empresaQrId) {
+      return res.status(409).json({ success: false, error: "No hay un canal WhatsApp activo" });
+    }
+
+    const slug = String(req.body?.producto_slug || "").trim();
+
+    if (!slug) {
+      return res.status(400).json({ success: false, error: "Producto no valido" });
+    }
+
+    const productoResult = await pool.query(
+      `SELECT slug
+       FROM productos
+       WHERE empresa_id = $1
+         AND slug = $2
+         AND activo = true
+         AND ia_activo = true
+       LIMIT 1`,
+      [empresaQrId, slug]
+    );
+
+    if (productoResult.rowCount === 0) {
+      return res.status(404).json({ success: false, error: "Producto no encontrado o no disponible para IA" });
+    }
+
+    const actualizado = await pool.query(
+      `UPDATE integraciones_whatsapp_qr
+       SET producto_slug = $3,
+           updated_at = NOW()
+       WHERE id = $1
+         AND empresa_id = $2
+       RETURNING producto_slug`,
+      [whatsappQrId, empresaQrId, slug]
+    );
+
+    if (actualizado.rowCount === 0) {
+      return res.status(404).json({ success: false, error: "Canal WhatsApp no encontrado" });
+    }
+
+    productoQrSlug = actualizado.rows[0].producto_slug;
+
+    console.log("PRODUCTO PRINCIPAL WHATSAPP ACTUALIZADO:", {
+      whatsappQrId,
+      empresaQrId,
+      productoQrSlug,
+    });
+
+    return res.json({
+      success: true,
+      whatsapp_qr_id: whatsappQrId,
+      producto_slug: productoQrSlug,
+    });
+  } catch (error) {
+    console.error("ERROR ACTUALIZANDO PRODUCTO PRINCIPAL WHATSAPP:", error);
+    return res.status(500).json({ success: false, error: "No se pudo actualizar el producto principal" });
+  }
+});
 
 app.post("/desconectar", async (req, res) => {
   try {
