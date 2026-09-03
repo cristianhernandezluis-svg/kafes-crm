@@ -330,6 +330,27 @@ export default function CatalogoPage() {
     }
   };
 
+  const usarComoPortada = async (mediaId: number) => {
+    if (!empresaId) return;
+
+    setMensajeEstado("");
+
+    const res = await fetch(
+      `/api/productos/media/${mediaId}?empresa_id=${empresaId}`,
+      { method: "PATCH" }
+    );
+
+    const data = await res.json();
+
+    if (!data.success) {
+      setMensajeEstado(data.error || "No se pudo cambiar la portada");
+      return;
+    }
+
+    setMensajeEstado("Portada del producto actualizada");
+    await cargarProductos(empresaId);
+  };
+
   const eliminarMultimedia = async (mediaId: number) => {
     if (!empresaId) return;
 
@@ -657,13 +678,31 @@ export default function CatalogoPage() {
                                   )}
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() => eliminarMultimedia(media.id)}
-                                  className="w-full py-2 text-xs font-black text-red-600"
-                                >
-                                  Eliminar
-                                </button>
+                                <div className="border-t">
+                                  {(media.tipo === "foto" || media.tipo === "gif") && (
+                                    media.orden === 0 ? (
+                                      <div className="w-full py-2 text-center text-xs font-black text-amber-600 bg-amber-50">
+                                        ⭐ Portada actual
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => usarComoPortada(media.id)}
+                                        className="w-full py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                                      >
+                                        ☆ Usar como portada
+                                      </button>
+                                    )
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => eliminarMultimedia(media.id)}
+                                    className="w-full py-2 text-xs font-black text-red-600 border-t"
+                                  >
+                                    Eliminar
+                                  </button>
+                                </div>
                               </div>
                             );
                           })}

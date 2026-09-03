@@ -1419,8 +1419,17 @@ async function procesarLoteBot(lote) {
     );
 
     const secuencia = [];
-    if (fotos[0]) secuencia.push({ tipo: "foto", archivo: fotos[0] });
-    if (videos[0]) secuencia.push({ tipo: "video", archivo: videos[0] });
+
+    // Patron universal de presentacion comercial:
+    // primera foto = portada; siguientes fotos = galeria/material adicional.
+    for (const foto of fotos) {
+      secuencia.push({ tipo: "foto", archivo: foto });
+    }
+
+    // Si existe demostracion en video, se envia despues de la galeria.
+    if (videos[0]) {
+      secuencia.push({ tipo: "video", archivo: videos[0] });
+    }
 
     const apertura = String(respuestaBot?.apertura || "").trim();
     let aperturaUsada = false;

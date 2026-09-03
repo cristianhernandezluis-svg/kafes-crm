@@ -104,6 +104,91 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+ ) {
+  const client = await pool.connect();
+
+  try {
+    const { id } = await context.params;
+    const mediaId = Number(id);
+    const { searchParams } = new URL(request.url);
+    const empresaId = Number(searchParams.get("empresa_id"));
+
+    if (!mediaId || !empresaId) {
+      return new Response(JSON.stringify({ success: false, error: "Datos invalidos" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const mediaResult = await client.query(
+      `SELECT id, producto_id, tipo
+       FROM producto_multimedia
+       WHERE id = $1
+         AND empresa_id = $2
+         AND activo = true
+       LIMIT 1`,
+      [mediaId, empresaId]
+    );
+
+    if (mediaResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return new Response(JSON.stringify({ success: false, error: "Archivo no encontrado" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const media = mediaResult.rows[0];
+
+    if (media.tipo !== "foto" && media.tipo !== "gif") {
+      await client.query("ROLLBACK");
+      return new Response(JSON.stringify({ success: false, error: "Solo una imagen puede usarse como portada" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const lista = await client.query(
+      `SELECT id
+       FROM producto_multimedia
+       WHERE producto_id = $1
+         AND empresa_id = $2
+         AND activo = true
+       ORDER BY CASE WHEN id = $3 THEN 0 ELSE 1 END, orden ASC, id ASC`,
+      [media.producto_id, empresaId, mediaId]
+    );
+
+    for (let i = 0; i < lista.rows.length; i += 1) {
+      await client.query(
+        "UPDATE producto_multimedia SET orden = $2 WHERE id = $1 AND empresa_id = $3",
+        [lista.rows[i].id, i, empresaId]
+      );
+    }
+
+    await client.query("COMMIT");
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("ERROR CAMBIANDO PORTADA PRODUCTO:", error);
+
+    return new Response(JSON.stringify({ success: false, error: "No se pudo cambiar la portada" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  } finally {
+    client.release();
+  }
+}
+
 export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> }
