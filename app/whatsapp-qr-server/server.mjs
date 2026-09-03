@@ -1368,7 +1368,20 @@ async function procesarLoteBot(lote) {
     tipo,
     caption = undefined,
   }) => {
-    const bufferArchivo = await readFile(archivo);
+    const esUrlRemota = /^https?:\/\//i.test(String(archivo));
+    let bufferArchivo;
+
+    if (esUrlRemota) {
+      const respuestaArchivo = await fetch(archivo);
+
+      if (!respuestaArchivo.ok) {
+        throw new Error(`HTTP ${respuestaArchivo.status} descargando multimedia: ${archivo}`);
+      }
+
+      bufferArchivo = Buffer.from(await respuestaArchivo.arrayBuffer());
+    } else {
+      bufferArchivo = await readFile(archivo);
+    }
 
     if (tipo === "foto") {
       await sock.sendMessage(jidRespuesta, {

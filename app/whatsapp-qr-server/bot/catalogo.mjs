@@ -11,6 +11,10 @@ const STORAGE_DIR =
   process.env.CATALOGO_STORAGE_DIR ||
   path.join(process.cwd(), "storage", "catalogo");
 
+const CRM_BASE_URL = String(
+  process.env.CRM_BASE_URL || "https://crm.kafesonline.com"
+).replace(/\/+$/, "");
+
 const LEGACY_EMPRESA_ID = Number(
   process.env.CATALOGO_LEGACY_EMPRESA_ID || 1
 );
@@ -153,6 +157,14 @@ function rutaMultimedia(url) {
   return path.join(STORAGE_DIR, valor);
 }
 
+function rutaMultimediaDB(media, empresaId) {
+  if (media?.id) {
+    return CRM_BASE_URL + "/api/productos/media/" + media.id + "?empresa_id=" + empresaId;
+  }
+
+  return rutaMultimedia(media?.url);
+}
+
 function productoDesdeFila(row) {
   const promociones = Array.isArray(row.promociones)
     ? row.promociones.map((p) => ({
@@ -169,19 +181,19 @@ function productoDesdeFila(row) {
   const multimedia = {
     fotos: media
       .filter((m) => m.tipo === "foto")
-      .map((m) => rutaMultimedia(m.url))
+      .map((m) => rutaMultimediaDB(m, row.empresa_id))
       .filter(Boolean),
     videos: media
       .filter((m) => m.tipo === "video")
-      .map((m) => rutaMultimedia(m.url))
+      .map((m) => rutaMultimediaDB(m, row.empresa_id))
       .filter(Boolean),
     audios: media
       .filter((m) => m.tipo === "audio")
-      .map((m) => rutaMultimedia(m.url))
+      .map((m) => rutaMultimediaDB(m, row.empresa_id))
       .filter(Boolean),
     gifs: media
       .filter((m) => m.tipo === "gif")
-      .map((m) => rutaMultimedia(m.url))
+      .map((m) => rutaMultimediaDB(m, row.empresa_id))
       .filter(Boolean),
   };
 
@@ -257,7 +269,7 @@ async function obtenerProductosDB(empresaId) {
         (
           SELECT json_agg(
             json_build_object(
-              'tipo', pm.tipo,
+              'id', pm.id,\n              'tipo', pm.tipo,
               'url', pm.url,
               'orden', pm.orden
             )
