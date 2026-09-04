@@ -21,6 +21,8 @@ export const AnalisisVenta = z.object({
   ]),
 
   ciudad: z.string().nullable(),
+  dni: z.string().nullable(),
+  nombre: z.string().nullable(),
   uso: z.string().nullable(),
 
   nivel_interes: z.enum([

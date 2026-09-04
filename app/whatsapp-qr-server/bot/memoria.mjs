@@ -105,6 +105,16 @@ export async function guardarMemoriaBot(
       [contexto.ciudad,clienteId]
     );
   }
+
+  if(contexto?.dni || contexto?.nombre){
+    await pool.query(
+      `UPDATE clientes
+       SET dni=COALESCE($1,dni),
+           nombre=COALESCE($2,nombre)
+       WHERE id=$3`,
+      [contexto.dni??null,contexto.nombre??null,clienteId]
+    );
+  }
 }
 
 export async function limpiarMemoriaBot(pool,clienteId,whatsappQrId){

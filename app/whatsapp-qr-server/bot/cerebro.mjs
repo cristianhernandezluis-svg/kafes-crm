@@ -205,6 +205,14 @@ export async function decidirRespuestaBot({
       contexto.ciudad = analisis.ciudad;
     }
 
+    if (analisis.dni) {
+      contexto.dni = analisis.dni;
+    }
+
+    if (analisis.nombre) {
+      contexto.nombre = analisis.nombre;
+    }
+
     const senalesCalificacion = Array.isArray(calificacion?.senales)
       ? calificacion.senales
       : [];
