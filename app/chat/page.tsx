@@ -947,14 +947,19 @@ useEffect(() => {
 }`}
               >
                 {msg.tipo === "image" && msg.media_id ? (
-                  <img
-                    src={`/api/whatsapp/media/${msg.media_id}`}
-                    alt="Imagen enviada por cliente"
-                    className="max-w-xs rounded-lg border cursor-pointer"
-                    onClick={() =>
-                      window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
-                    }
-                  />
+                  <div>
+                    <img
+                      src={`/api/whatsapp/media/${msg.media_id}`}
+                      alt="Imagen de WhatsApp"
+                      className="max-w-xs rounded-lg border cursor-pointer"
+                      onClick={() =>
+                        window.open(`/api/whatsapp/media/${msg.media_id}`, "_blank")
+                      }
+                    />
+                    {msg.mensaje && msg.mensaje !== "[Imagen]" ? (
+                      <p className="mt-2 whitespace-pre-wrap">{msg.mensaje}</p>
+                    ) : null}
+                  </div>
                 ) : msg.tipo === "video" && msg.media_id ? (
                   <video controls className="max-w-xs rounded-lg">
                     <source src={`/api/whatsapp/media/${msg.media_id}`} type={msg.mime_type || "video/mp4"} />

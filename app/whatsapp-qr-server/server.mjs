@@ -1370,6 +1370,7 @@ async function procesarLoteBot(lote) {
   }) => {
     const esUrlRemota = /^https?:\/\//i.test(String(archivo));
     let bufferArchivo;
+    let mimeType = null;
 
     if (esUrlRemota) {
       const respuestaArchivo = await fetch(archivo);
@@ -1378,41 +1379,86 @@ async function procesarLoteBot(lote) {
         throw new Error(`HTTP ${respuestaArchivo.status} descargando multimedia: ${archivo}`);
       }
 
+      mimeType = respuestaArchivo.headers.get('content-type')?.split(';')[0] || null;
       bufferArchivo = Buffer.from(await respuestaArchivo.arrayBuffer());
     } else {
       bufferArchivo = await readFile(archivo);
     }
 
-    if (tipo === "foto") {
-      await sock.sendMessage(jidRespuesta, {
+    let enviado;
+
+    if (tipo === 'foto') {
+      if (!mimeType) {
+        const ruta = String(archivo).toLowerCase();
+        mimeType = ruta.endsWith('.png') ? 'image/png' : ruta.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+      }
+      enviado = await sock.sendMessage(jidRespuesta, {
         image: bufferArchivo,
         ...(caption ? { caption } : {}),
       });
-    } else if (tipo === "video") {
-      await sock.sendMessage(jidRespuesta, {
+    } else if (tipo === 'video') {
+      mimeType = mimeType || 'video/mp4';
+      enviado = await sock.sendMessage(jidRespuesta, {
         video: bufferArchivo,
         ...(caption ? { caption } : {}),
       });
-    } else if (tipo === "audio") {
+    } else if (tipo === 'audio') {
       const ruta = String(archivo).toLowerCase();
-      const mimetype = ruta.endsWith(".ogg")
-        ? "audio/ogg; codecs=opus"
-        : ruta.endsWith(".m4a") || ruta.endsWith(".mp4")
-          ? "audio/mp4"
-          : "audio/mpeg";
+      mimeType = mimeType || (ruta.endsWith('.ogg') ? 'audio/ogg; codecs=opus' : ruta.endsWith('.m4a') || ruta.endsWith('.mp4') ? 'audio/mp4' : 'audio/mpeg');
 
-      await sock.sendMessage(jidRespuesta, {
+      enviado = await sock.sendMessage(jidRespuesta, {
         audio: bufferArchivo,
-        mimetype,
+        mimetype: mimeType,
         ptt: false,
       });
     }
 
-    console.log("MULTIMEDIA BOT ENVIADO:", {
+    const tipoConversacion = tipo === 'foto' ? 'image' : tipo;
+    const mensajeMultimedia = caption || (tipo === 'foto' ? '[Imagen]' : tipo === 'video' ? '[Video]' : '[Audio]');
+
+    await mkdir(MEDIA_DIR, { recursive: true });
+    const mediaId = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionMedia(mimeType || '')}`;
+    await writeFile(`${MEDIA_DIR}/${mediaId}`, bufferArchivo);
+
+    await pool.query(
+      `INSERT INTO conversaciones (
+        cliente_id,
+        telefono,
+        whatsapp_message_id,
+        mensaje,
+        remitente,
+        tipo,
+        empresa_id,
+        whatsapp_qr_id,
+        canal,
+        media_id,
+        mime_type,
+        estado_whatsapp,
+        enviado_at
+      )
+      VALUES ($1, $2, $3, $4, 'bot', $5, $6, $7, 'qr', $8, $9, 'enviado', NOW())
+      ON CONFLICT (whatsapp_message_id)
+      WHERE whatsapp_message_id IS NOT NULL
+      DO NOTHING`,
+      [
+        clienteId,
+        telefono,
+        enviado?.key?.id || null,
+        mensajeMultimedia,
+        tipoConversacion,
+        empresaQrId,
+        whatsappQrId,
+        mediaId,
+        mimeType,
+      ]
+    );
+
+    console.log('MULTIMEDIA BOT ENVIADO:', {
       clienteId,
       producto: respuestaBot.producto,
       tipo,
       archivo,
+      mediaId,
     });
   };
 
