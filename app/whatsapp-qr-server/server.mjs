@@ -2632,12 +2632,6 @@ console.log("Mensaje guardado en PostgreSQL");
   });
 }
 
-        console.log("BUFFER BOT AGREGADO:", {
-          clienteId,
-          idConversacion: mensajeGuardado.rows[0].id,
-          tipoMensaje,
-        });
-      }
     } catch (error) {
       console.error("Error guardando mensaje:", error);
     }
