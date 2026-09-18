@@ -16,6 +16,7 @@ type Cliente = {
   requiere_closer?: boolean;
   handoff_motivo?: string | null;
   whatsapp_qr_id?: number | null;
+  ultima_conversacion?: string | null;
 };
 
 const columnas = [{id:'frio',nombre:'FRIO',estados:['No Responde','Descartado'],guardar:'No Responde'},{id:'tibio',nombre:'TIBIO',estados:['Nuevo','Interesado','Seguimiento'],guardar:'Interesado'},{id:'caliente',nombre:'CALIENTE',estados:['Calificado','Pendiente Adelanto'],guardar:'Calificado'},{id:'pago-validar',nombre:'PAGO POR VALIDAR',estados:['Pago por validar'],guardar:'Pago por validar'}];
@@ -32,6 +33,28 @@ function etiquetaMotivoCloser(motivo?: string | null) {
   };
 
   return etiquetas[String(motivo || "")] || "Requiere revision humana";
+}
+
+function fechaLocalISO() {
+  const ahora = new Date();
+  const offset = ahora.getTimezoneOffset();
+
+  return new Date(ahora.getTime() - offset * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+function formatearFechaHora(fecha?: string | null) {
+  if (!fecha) return "Sin conversación";
+
+  return new Intl.DateTimeFormat("es-PE", {
+    timeZone: "America/Lima",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(fecha));
 }
 
 export default function KanbanPage() {
@@ -51,43 +74,75 @@ const cambiarTema = () => {
 };
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [cargando, setCargando] = useState(true);
+const [cargando, setCargando] = useState(true);
+
+const [filtroFecha, setFiltroFecha] = useState<
+  "todo" | "hoy" | "fecha"
+>("hoy");
+
+const [fechaSeleccionada, setFechaSeleccionada] =
+  useState(fechaLocalISO());
 
   const cargarClientes = async () => {
-    const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+  const usuario = JSON.parse(
+    localStorage.getItem("usuario") || "{}"
+  );
 
-    const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
-    const qrData = await qrRes.json();
-    const whatsappQrId = qrData.whatsapp_qr_id;
+  const qrRes = await fetch("/api/whatsapp-qr", {
+    cache: "no-store",
+  });
 
-    if (!whatsappQrId) {
-      setClientes([]);
-      setCargando(false);
-      return;
-    }
+  const qrData = await qrRes.json();
+  const whatsappQrId = qrData.whatsapp_qr_id;
 
-    const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}`, {
-      cache: "no-store",
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      setClientes(data.clientes);
-    }
-
+  if (!whatsappQrId) {
+    setClientes([]);
     setCargando(false);
-  };
+    return;
+  }
 
-  useEffect(() => {
+  const fechaConsulta =
+    filtroFecha === "todo"
+      ? null
+      : filtroFecha === "hoy"
+      ? fechaLocalISO()
+      : fechaSeleccionada;
+
+  const params = new URLSearchParams({
+    empresa_id: String(usuario.empresa_id),
+    whatsapp_qr_id: String(whatsappQrId),
+  });
+
+  if (fechaConsulta) {
+    params.set("fecha", fechaConsulta);
+  }
+
+  const res = await fetch(
+    `/api/clientes?${params.toString()}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  const data = await res.json();
+
+  if (data.success) {
+    setClientes(data.clientes);
+  }
+
+  setCargando(false);
+};
+
+ useEffect(() => {
+  setCargando(true);
+  cargarClientes();
+
+  const intervalo = setInterval(() => {
     cargarClientes();
+  }, 5000);
 
-    const intervalo = setInterval(() => {
-      cargarClientes();
-    }, 5000);
-
-    return () => clearInterval(intervalo);
-  }, []);
+  return () => clearInterval(intervalo);
+}, [filtroFecha, fechaSeleccionada]);
 
   const moverEtapa = async (cliente: Cliente, nuevaEtapa: string) => {
     await fetch(`/api/clientes/${cliente.id}`, {
@@ -161,60 +216,71 @@ const cambiarTema = () => {
       : "border-slate-800"
   }`}
 >
-  <div className="flex gap-3">
-    <button
-      className={`border px-4 py-2 rounded-xl ${
-        temaClaro
-          ? "bg-white border-slate-300 text-slate-700"
-          : "bg-[#111827] border-slate-700 text-white"
-      }`}
-    >
-      Oportunidades
-    </button>
+  <div className="flex items-center gap-2 flex-wrap">
+  <button
+    onClick={() => setFiltroFecha("todo")}
+    className={`border px-4 py-2 rounded-xl text-xs font-bold ${
+      filtroFecha === "todo"
+        ? "bg-green-600 border-green-600 text-white"
+        : temaClaro
+        ? "bg-white border-slate-300 text-slate-700"
+        : "bg-[#111827] border-slate-700 text-white"
+    }`}
+  >
+    TODO
+  </button>
 
-    <button className="bg-green-700/50 border border-green-700 px-4 py-2 rounded-xl">
-      Kanban
-    </button>
+  <button
+    onClick={() => {
+      setFechaSeleccionada(fechaLocalISO());
+      setFiltroFecha("hoy");
+    }}
+    className={`border px-4 py-2 rounded-xl text-xs font-bold ${
+      filtroFecha === "hoy"
+        ? "bg-green-600 border-green-600 text-white"
+        : temaClaro
+        ? "bg-white border-slate-300 text-slate-700"
+        : "bg-[#111827] border-slate-700 text-white"
+    }`}
+  >
+    HOY
+  </button>
 
-    <button
-      className={`border px-4 py-2 rounded-xl ${
-        temaClaro
-          ? "bg-white border-slate-300 text-slate-700"
-          : "bg-[#111827] border-slate-700 text-white"
-      }`}
-    >
-      Lista
-    </button>
+  <input
+    type="date"
+    value={fechaSeleccionada}
+    onChange={(e) => {
+      setFechaSeleccionada(e.target.value);
+      setFiltroFecha("fecha");
+    }}
+    className={`border px-3 py-2 rounded-xl text-xs ${
+      filtroFecha === "fecha"
+        ? "border-green-500 ring-1 ring-green-500"
+        : ""
+    } ${
+      temaClaro
+        ? "bg-white border-slate-300 text-slate-700"
+        : "bg-[#111827] border-slate-700 text-white"
+    }`}
+  />
+
+  <div
+    className={`border px-4 py-2 rounded-xl text-xs font-bold ${
+      temaClaro
+        ? "bg-slate-100 border-slate-200 text-slate-700"
+        : "bg-[#111827] border-slate-700 text-slate-300"
+    }`}
+  >
+    Conversaciones: {clientes.length}
   </div>
 
-  <div className="flex gap-3">
-    <button
-      className={`border px-4 py-2 rounded-xl ${
-        temaClaro
-          ? "bg-white border-slate-300 text-slate-700"
-          : "bg-[#111827] border-slate-700 text-white"
-      }`}
-    >
-      Filtro
-    </button>
-
-    <button
-      className={`border px-4 py-2 rounded-xl ${
-        temaClaro
-          ? "bg-white border-slate-300 text-slate-700"
-          : "bg-[#111827] border-slate-700 text-white"
-      }`}
-    >
-      Asignado a: Todos
-    </button>
-
-    <Link
-      href="/contactos"
-      className="bg-green-600 px-4 py-2 rounded-xl font-bold text-white"
-    >
-      + Nueva oportunidad
-    </Link>
-  </div>
+  <Link
+    href="/contactos"
+    className="bg-green-600 px-4 py-2 rounded-xl font-bold text-white"
+  >
+    + Nueva oportunidad
+  </Link>
+</div>
 </div>
 
         {clientes.some((c) => c.requiere_closer) && (
@@ -369,6 +435,13 @@ const cambiarTema = () => {
                             </div>
                           )}
 
+<div
+  className={`mt-3 text-xs font-medium ${
+    temaClaro ? "text-slate-600" : "text-slate-300"
+  }`}
+>
+  Último mensaje: {formatearFechaHora(cliente.ultima_conversacion)}
+</div>
 
                           <div
   className={`mt-3 text-xs ${
