@@ -580,8 +580,17 @@ const PESOS_SENALES = {
   urgencia: 20,
 };
 
-async function actualizarCalificacionCliente(clienteId,whatsappQrId,texto){
-  const detectado=calificarMensajeCliente(texto);
+async function actualizarCalificacionCliente(
+  clienteId,
+  whatsappQrId,
+  texto,
+  senalesExtra = []
+) {
+  const detectado = calificarMensajeCliente(texto);
+
+  const extras = Array.isArray(senalesExtra)
+    ? senalesExtra.filter(Boolean)
+    : [];
 
   await pool.query(
     `UPDATE clientes_whatsapp_qr
@@ -607,7 +616,13 @@ async function actualizarCalificacionCliente(clienteId,whatsappQrId,texto){
   if(!r.rows[0] || r.rows[0].bot_activo===false) return null;
 
   const anteriores=Array.isArray(r.rows[0].bot_senales)?r.rows[0].bot_senales:[];
-  const senales=[...new Set([...anteriores,...detectado.senales])];
+  const senales = [
+  ...new Set([
+    ...anteriores,
+    ...detectado.senales,
+    ...extras,
+  ]),
+];
   const score=Math.min(100,senales.reduce((t,x)=>t+(PESOS_SENALES[x]||0),0));
   const temperatura=score>=80?'caliente':score>=25?'tibio':'frio';
 
@@ -1419,7 +1434,7 @@ const ultimoId = ids.length ? Math.max(...ids) : 0;
     primerId,
   });
 
-  const calificacion = await actualizarCalificacionCliente(
+  let calificacion = await actualizarCalificacionCliente(
     clienteId,
     whatsappQrId,
     textoAccion || ""
@@ -1467,6 +1482,34 @@ if (mensajeMasNuevo.rowCount > 0) {
 }
 
   const analisisCRM = respuestaBot?.analisis || null;
+
+const ciudadDetectada = String(
+  analisisCRM?.ciudad || ""
+).trim();
+
+if (
+  ciudadDetectada &&
+  !calificacion?.senales?.includes("ubicacion")
+) {
+  const recalificacion = await actualizarCalificacionCliente(
+    clienteId,
+    whatsappQrId,
+    "",
+    ["ubicacion"]
+  );
+
+  if (recalificacion) {
+    calificacion = recalificacion;
+
+    console.log("CALIFICACION ACTUALIZADA POR CIUDAD IA:", {
+      clienteId,
+      ciudad: ciudadDetectada,
+      senales: recalificacion.senales,
+      score: recalificacion.score,
+      temperatura: recalificacion.temperatura,
+    });
+  }
+}
 
   const etapaAutomatica = resolverEtapaAutomatica(
     memoria?.etapa,
@@ -1573,6 +1616,32 @@ if (mensajeMasNuevo.rowCount > 0) {
   try {
     await sock?.sendPresenceUpdate?.("paused", jidRespuesta);
   } catch {}
+
+const mensajeDuranteEspera = await pool.query(
+  `
+  SELECT id
+  FROM conversaciones
+  WHERE cliente_id = $1
+    AND whatsapp_qr_id = $2
+    AND remitente = 'cliente'
+    AND id > $3
+  ORDER BY id DESC
+  LIMIT 1
+  `,
+  [clienteId, whatsappQrId, ultimoId]
+);
+
+if (mensajeDuranteEspera.rowCount > 0) {
+  console.log("RESPUESTA BOT CANCELADA DURANTE DEMORA:", {
+    clienteId,
+    loteHasta: ultimoId,
+    nuevoId: mensajeDuranteEspera.rows[0].id,
+  });
+
+  return;
+}
+
+const multimediaSolicitada = respuestaBot?.multimedia || "ninguno";
 
   const multimediaSolicitada = respuestaBot?.multimedia || "ninguno";
 
