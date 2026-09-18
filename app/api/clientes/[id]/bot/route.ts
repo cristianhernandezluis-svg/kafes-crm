@@ -12,7 +12,9 @@ export async function PATCH(
   try {
     const { id } = await context.params;
     const body = await request.json();
+
     const whatsappQrId = Number(body.whatsapp_qr_id);
+    const accion = String(body.accion || "").toLowerCase();
 
     if (!whatsappQrId) {
       return NextResponse.json(
@@ -22,11 +24,17 @@ export async function PATCH(
     }
 
     const actual = await pool.query(
-      `SELECT id, etapa
-       FROM clientes_whatsapp_qr
-       WHERE cliente_id = $1
-         AND whatsapp_qr_id = $2
-       LIMIT 1`,
+      `
+      SELECT
+        id,
+        etapa,
+        bot_activo,
+        modo_humano_permanente
+      FROM clientes_whatsapp_qr
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
+      LIMIT 1
+      `,
       [id, whatsappQrId]
     );
 
@@ -37,7 +45,71 @@ export async function PATCH(
       );
     }
 
+    if (accion === "pausar") {
+      const result = await pool.query(
+        `
+        UPDATE clientes_whatsapp_qr
+        SET bot_activo = false,
+            modo_humano_permanente = true,
+            humano_hasta = NULL,
+            proximo_seguimiento = NULL,
+            requiere_closer = false,
+            handoff_motivo = 'intervencion_manual',
+            bot_contexto =
+              COALESCE(bot_contexto, '{}'::jsonb) ||
+              jsonb_build_object(
+                'seguimiento_silencio_activo', false,
+                'seguimiento_explicito_activo', false
+              ),
+            updated_at = NOW()
+        WHERE cliente_id = $1
+          AND whatsapp_qr_id = $2
+        RETURNING *
+        `,
+        [id, whatsappQrId]
+      );
+
+      return NextResponse.json({
+        success: true,
+        accion: "pausado",
+        cliente: result.rows[0],
+      });
+    }
+
+    if (accion === "activar") {
+      const result = await pool.query(
+        `
+        UPDATE clientes_whatsapp_qr
+        SET bot_activo = true,
+            modo_humano_permanente = false,
+            humano_hasta = NULL,
+            updated_at = NOW()
+        WHERE cliente_id = $1
+          AND whatsapp_qr_id = $2
+        RETURNING *
+        `,
+        [id, whatsappQrId]
+      );
+
+      return NextResponse.json({
+        success: true,
+        accion: "activado",
+        cliente: result.rows[0],
+      });
+    }
+
+if (actual.rows[0].modo_humano_permanente === true) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "El bot esta pausado manualmente. Debes activarlo con el boton Activar bot.",
+    },
+    { status: 409 }
+  );
+}
+
     const etapa = String(actual.rows[0].etapa || "");
+
     const esPostventa =
       (etapa.startsWith("Pag") && etapa.includes("Adelanto")) ||
       etapa === "Enviado" ||
@@ -54,7 +126,9 @@ export async function PATCH(
       `
       UPDATE clientes_whatsapp_qr
       SET bot_activo = true,
+          modo_humano_permanente = false,
           requiere_closer = false,
+          humano_hasta = NULL,
           bot_paso = 'postventa',
           updated_at = NOW()
       WHERE cliente_id = $1
@@ -69,9 +143,10 @@ export async function PATCH(
       cliente: result.rows[0],
     });
   } catch (error) {
-    console.error("ERROR DEVOLVIENDO AL BOT:", error);
+    console.error("ERROR CONTROLANDO BOT:", error);
+
     return NextResponse.json(
-      { success: false, error: "Error devolviendo conversacion al bot" },
+      { success: false, error: "Error controlando conversacion del bot" },
       { status: 500 }
     );
   }

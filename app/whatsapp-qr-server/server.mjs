@@ -589,6 +589,7 @@ async function actualizarCalificacionCliente(clienteId,whatsappQrId,texto){
      WHERE cliente_id=$1
        AND whatsapp_qr_id=$2
        AND bot_activo=false
+       AND COALESCE(modo_humano_permanente, false)=false
        AND (humano_hasta IS NULL OR humano_hasta <= NOW())`
 ,    [clienteId,whatsappQrId]
   );

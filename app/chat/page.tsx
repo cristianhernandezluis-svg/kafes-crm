@@ -15,6 +15,7 @@ type Cliente = {
   score?: number;
   temperatura?: string;
   bot_activo?: boolean;
+  modo_humano_permanente?: boolean;
   requiere_closer?: boolean;
   bot_producto?: string | null;
   bot_paso?: string | null;
@@ -161,7 +162,7 @@ setWhatsappQrId(nuevoQrId);
 };
 
 const cargarPlantillas = async () => {
-  
+
   const usuarioGuardado = localStorage.getItem("usuario");
 
   if (!usuarioGuardado) return;
@@ -387,6 +388,54 @@ const devolverAlBot = async () => {
   } catch (error) {
     console.error("Error devolviendo al bot:", error);
     alert("Error devolviendo al bot");
+  }
+};
+
+const cambiarControlBot = async () => {
+  if (!clienteActivo || !whatsappQrId) return;
+
+  const pausar = !clienteActivo.modo_humano_permanente;
+
+  try {
+    const res = await fetch(`/api/clientes/${clienteActivo.id}/bot`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        whatsapp_qr_id: whatsappQrId,
+        accion: pausar ? "pausar" : "activar",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(
+        data.error ||
+          (pausar
+            ? "No se pudo pausar el bot"
+            : "No se pudo activar el bot")
+      );
+      return;
+    }
+
+    setClienteActivo((actual) =>
+      actual
+        ? {
+            ...actual,
+            bot_activo: data.cliente.bot_activo ?? actual.bot_activo,
+            modo_humano_permanente:
+              data.cliente.modo_humano_permanente ??
+              actual.modo_humano_permanente,
+            requiere_closer:
+              data.cliente.requiere_closer ?? actual.requiere_closer,
+          }
+        : actual
+    );
+
+    cargarClientes();
+  } catch (error) {
+    console.error("Error cambiando control del bot:", error);
+    alert("Error cambiando control del bot");
   }
 };
 
@@ -1337,20 +1386,40 @@ useEffect(() => {
   </p>
 
   <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
-    Bot:{" "}
-    <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
-      {clienteActivo.bot_activo === false ? "Pausado" : "Activo"}
-    </span>
-  </p>
+  Bot:{" "}
+  <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
+    {clienteActivo.modo_humano_permanente
+      ? "Pausado manualmente"
+      : clienteActivo.bot_activo === false
+        ? "Pausado temporalmente"
+        : "Activo"}
+  </span>
+</p>
 
-  <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
-    Closer:{" "}
-    <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
-      {clienteActivo.requiere_closer ? "Requiere closer" : "Aun no"}
-    </span>
-  </p>
+<button
+  type="button"
+  onClick={cambiarControlBot}
+  className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-bold text-white ${
+    clienteActivo.modo_humano_permanente
+      ? "bg-green-600 hover:bg-green-700"
+      : "bg-red-600 hover:bg-red-700"
+  }`}
+>
+  {clienteActivo.modo_humano_permanente
+    ? "▶ Activar bot"
+    : "⏸ Pausar bot"}
+</button>
 
-  {clienteActivo.bot_paso === "postventa" && clienteActivo.bot_activo === false && (
+<p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
+  Closer:{" "}
+  <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
+    {clienteActivo.requiere_closer ? "Requiere closer" : "Aun no"}
+  </span>
+</p>
+
+{clienteActivo.bot_paso === "postventa" &&
+  clienteActivo.bot_activo === false &&
+  !clienteActivo.modo_humano_permanente && (
     <button
       type="button"
       onClick={devolverAlBot}
@@ -1358,7 +1427,8 @@ useEffect(() => {
     >
       🤖 Devolver al bot
     </button>
-  )}
+)}
+
 </div>
 
         <div

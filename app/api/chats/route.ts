@@ -32,6 +32,7 @@ export async function GET(request: Request) {
         COALESCE(rel.score, 0) AS score,
         COALESCE(rel.temperatura, 'frio') AS temperatura,
         COALESCE(rel.bot_activo, true) AS bot_activo,
+        COALESCE(rel.modo_humano_permanente, false) AS modo_humano_permanente,
         COALESCE(rel.requiere_closer, false) AS requiere_closer,
         rel.bot_producto AS bot_producto,
         rel.bot_paso AS bot_paso,
@@ -109,6 +110,7 @@ export async function PATCH(req: Request) {
             updated_at = NOW()
         WHERE cliente_id = $1
           AND whatsapp_qr_id = $2
+          AND COALESCE(modo_humano_permanente, false) = false
           AND humano_hasta IS NOT NULL
         `,
         [cliente_id, whatsapp_qr_id]

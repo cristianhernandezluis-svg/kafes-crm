@@ -39,7 +39,12 @@ export async function PATCH(
              END,
              cerrado_at = CASE WHEN $1 LIKE 'Pag%Adelanto' AND cerrado_at IS NULL THEN NOW() ELSE cerrado_at END,
              requiere_closer = CASE WHEN $1 LIKE 'Pag%Adelanto' THEN false ELSE requiere_closer END,
-             bot_activo = CASE WHEN $1 LIKE 'Pag%Adelanto' THEN true ELSE bot_activo END,
+             bot_activo = CASE
+  WHEN $1 LIKE 'Pag%Adelanto'
+       AND COALESCE(modo_humano_permanente, false) = false
+    THEN true
+  ELSE bot_activo
+END,
              bot_paso = CASE WHEN $1 LIKE 'Pag%Adelanto' THEN 'postventa' ELSE bot_paso END,
              updated_at = NOW()
          WHERE cliente_id = $6
