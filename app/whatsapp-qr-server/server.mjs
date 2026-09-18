@@ -628,6 +628,7 @@ async function programarSeguimientoExplicito({
       AND bot_activo = true
       AND COALESCE(requiere_closer, false) = false
       AND etapa NOT IN (
+ 	'Seguimiento',
         'Pago por validar',
         'Pagó Adelanto',
         'Enviado',
@@ -809,11 +810,33 @@ async function procesarSeguimientosExplicitos() {
   }
 }
 
+function esPostergacionCliente(texto) {
+  const t = normalizarTexto(String(texto || ""));
+
+  return [
+    /\bpor ahora no\b/,
+    /\bpor el momento no\b/,
+    /\b(?:x\s+)?ahora no\b/,
+    /\bahorita no\b/,
+    /\bmas adelante\b/,
+    /\bsera mas adelante\b/,
+    /\bmejor mas adelante\b/,
+    /\bno puedo ahora\b/,
+    /\bno puedo ahorita\b/,
+    /\bcuando pueda\b/,
+    /\bcuando tenga dinero\b/,
+    /\bcuando tenga plata\b/,
+    /\btengo unos? problemitas?\b/,
+    /\btengo problemas? ahorita\b/,
+  ].some((regex) => regex.test(t));
+}
+
 async function programarSeguimientoSilencio({
   clienteId,
   whatsappQrId,
   analisisCRM,
   requiereCloserIA,
+  textoCliente,
 }) {
   if (analisisCRM?.seguimiento === true) {
     await programarSeguimientoExplicito({
@@ -827,6 +850,44 @@ async function programarSeguimientoSilencio({
 
   if (requiereCloserIA === true) {
     await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+    return;
+  }
+
+  const esPostergacion =
+    String(analisisCRM?.etapa_sugerida || "").trim() === "Seguimiento" ||
+    esPostergacionCliente(textoCliente);
+
+  if (esPostergacion) {
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+
+    await pool.query(
+      `
+      UPDATE clientes_whatsapp_qr
+      SET etapa = CASE
+            WHEN etapa IN ('Nuevo', 'Interesado', 'Calificado', 'No Responde')
+            THEN 'Seguimiento'
+            ELSE etapa
+          END,
+          proximo_seguimiento = NULL,
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
+        AND etapa NOT IN (
+          'Pago por validar',
+          'PagÃ³ Adelanto',
+          'Enviado',
+          'Entregado',
+          'Descartado'
+        )
+      `,
+      [clienteId, whatsappQrId]
+    );
+
+    console.log(
+      "SEGUIMIENTO SILENCIO NO PROGRAMADO POR POSTERGACION:",
+      clienteId
+    );
+
     return;
   }
 
@@ -1625,11 +1686,12 @@ async function procesarLoteBot(lote) {
   );
 
   await programarSeguimientoSilencio({
-    clienteId,
-    whatsappQrId,
-    analisisCRM,
-    requiereCloserIA,
-  });
+  clienteId,
+  whatsappQrId,
+  analisisCRM,
+  requiereCloserIA,
+  textoCliente: textoAccion || textoBot,
+});
 
   console.log("BOT RESPONDIO:", {
     tipo: respuestaBot?.tipo,
