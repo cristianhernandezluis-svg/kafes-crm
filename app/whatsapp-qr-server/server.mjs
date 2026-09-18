@@ -584,7 +584,8 @@ async function actualizarCalificacionCliente(
   clienteId,
   whatsappQrId,
   texto,
-  senalesExtra = []
+  senalesExtra = [],
+  permitirPausado = false
 ) {
   const detectado = calificarMensajeCliente(texto);
 
@@ -613,7 +614,14 @@ async function actualizarCalificacionCliente(
     [clienteId,whatsappQrId]
   );
 
-  if(!r.rows[0] || r.rows[0].bot_activo===false) return null;
+  if (!r.rows[0]) return null;
+
+if (
+  r.rows[0].bot_activo === false &&
+  !permitirPausado
+) {
+  return null;
+}
 
   const anteriores=Array.isArray(r.rows[0].bot_senales)?r.rows[0].bot_senales:[];
   const senales = [
@@ -1492,11 +1500,12 @@ if (
   !calificacion?.senales?.includes("ubicacion")
 ) {
   const recalificacion = await actualizarCalificacionCliente(
-    clienteId,
-    whatsappQrId,
-    "",
-    ["ubicacion"]
-  );
+  clienteId,
+  whatsappQrId,
+  "",
+  ["ubicacion"],
+  true
+);
 
   if (recalificacion) {
     calificacion = recalificacion;
