@@ -1641,8 +1641,6 @@ if (mensajeDuranteEspera.rowCount > 0) {
   return;
 }
 
-const multimediaSolicitada = respuestaBot?.multimedia || "ninguno";
-
   const multimediaSolicitada = respuestaBot?.multimedia || "ninguno";
 
   const pausaMultimedia = () =>
