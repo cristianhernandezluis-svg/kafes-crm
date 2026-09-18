@@ -1399,6 +1399,8 @@ async function procesarLoteBot(lote) {
 
   const primerId = ids.length ? Math.min(...ids) : Number.MAX_SAFE_INTEGER;
 
+const ultimoId = ids.length ? Math.max(...ids) : 0;
+
   const partesBot = lote.map((item) => item.textoBot).filter(Boolean);
   const partesAccion = lote.map((item) => item.textoAccion).filter(Boolean);
 
@@ -1439,6 +1441,30 @@ async function procesarLoteBot(lote) {
   empresaId: empresaQrId,
   productoPrincipal: productoQrSlug,
 });
+
+  const mensajeMasNuevo = await pool.query(
+  `
+  SELECT id
+  FROM conversaciones
+  WHERE cliente_id = $1
+    AND whatsapp_qr_id = $2
+    AND remitente = 'cliente'
+    AND id > $3
+  ORDER BY id DESC
+  LIMIT 1
+  `,
+  [clienteId, whatsappQrId, ultimoId]
+);
+
+if (mensajeMasNuevo.rowCount > 0) {
+  console.log("RESPUESTA BOT DESCARTADA POR MENSAJE MAS NUEVO:", {
+    clienteId,
+    loteHasta: ultimoId,
+    nuevoId: mensajeMasNuevo.rows[0].id,
+  });
+
+  return;
+}
 
   const analisisCRM = respuestaBot?.analisis || null;
 
@@ -2476,17 +2502,68 @@ console.log("Mensaje guardado en PostgreSQL");
         .join("\n\n");
 
       if (!esMio && textoBot) {
-        const textoAccion = tipoMensaje === "audio" ? (mediaAnalisis || texto) : texto;
-        const jidRespuesta = msg.key.remoteJidAlt || `${telefono}@s.whatsapp.net`;
+  const textoAccion =
+    tipoMensaje === "audio"
+      ? (mediaAnalisis || texto)
+      : texto;
 
-        bufferMensajesBot.agregar(`${empresaQrId}:${clienteId}`, {
-          idConversacion: mensajeGuardado.rows[0].id,
-          clienteId,
-          telefono,
-          jidRespuesta,
-          textoBot,
-          textoAccion,
-        });
+  const jidRespuesta =
+    msg.key.remoteJidAlt || `${telefono}@s.whatsapp.net`;
+
+  const textoPrimerContacto = String(textoAccion || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[¡!¿?.,;:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const esMensajeGenericoPrimerContacto = [
+    "hola quiero mas informacion",
+    "quiero mas informacion",
+    "hola quiero informacion",
+    "quiero informacion",
+  ].includes(textoPrimerContacto);
+
+  let esPrimerContacto = false;
+
+  if (esMensajeGenericoPrimerContacto) {
+    const previo = await pool.query(
+      `
+      SELECT 1
+      FROM conversaciones
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
+        AND id < $3
+      LIMIT 1
+      `,
+      [
+        clienteId,
+        whatsappQrId,
+        mensajeGuardado.rows[0].id,
+      ]
+    );
+
+    esPrimerContacto = previo.rowCount === 0;
+  }
+
+  bufferMensajesBot.agregar(`${empresaQrId}:${clienteId}`, {
+    idConversacion: mensajeGuardado.rows[0].id,
+    clienteId,
+    telefono,
+    jidRespuesta,
+    textoBot,
+    textoAccion,
+    esPrimerContacto,
+  });
+
+  console.log("BUFFER BOT AGREGADO:", {
+    clienteId,
+    idConversacion: mensajeGuardado.rows[0].id,
+    tipoMensaje,
+    esPrimerContacto,
+  });
+}
 
         console.log("BUFFER BOT AGREGADO:", {
           clienteId,

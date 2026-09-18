@@ -1,6 +1,8 @@
 export function crearBufferMensajes({
   silencioMs = 3000,
   maxEsperaMs = 10000,
+  silencioPrimerContactoMs = 12000,
+  maxEsperaPrimerContactoMs = 12000,
   procesarLote,
 }) {
   const buffers = new Map();
@@ -29,6 +31,7 @@ export function crearBufferMensajes({
     if (!buffer) return;
 
     if (buffer.timer) clearTimeout(buffer.timer);
+
     buffers.delete(clave);
 
     if (buffer.items.length) {
@@ -45,25 +48,46 @@ export function crearBufferMensajes({
         inicio: ahora,
         items: [],
         timer: null,
+        primerContacto: item?.esPrimerContacto === true,
       };
+
       buffers.set(clave, buffer);
+    } else if (item?.esPrimerContacto === true) {
+      buffer.primerContacto = true;
     }
 
     buffer.items.push(item);
 
-    if (buffer.timer) clearTimeout(buffer.timer);
+    if (buffer.timer) {
+      clearTimeout(buffer.timer);
+    }
+
+    const silencioActual = buffer.primerContacto
+      ? silencioPrimerContactoMs
+      : silencioMs;
+
+    const maxEsperaActual = buffer.primerContacto
+      ? maxEsperaPrimerContactoMs
+      : maxEsperaMs;
 
     const transcurrido = ahora - buffer.inicio;
-    const restante = Math.max(0, maxEsperaMs - transcurrido);
+    const restante = Math.max(0, maxEsperaActual - transcurrido);
 
     if (restante === 0) {
       vaciar(clave);
       return;
     }
 
-    const espera = Math.min(silencioMs, restante);
-    buffer.timer = setTimeout(() => vaciar(clave), espera);
+    const espera = Math.min(silencioActual, restante);
+
+    buffer.timer = setTimeout(
+      () => vaciar(clave),
+      espera
+    );
   }
 
-  return { agregar, vaciar };
+  return {
+    agregar,
+    vaciar,
+  };
 }
