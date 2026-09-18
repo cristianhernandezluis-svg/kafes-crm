@@ -16,10 +16,33 @@ type Cliente = {
   requiere_closer?: boolean;
   handoff_motivo?: string | null;
   whatsapp_qr_id?: number | null;
+  temperatura?: string | null;
+score?: number | null;
   ultima_conversacion?: string | null;
 };
 
-const columnas = [{id:'frio',nombre:'FRIO',estados:['No Responde','Descartado'],guardar:'No Responde'},{id:'tibio',nombre:'TIBIO',estados:['Nuevo','Interesado','Seguimiento'],guardar:'Interesado'},{id:'caliente',nombre:'CALIENTE',estados:['Calificado','Pendiente Adelanto'],guardar:'Calificado'},{id:'pago-validar',nombre:'PAGO POR VALIDAR',estados:['Pago por validar'],guardar:'Pago por validar'}];
+const columnas = [
+  {
+    id: "frio",
+    nombre: "FRIO",
+    guardar: "No Responde",
+  },
+  {
+    id: "tibio",
+    nombre: "TIBIO",
+    guardar: "Interesado",
+  },
+  {
+    id: "caliente",
+    nombre: "CALIENTE",
+    guardar: "Calificado",
+  },
+  {
+    id: "pago-validar",
+    nombre: "PAGO POR VALIDAR",
+    guardar: "Pago por validar",
+  },
+];
 
 
 function etiquetaMotivoCloser(motivo?: string | null) {
@@ -309,7 +332,19 @@ const [fechaSeleccionada, setFechaSeleccionada] =
           ) : (
             <div className="flex gap-4 min-w-max">
               {columnas.map((columna, index) => {
-                const clientesEtapa = clientes.filter((c) => columna.estados.includes(c.etapa));
+                const clientesEtapa = clientes.filter((c) => {
+  if (columna.id === "pago-validar") {
+    return c.etapa === "Pago por validar";
+  }
+
+  if (c.etapa === "Pago por validar") {
+    return false;
+  }
+
+  const temperatura = String(c.temperatura || "frio").toLowerCase();
+
+  return temperatura === columna.id;
+});
 
                 return (
                   <div
@@ -459,19 +494,15 @@ const [fechaSeleccionada, setFechaSeleccionada] =
   WhatsApp
 </Link>
 
-                            <select
-                              value={columna.guardar}
-                              onChange={(e) =>
-                                moverEtapa(cliente, e.target.value)
-                              }
-                              className={`border rounded-lg text-xs px-2 ${
-  temaClaro
-    ? "bg-white border-slate-300 text-slate-700"
-    : "bg-[#0f172a] border-slate-700 text-white"
-}`}
-                            >
-                              {columnas.map((col) => (<option key={col.id} value={col.guardar}>{col.nombre}</option>))}
-                            </select>
+                            <div
+  className={`border rounded-lg text-xs px-3 py-2 text-center font-bold ${
+    temaClaro
+      ? "bg-white border-slate-300 text-slate-700"
+      : "bg-[#0f172a] border-slate-700 text-white"
+  }`}
+>
+  {columna.nombre}
+</div>
                           </div>
                         </div>
                       ))}

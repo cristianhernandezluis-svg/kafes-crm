@@ -37,6 +37,18 @@ export async function GET(request: Request) {
         clientes.telefono,
         clientes.ciudad,
 
+CASE
+  WHEN $2::integer IS NOT NULL
+  THEN COALESCE(rel.temperatura, 'frio')
+  ELSE 'frio'
+END AS temperatura,
+
+CASE
+  WHEN $2::integer IS NOT NULL
+  THEN COALESCE(rel.score, 0)
+  ELSE 0
+END AS score,
+
         CASE
           WHEN $2::integer IS NOT NULL
           THEN COALESCE(rel.etapa, 'Nuevo')
