@@ -628,7 +628,6 @@ async function programarSeguimientoExplicito({
       AND bot_activo = true
       AND COALESCE(requiere_closer, false) = false
       AND etapa NOT IN (
- 	'Seguimiento',
         'Pago por validar',
         'Pagó Adelanto',
         'Enviado',
@@ -838,6 +837,63 @@ async function programarSeguimientoSilencio({
   requiereCloserIA,
   textoCliente,
 }) {
+  const esPostergacion = esPostergacionCliente(textoCliente);
+
+  const tieneFechaExplicita =
+    String(analisisCRM?.seguimiento_fecha || "").trim() !== "";
+
+  // Ej:
+  // "más adelante", "por ahora no", "ahorita no".
+  // Si NO dio una fecha concreta, no perseguirlo con otro ciclo.
+  if (esPostergacion && !tieneFechaExplicita) {
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+
+    await pool.query(
+      `
+      UPDATE clientes_whatsapp_qr
+      SET etapa = CASE
+            WHEN etapa IN (
+              'Nuevo',
+              'Interesado',
+              'Calificado',
+              'No Responde'
+            )
+            THEN 'Seguimiento'
+            ELSE etapa
+          END,
+          proximo_seguimiento = NULL,
+          bot_contexto =
+            COALESCE(bot_contexto, '{}'::jsonb) ||
+            jsonb_build_object(
+              'seguimiento_silencio_activo', false,
+              'seguimiento_silencio_intento', 0,
+              'seguimiento_explicito_activo', false,
+              'seguimiento_explicito_para', NULL
+            ),
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
+        AND etapa NOT IN (
+          'Pago por validar',
+          'Pagó Adelanto',
+          'Enviado',
+          'Entregado',
+          'Descartado'
+        )
+      `,
+      [clienteId, whatsappQrId]
+    );
+
+    console.log(
+      "POSTERGACION SIN FECHA -> SIN SEGUIMIENTO AUTOMATICO:",
+      clienteId
+    );
+
+    return;
+  }
+
+  // Si el cliente sí dio una fecha concreta:
+  // "escríbeme mañana", "el viernes", etc.
   if (analisisCRM?.seguimiento === true) {
     await programarSeguimientoExplicito({
       clienteId,
@@ -853,45 +909,18 @@ async function programarSeguimientoSilencio({
     return;
   }
 
-  const esPostergacion =
-    String(analisisCRM?.etapa_sugerida || "").trim() === "Seguimiento" ||
-    esPostergacionCliente(textoCliente);
-
-  if (esPostergacion) {
+  // Si la IA lo clasificó como Seguimiento pero no existe
+  // una fecha explícita, tampoco arrancar seguimiento por silencio.
+  if (
+    String(analisisCRM?.etapa_sugerida || "").trim() === "Seguimiento"
+  ) {
     await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
-
-    await pool.query(
-      `
-      UPDATE clientes_whatsapp_qr
-      SET etapa = CASE
-            WHEN etapa IN ('Nuevo', 'Interesado', 'Calificado', 'No Responde')
-            THEN 'Seguimiento'
-            ELSE etapa
-          END,
-          proximo_seguimiento = NULL,
-          updated_at = NOW()
-      WHERE cliente_id = $1
-        AND whatsapp_qr_id = $2
-        AND etapa NOT IN (
-          'Pago por validar',
-          'PagÃ³ Adelanto',
-          'Enviado',
-          'Entregado',
-          'Descartado'
-        )
-      `,
-      [clienteId, whatsappQrId]
-    );
-
-    console.log(
-      "SEGUIMIENTO SILENCIO NO PROGRAMADO POR POSTERGACION:",
-      clienteId
-    );
-
     return;
   }
 
-  const proximaFecha = fechaDesdeAhora(FOLLOWUP_1_MIN * 60 * 1000);
+  const proximaFecha = fechaDesdeAhora(
+    FOLLOWUP_1_MIN * 60 * 1000
+  );
 
   const result = await pool.query(
     `
@@ -914,6 +943,7 @@ async function programarSeguimientoSilencio({
       AND bot_activo = true
       AND COALESCE(requiere_closer, false) = false
       AND etapa NOT IN (
+        'Seguimiento',
         'Pago por validar',
         'Pagó Adelanto',
         'Enviado',
