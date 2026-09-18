@@ -18,18 +18,7 @@ type Cliente = {
   whatsapp_qr_id?: number | null;
 };
 
-const etapas = [
-  "Nuevo",
-  "Interesado",
-  "Calificado",
-  "Seguimiento",
-  "Pago por validar",
-  "Pagó Adelanto",
-  "Enviado",
-  "Entregado",
-  "No Responde",
-  "Descartado",
-];
+const columnas = [{id:'frio',nombre:'FRIO',estados:['No Responde','Descartado'],guardar:'No Responde'},{id:'tibio',nombre:'TIBIO',estados:['Nuevo','Interesado','Seguimiento'],guardar:'Interesado'},{id:'caliente',nombre:'CALIENTE',estados:['Calificado','Pendiente Adelanto'],guardar:'Calificado'},{id:'pago-validar',nombre:'PAGO POR VALIDAR',estados:['Pago por validar'],guardar:'Pago por validar'}];
 
 
 function etiquetaMotivoCloser(motivo?: string | null) {
@@ -253,25 +242,25 @@ const cambiarTema = () => {
             <p className="text-slate-400">Cargando Kanban...</p>
           ) : (
             <div className="flex gap-4 min-w-max">
-              {etapas.map((etapa, index) => {
-                const clientesEtapa = clientes.filter((c) => c.etapa === etapa);
+              {columnas.map((columna, index) => {
+                const clientesEtapa = clientes.filter((c) => columna.estados.includes(c.etapa));
 
                 return (
                   <div
-                    key={etapa}
-                    className={`w-[280px] border rounded-2xl overflow-hidden ${
+                    key={columna.id}
+                    className={`w-[280px] border rounded-2xl ${
   temaClaro
     ? "bg-white border-slate-200"
     : "bg-[#0f172a] border-slate-800"
 }`}
                   >
                     <div
-  className={`p-4 border-b ${
-    temaClaro ? "border-slate-200" : "border-slate-800"
+  className={`p-4 border-b sticky top-0 z-20 ${
+    temaClaro ? "border-slate-200 bg-white" : "border-slate-800 bg-[#0f172a]"
   }`}
 >
                       <div className="flex justify-between items-center">
-                        <h2 className="font-bold">{etapa}</h2>
+                        <h2 className="font-bold">{columna.nombre}</h2>
 
                         <span
   className={`text-xs px-2 py-1 rounded-full ${
@@ -356,7 +345,7 @@ const cambiarTema = () => {
 
                           <div className="mt-3 flex flex-wrap gap-2">
                             <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded-full text-[11px]">
-                              {cliente.etapa}
+                              {columna.nombre}
                             </span>
 
                             <span
@@ -398,7 +387,7 @@ const cambiarTema = () => {
 </Link>
 
                             <select
-                              value={cliente.etapa}
+                              value={columna.guardar}
                               onChange={(e) =>
                                 moverEtapa(cliente, e.target.value)
                               }
@@ -408,11 +397,7 @@ const cambiarTema = () => {
     : "bg-[#0f172a] border-slate-700 text-white"
 }`}
                             >
-                              {etapas.map((e) => (
-                                <option key={e} value={e}>
-                                  {e}
-                                </option>
-                              ))}
+                              {columnas.map((col) => (<option key={col.id} value={col.guardar}>{col.nombre}</option>))}
                             </select>
                           </div>
                         </div>
