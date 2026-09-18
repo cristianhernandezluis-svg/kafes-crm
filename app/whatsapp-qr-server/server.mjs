@@ -477,53 +477,107 @@ function resolverEtapaAutomatica(etapaActual, etapaSugerida) {
 }
 
 function calificarMensajeCliente(texto) {
-  const t = normalizarTexto(texto);
+  const t = normalizarTexto(String(texto || ""));
+
+  const limpio = t
+    .replace(/[¡!¿?.,;:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
   const senales = [];
 
-  if (/\b(precio|cuanto|costo|vale)\b/.test(t))
-    senales.push("precio");
+  // Entradas genéricas desde publicidad:
+  // NO deben subir a TIBIO.
+  const entradasNeutras = [
+    "hola",
+    "info",
+    "informacion",
+    "mas informacion",
+    "quiero informacion",
+    "quiero mas informacion",
+    "hola quiero informacion",
+    "hola quiero mas informacion",
+  ];
 
-  if (/\b(envio|envios|delivery|entrega|entregas|llega|llegan|agencia|agencias|shalom|olva)\b/.test(t))
-    senales.push("envio");
+  if (entradasNeutras.includes(limpio)) {
+    return { senales: [] };
+  }
 
-  if (/\b(ciudad|distrito|provincia|departamento|direccion|soy de|vivo en)\b/.test(t))
-    senales.push("ubicacion");
-
-  if (/\bgarantia\b/.test(t))
-    senales.push("garantia");
-
-  if (/\b(yape|plin|transferencia|transferir|deposito|depositar|pago|pagos|pagar)\b/.test(t))
-    senales.push("pago");
-
-  // Interés real, pero todavía no significa compra
+  // Preguntar solo el precio es todavía una señal débil.
   if (
-    /\b(mas informacion|informacion|me interesa|estoy interesado|quisiera saber|quiero saber|quiero informacion)\b/.test(t)
+    /^(precio|el precio|cuanto|cuanto cuesta|cuanto vale|costo)$/.test(limpio)
+  ) {
+    senales.push("precio");
+  }
+
+  // Ubicación real del cliente.
+  if (
+    /\b(soy de|vivo en|estoy en|me encuentro en|ciudad|distrito|provincia|departamento)\b/.test(t)
+  ) {
+    senales.push("ubicacion");
+  }
+
+  // Interés por el envío.
+  if (
+    /\b(envio|envios|delivery|entrega|entregan|llega|llegan|shalom|olva|agencia)\b/.test(t)
+  ) {
+    senales.push("envio");
+  }
+
+  // Preguntas que demuestran evaluación real del producto.
+  if (
+    /\b(garantia|garantía)\b/.test(t)
+  ) {
+    senales.push("garantia");
+  }
+
+  if (
+    /\b(sirve|funciona|compatible|puedo usar|se puede usar|para porcelanato|para ceramica|para granito|para marmol)\b/.test(t)
+  ) {
+    senales.push("compatibilidad");
+  }
+
+  // Interés expresado claramente.
+  if (
+    /\b(me interesa|estoy interesado|estoy interesada|me interesa bastante|quisiera comprar despues)\b/.test(t)
   ) {
     senales.push("interes");
   }
 
-  // Intención de compra: solo expresiones claras
+  // Intención clara de compra.
   if (
-    /\b(quiero comprar|deseo comprar|voy a comprar|lo compro|la compro|quiero uno|quiero una|separame uno|separame una|reservame uno|reservame una|quiero hacer el pedido|como hago el pedido|como compro)\b/.test(t)
+    /\b(quiero comprar|deseo comprar|voy a comprar|lo compro|la compro|quiero uno|quiero una|separame uno|separame una|reservame uno|reservame una|quiero hacer el pedido|como hago el pedido|como hago para comprar|como compro|como pido)\b/.test(t)
   ) {
     senales.push("intencion_compra");
   }
 
-  if (/\b(hoy|ahora|ya mismo)\b/.test(t))
+  // Intención de pago = cliente muy avanzado.
+  if (
+    /\b(yape|plin|transferencia|transferir|deposito|depositar|voy a pagar|quiero pagar|te pago|pasame tu yape|numero de yape)\b/.test(t)
+  ) {
+    senales.push("pago");
+  }
+
+  // Urgencia por sí sola no basta para convertirlo en caliente.
+  if (
+    /\b(hoy|ahorita|ahora mismo|ya mismo|urgente)\b/.test(t)
+  ) {
     senales.push("urgencia");
+  }
 
   return { senales };
 }
 
 const PESOS_SENALES = {
-  precio: 5,
-  envio: 10,
-  ubicacion: 10,
-  garantia: 5,
-  pago: 30,
+  precio: 10,
+  envio: 25,
+  ubicacion: 25,
+  garantia: 25,
+  compatibilidad: 25,
   interes: 25,
-  intencion_compra: 60,
-  urgencia: 10,
+  pago: 80,
+  intencion_compra: 80,
+  urgencia: 20,
 };
 
 async function actualizarCalificacionCliente(clienteId,whatsappQrId,texto){
