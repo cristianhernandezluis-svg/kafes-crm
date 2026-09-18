@@ -476,9 +476,55 @@ function resolverEtapaAutomatica(etapaActual, etapaSugerida) {
   return sugeridoRango >= actualRango ? sugerida : null;
 }
 
-function calificarMensajeCliente(texto){const t=normalizarTexto(texto);const senales=[];if(/\b(precio|cuanto|costo|vale)\b/.test(t))senales.push('precio');if(/\b(envio|envios|delivery|entrega|entregas|llega|llegan|agencia|agencias|shalom|olva)\b/.test(t))senales.push('envio');if(/\b(ciudad|distrito|provincia|departamento|direccion|soy de|vivo en)\b/.test(t))senales.push('ubicacion');if(/\b(garantia)\b/.test(t))senales.push('garantia');if(/\b(yape|plin|transferencia|transferir|deposito|depositar|pago|pagos|pagar)\b/.test(t))senales.push('pago');if(/\b(quiero|compro|comprar|separar|separame|reservar|pedido|quiero uno)\b/.test(t))senales.push('intencion_compra');if(/\b(hoy|ahora|ya mismo)\b/.test(t))senales.push('urgencia');return {senales};}
+function calificarMensajeCliente(texto) {
+  const t = normalizarTexto(texto);
+  const senales = [];
 
-const PESOS_SENALES={precio:5,envio:10,ubicacion:10,garantia:5,pago:30,intencion_compra:60,urgencia:10};
+  if (/\b(precio|cuanto|costo|vale)\b/.test(t))
+    senales.push("precio");
+
+  if (/\b(envio|envios|delivery|entrega|entregas|llega|llegan|agencia|agencias|shalom|olva)\b/.test(t))
+    senales.push("envio");
+
+  if (/\b(ciudad|distrito|provincia|departamento|direccion|soy de|vivo en)\b/.test(t))
+    senales.push("ubicacion");
+
+  if (/\bgarantia\b/.test(t))
+    senales.push("garantia");
+
+  if (/\b(yape|plin|transferencia|transferir|deposito|depositar|pago|pagos|pagar)\b/.test(t))
+    senales.push("pago");
+
+  // Interés real, pero todavía no significa compra
+  if (
+    /\b(mas informacion|informacion|me interesa|estoy interesado|quisiera saber|quiero saber|quiero informacion)\b/.test(t)
+  ) {
+    senales.push("interes");
+  }
+
+  // Intención de compra: solo expresiones claras
+  if (
+    /\b(quiero comprar|deseo comprar|voy a comprar|lo compro|la compro|quiero uno|quiero una|separame uno|separame una|reservame uno|reservame una|quiero hacer el pedido|como hago el pedido|como compro)\b/.test(t)
+  ) {
+    senales.push("intencion_compra");
+  }
+
+  if (/\b(hoy|ahora|ya mismo)\b/.test(t))
+    senales.push("urgencia");
+
+  return { senales };
+}
+
+const PESOS_SENALES = {
+  precio: 5,
+  envio: 10,
+  ubicacion: 10,
+  garantia: 5,
+  pago: 30,
+  interes: 25,
+  intencion_compra: 60,
+  urgencia: 10,
+};
 
 async function actualizarCalificacionCliente(clienteId,whatsappQrId,texto){
   const detectado=calificarMensajeCliente(texto);
