@@ -248,7 +248,7 @@ const promptActivo =
     : PROMPT_VENDEDOR;
 
   const response = await client.responses.parse({
-    model: "gpt-5.6-terra",
+    model: "gpt-4.1-mini",
     instructions: promptActivo,
     input: contexto,
     text: {
