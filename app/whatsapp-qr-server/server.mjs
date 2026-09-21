@@ -2120,6 +2120,40 @@ if (!canalHistorialListo) {
         contenido.templateButtonReplyMessage?.selectedDisplayText ||
         "";
 
+const contextInfoMeta =
+  contenido.extendedTextMessage?.contextInfo ||
+  contenido.imageMessage?.contextInfo ||
+  contenido.videoMessage?.contextInfo ||
+  contenido.documentMessage?.contextInfo ||
+  null;
+
+const externalAdReply =
+  contextInfoMeta?.externalAdReply || null;
+
+if (msg.key.fromMe !== true && contextInfoMeta) {
+  console.log("META ADS ENTRADA:", {
+    telefono,
+    ctwaClid:
+      contextInfoMeta?.ctwaClid || null,
+    conversionSource:
+      contextInfoMeta?.conversionSource || null,
+    entryPointConversionSource:
+      contextInfoMeta?.entryPointConversionSource || null,
+    sourceType:
+      contextInfoMeta?.sourceType || null,
+    sourceId:
+      externalAdReply?.sourceId || null,
+    sourceUrl:
+      externalAdReply?.sourceUrl || null,
+    title:
+      externalAdReply?.title || null,
+    body:
+      externalAdReply?.body || null,
+    mediaType:
+      externalAdReply?.mediaType ?? null,
+  });
+}
+
       let tipoMensaje = 'text';
       let textoGuardado = texto;
 
