@@ -399,6 +399,483 @@ function construirSiguiente(
   return mapa;
 }
 
+function construirSiguientePorHandle(
+  conexiones
+) {
+  const mapa = new Map();
+
+  for (
+    const conexion of conexiones
+  ) {
+    const handle =
+      conexion.source_handle ||
+      "";
+
+    if (!handle) continue;
+
+    mapa.set(
+      `${conexion.source_uid}::${handle}`,
+      conexion.target_uid
+    );
+  }
+
+  return mapa;
+}
+
+function normalizarCondicion(
+  valor = ""
+) {
+  return String(
+    valor == null ? "" : valor
+  )
+    .trim()
+    .toLocaleLowerCase("es");
+}
+
+function gruposCondicionDesdeConfig(
+  config = {}
+) {
+  if (
+    Array.isArray(
+      config?.condicionGrupos
+    ) &&
+    config.condicionGrupos.length > 0
+  ) {
+    return config.condicionGrupos;
+  }
+
+  return [
+    {
+      id: "legacy",
+      modo: "todas",
+      reglas: [
+        {
+          id: "legacy-regla",
+          campo: "ultimo_mensaje",
+          operador:
+            config?.condicionOperador ||
+            "contiene",
+          valor:
+            config?.condicionValor || "",
+        },
+      ],
+    },
+  ];
+}
+
+function evaluarReglaCondicion({
+  actualRaw,
+  operador,
+  esperadoRaw,
+}) {
+  const tieneActual =
+    actualRaw !== null &&
+    actualRaw !== undefined &&
+    String(actualRaw).trim() !== "";
+
+  if (operador === "tiene_valor") {
+    return tieneActual;
+  }
+
+  if (operador === "sin_valor") {
+    return !tieneActual;
+  }
+
+  const actual =
+    normalizarCondicion(
+      actualRaw
+    );
+
+  const esperado =
+    normalizarCondicion(
+      esperadoRaw
+    );
+
+  if (!esperado) {
+    return false;
+  }
+
+  if (operador === "igual") {
+    return actual === esperado;
+  }
+
+  if (operador === "no_igual") {
+    return actual !== esperado;
+  }
+
+  if (operador === "contiene") {
+    return actual.includes(
+      esperado
+    );
+  }
+
+  if (
+    operador === "no_contiene"
+  ) {
+    return !actual.includes(
+      esperado
+    );
+  }
+
+  if (
+    operador === "empieza_con"
+  ) {
+    return actual.startsWith(
+      esperado
+    );
+  }
+
+  if (
+    operador === "termina_con"
+  ) {
+    return actual.endsWith(
+      esperado
+    );
+  }
+
+  const numeroActual = Number(
+    String(actualRaw)
+      .replace(",", ".")
+  );
+
+  const numeroEsperado = Number(
+    String(esperadoRaw)
+      .replace(",", ".")
+  );
+
+  if (
+    !Number.isFinite(
+      numeroActual
+    ) ||
+    !Number.isFinite(
+      numeroEsperado
+    )
+  ) {
+    return false;
+  }
+
+  if (operador === "mayor_que") {
+    return (
+      numeroActual >
+      numeroEsperado
+    );
+  }
+
+  if (operador === "menor_que") {
+    return (
+      numeroActual <
+      numeroEsperado
+    );
+  }
+
+  if (
+    operador === "mayor_igual"
+  ) {
+    return (
+      numeroActual >=
+      numeroEsperado
+    );
+  }
+
+  if (
+    operador === "menor_igual"
+  ) {
+    return (
+      numeroActual <=
+      numeroEsperado
+    );
+  }
+
+  return false;
+}
+
+function evaluarGrupoCondicion({
+  grupo,
+  contexto,
+}) {
+  const reglas =
+    Array.isArray(grupo?.reglas)
+      ? grupo.reglas
+      : [];
+
+  if (reglas.length === 0) {
+    return false;
+  }
+
+  const resultados = reglas.map(
+    (regla) =>
+      evaluarReglaCondicion({
+        actualRaw:
+          contexto?.[
+            regla.campo
+          ],
+        operador:
+          regla.operador,
+        esperadoRaw:
+          regla.valor,
+      })
+  );
+
+  return grupo?.modo ===
+    "cualquiera"
+    ? resultados.some(Boolean)
+    : resultados.every(Boolean);
+}
+
+function contextoCondicionCliente({
+  estado,
+  textoCliente,
+  tipoMensajeCliente,
+  telefono,
+  flujoId,
+  productoFlujo,
+}) {
+  const ahora = new Date();
+
+  let horaActual = "";
+  let diaSemana = "";
+
+  try {
+    horaActual =
+      ahora.toLocaleTimeString(
+        "es-PE",
+        {
+          timeZone:
+            "America/Lima",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }
+      );
+
+    diaSemana =
+      ahora.toLocaleDateString(
+        "es-PE",
+        {
+          timeZone:
+            "America/Lima",
+          weekday: "long",
+        }
+      );
+  } catch {
+    horaActual =
+      ahora.toISOString()
+        .slice(11, 16);
+
+    diaSemana = "";
+  }
+
+  return {
+    ultimo_mensaje:
+      textoCliente || "",
+    tipo_ultimo_mensaje:
+      tipoMensajeCliente ||
+      "text",
+    telefono:
+      telefono || "",
+    producto:
+      estado?.bot_producto ||
+      productoFlujo ||
+      "",
+    etapa:
+      estado?.etapa || "",
+    score:
+      estado?.score ?? "",
+    temperatura:
+      estado?.temperatura || "",
+    requiere_closer:
+      estado?.requiere_closer ===
+      true,
+    bot_activo:
+      estado?.bot_activo !==
+      false,
+    seguimiento:
+      Boolean(
+        estado?.proximo_seguimiento
+      ),
+    source_id:
+      estado?.distribucion_post_id ||
+      "",
+    grupo_distribucion:
+      estado
+        ?.distribucion_grupo_id ??
+      "",
+    closer_asignado:
+      estado
+        ?.distribucion_closer_id ??
+      "",
+    usa_reemplazo:
+      estado
+        ?.distribucion_usando_reemplazo ===
+      true,
+    canal: "whatsapp",
+    flujo_id:
+      flujoId || "",
+    flujo_estado:
+      estado?.flujo_estado ||
+      "",
+    hora_actual:
+      horaActual,
+    dia_semana:
+      diaSemana,
+  };
+}
+
+function normalizarPilaFlujos(
+  valor
+) {
+  if (Array.isArray(valor)) {
+    return valor;
+  }
+
+  if (typeof valor === "string") {
+    try {
+      const parsed =
+        JSON.parse(valor);
+
+      return Array.isArray(parsed)
+        ? parsed
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+async function guardarContextoEjecucionFlujo(
+  pool,
+  {
+    clienteId,
+    whatsappQrId,
+    flujoEjecucionId,
+    pila,
+    estado,
+    nodoUid,
+  }
+) {
+  await pool.query(
+    `
+    UPDATE clientes_whatsapp_qr
+    SET
+      flujo_ejecucion_id = $3,
+      flujo_pila = $4::jsonb,
+      flujo_estado = $5,
+      flujo_nodo_uid = $6,
+      flujo_iniciado_at =
+        COALESCE(
+          flujo_iniciado_at,
+          NOW()
+        ),
+      flujo_completado_at = NULL,
+      updated_at = NOW()
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $2
+    `,
+    [
+      clienteId,
+      whatsappQrId,
+      flujoEjecucionId || null,
+      JSON.stringify(
+        Array.isArray(pila)
+          ? pila
+          : []
+      ),
+      estado,
+      nodoUid || null,
+    ]
+  );
+}
+
+async function retornarDesdeSubflujo({
+  pool,
+  clienteId,
+  whatsappQrId,
+  flujoRaizId,
+  pila,
+}) {
+  const restante = [
+    ...normalizarPilaFlujos(
+      pila
+    ),
+  ];
+
+  while (restante.length > 0) {
+    const frame =
+      restante.pop();
+
+    const flujoPadreId =
+      Number(
+        frame?.flujo_id || 0
+      );
+
+    if (!flujoPadreId) {
+      continue;
+    }
+
+    const continuarNodoUid =
+      String(
+        frame
+          ?.continuar_nodo_uid ||
+          ""
+      ).trim() || null;
+
+    if (!continuarNodoUid) {
+      /*
+       * El padre también terminó al
+       * volver del subflujo. Seguimos
+       * subiendo por la pila.
+       */
+      continue;
+    }
+
+    await guardarContextoEjecucionFlujo(
+      pool,
+      {
+        clienteId,
+        whatsappQrId,
+        flujoEjecucionId:
+          flujoPadreId,
+        pila: restante,
+        estado: "ejecutando",
+        nodoUid:
+          continuarNodoUid,
+      }
+    );
+
+    return {
+      reanudar: true,
+      flujoId:
+        flujoPadreId,
+      nodoUid:
+        continuarNodoUid,
+    };
+  }
+
+  /*
+   * Ya no existe un padre al cual
+   * regresar. Dejamos la ejecución
+   * nuevamente anclada al flujo raíz.
+   */
+  await guardarContextoEjecucionFlujo(
+    pool,
+    {
+      clienteId,
+      whatsappQrId,
+      flujoEjecucionId:
+        flujoRaizId || null,
+      pila: [],
+      estado: "ejecutando",
+      nodoUid: null,
+    }
+  );
+
+  return {
+    reanudar: false,
+  };
+}
+
 async function cargarFlujo(
   pool,
   {
@@ -501,6 +978,18 @@ async function actualizarEstado(
           THEN NOW()
           ELSE flujo_completado_at
         END,
+      flujo_pila =
+        CASE
+          WHEN $5 = true
+          THEN '[]'::jsonb
+          ELSE flujo_pila
+        END,
+      flujo_ejecucion_id =
+        CASE
+          WHEN $5 = true
+          THEN distribucion_flujo_id
+          ELSE flujo_ejecucion_id
+        END,
       updated_at = NOW()
     WHERE cliente_id = $1
       AND whatsapp_qr_id = $2
@@ -593,6 +1082,13 @@ export async function prepararEsquemaFlujos(
       ADD COLUMN IF NOT EXISTS
         distribucion_flujo_id INTEGER,
       ADD COLUMN IF NOT EXISTS
+        flujo_ejecucion_id INTEGER
+        REFERENCES flujos_bot(id)
+        ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS
+        flujo_pila JSONB NOT NULL
+        DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS
         flujo_estado TEXT DEFAULT 'sin_iniciar',
       ADD COLUMN IF NOT EXISTS
         flujo_nodo_uid TEXT,
@@ -611,16 +1107,32 @@ export async function procesarFlujoCliente({
   whatsappQrId,
   clienteId,
   telefono,
+  textoCliente = "",
+  tipoMensajeCliente = "text",
   jidRespuesta,
   mediaDir = "./auth/media",
+  _profundidadSubflujo = 0,
 }) {
   const estadoResult =
     await pool.query(
       `
       SELECT
         distribucion_flujo_id,
+        flujo_ejecucion_id,
+        flujo_pila,
         flujo_estado,
-        flujo_nodo_uid
+        flujo_nodo_uid,
+        bot_producto,
+        etapa,
+        score,
+        temperatura,
+        requiere_closer,
+        bot_activo,
+        proximo_seguimiento,
+        distribucion_post_id,
+        distribucion_grupo_id,
+        distribucion_closer_id,
+        distribucion_usando_reemplazo
       FROM clientes_whatsapp_qr
       WHERE cliente_id = $1
         AND whatsapp_qr_id = $2
@@ -645,12 +1157,28 @@ export async function procesarFlujoCliente({
   const estado =
     estadoResult.rows[0];
 
-  const flujoId =
+  const flujoRaizId =
     estado.distribucion_flujo_id
       ? Number(
           estado.distribucion_flujo_id
         )
       : null;
+
+  const flujoEjecucionId =
+    estado.flujo_ejecucion_id
+      ? Number(
+          estado.flujo_ejecucion_id
+        )
+      : null;
+
+  const flujoId =
+    flujoEjecucionId ||
+    flujoRaizId;
+
+  const pilaFlujo =
+    normalizarPilaFlujos(
+      estado.flujo_pila
+    );
 
   if (!flujoId) {
     return {
@@ -716,6 +1244,11 @@ export async function procesarFlujoCliente({
       cargado.conexiones
     );
 
+  const siguientePorHandle =
+    construirSiguientePorHandle(
+      cargado.conexiones
+    );
+
   let nodoActual = null;
 
   if (
@@ -750,6 +1283,37 @@ export async function procesarFlujoCliente({
   }
 
   if (!nodoActual) {
+    if (
+      pilaFlujo.length > 0
+    ) {
+      const retorno =
+        await retornarDesdeSubflujo({
+          pool,
+          clienteId,
+          whatsappQrId,
+          flujoRaizId,
+          pila: pilaFlujo,
+        });
+
+      if (retorno.reanudar) {
+        return procesarFlujoCliente({
+          pool,
+          sock,
+          empresaId,
+          whatsappQrId,
+          clienteId,
+          telefono,
+          textoCliente,
+          tipoMensajeCliente,
+          jidRespuesta,
+          mediaDir,
+          _profundidadSubflujo:
+            _profundidadSubflujo +
+            1,
+        });
+      }
+    }
+
     await actualizarEstado(
       pool,
       {
@@ -832,6 +1396,317 @@ export async function procesarFlujoCliente({
 
     if (
       nodo.tipo ===
+      "iniciar_flujo"
+    ) {
+      const flujoDestinoId =
+        Number(
+          nodo.config
+            ?.flujoDestinoId ||
+            0
+        );
+
+      const continuarNodoUid =
+        siguiente.get(
+          nodo.nodo_uid
+        ) || null;
+
+      if (
+        !flujoDestinoId ||
+        flujoDestinoId ===
+          flujoId ||
+        pilaFlujo.length >=
+          20 ||
+        _profundidadSubflujo >=
+          20
+      ) {
+        console.warn(
+          "FLUJO SUBFLUJO OMITIDO:",
+          {
+            clienteId,
+            flujoId,
+            nodoUid:
+              nodo.nodo_uid,
+            flujoDestinoId:
+              flujoDestinoId ||
+              null,
+            profundidad:
+              pilaFlujo.length,
+          }
+        );
+
+        nodoActual =
+          continuarNodoUid;
+
+        continue;
+      }
+
+      const destinoCargado =
+        await cargarFlujo(
+          pool,
+          {
+            empresaId,
+            flujoId:
+              flujoDestinoId,
+          }
+        );
+
+      if (!destinoCargado) {
+        console.warn(
+          "FLUJO SUBFLUJO NO DISPONIBLE:",
+          {
+            clienteId,
+            flujoId,
+            nodoUid:
+              nodo.nodo_uid,
+            flujoDestinoId,
+          }
+        );
+
+        nodoActual =
+          continuarNodoUid;
+
+        continue;
+      }
+
+      const nuevaPila = [
+        ...pilaFlujo,
+        {
+          flujo_id:
+            flujoId,
+          nodo_iniciar_uid:
+            nodo.nodo_uid,
+          continuar_nodo_uid:
+            continuarNodoUid,
+        },
+      ];
+
+      console.log(
+        "FLUJO INICIAR SUBFLUJO:",
+        {
+          clienteId,
+          flujoOrigenId:
+            flujoId,
+          flujoDestinoId,
+          nodoUid:
+            nodo.nodo_uid,
+          continuarNodoUid,
+          profundidad:
+            nuevaPila.length,
+        }
+      );
+
+      await guardarContextoEjecucionFlujo(
+        pool,
+        {
+          clienteId,
+          whatsappQrId,
+          flujoEjecucionId:
+            flujoDestinoId,
+          pila: nuevaPila,
+          estado:
+            "ejecutando",
+          nodoUid: null,
+        }
+      );
+
+      return procesarFlujoCliente({
+        pool,
+        sock,
+        empresaId,
+        whatsappQrId,
+        clienteId,
+        telefono,
+        textoCliente,
+        tipoMensajeCliente,
+        jidRespuesta,
+        mediaDir,
+        _profundidadSubflujo:
+          _profundidadSubflujo +
+          1,
+      });
+    }
+
+    if (
+      nodo.tipo ===
+      "condicion"
+    ) {
+      const grupos =
+        gruposCondicionDesdeConfig(
+          nodo.config || {}
+        );
+
+      const contexto =
+        contextoCondicionCliente({
+          estado,
+          textoCliente,
+          tipoMensajeCliente,
+          telefono,
+          flujoId,
+          productoFlujo:
+            cargado?.flujo
+              ?.producto_slug ||
+            "",
+        });
+
+      let indiceCoincidente =
+        -1;
+
+      for (
+        let i = 0;
+        i < grupos.length;
+        i += 1
+      ) {
+        if (
+          evaluarGrupoCondicion({
+            grupo: grupos[i],
+            contexto,
+          })
+        ) {
+          indiceCoincidente =
+            i;
+          break;
+        }
+      }
+
+      const salida =
+        indiceCoincidente === 0
+          ? "si"
+          : indiceCoincidente > 0
+          ? `grupo:${
+              grupos[
+                indiceCoincidente
+              ].id
+            }`
+          : "no";
+
+      console.log(
+        "FLUJO CONDICION:",
+        {
+          clienteId,
+          flujoId,
+          nodoUid:
+            nodo.nodo_uid,
+          grupos:
+            grupos.length,
+          grupoCoincidente:
+            indiceCoincidente >=
+            0
+              ? indiceCoincidente +
+                1
+              : null,
+          salida,
+        }
+      );
+
+      nodoActual =
+        siguientePorHandle.get(
+          `${nodo.nodo_uid}::${salida}`
+        ) || null;
+
+      continue;
+    }
+
+    if (
+      nodo.tipo ===
+      "accion"
+    ) {
+      const accion =
+        nodo.config
+          ?.accionFlujo ||
+        "activar_bot";
+
+      if (
+        accion ===
+        "finalizar_flujo"
+      ) {
+        await actualizarEstado(
+          pool,
+          {
+            clienteId,
+            whatsappQrId,
+            estado: "completado",
+            nodoUid:
+              nodo.nodo_uid,
+            completar: true,
+          }
+        );
+
+        return {
+          consumido: true,
+          botActivado: false,
+          motivo:
+            "finalizar_flujo",
+          flujoId,
+          flujoNombre:
+            cargado.flujo.nombre,
+        };
+      }
+
+      await actualizarEstado(
+        pool,
+        {
+          clienteId,
+          whatsappQrId,
+          estado: "completado",
+          nodoUid:
+            nodo.nodo_uid,
+          completar: true,
+        }
+      );
+
+      return {
+        consumido: false,
+        botActivado: true,
+        motivo:
+          "accion_activar_bot",
+        flujoId,
+        flujoNombre:
+          cargado.flujo.nombre,
+      };
+    }
+
+    if (
+      nodo.tipo ===
+      "esperar_tiempo"
+    ) {
+      const segundos =
+        Math.min(
+          60,
+          Math.max(
+            1,
+            numeroSeguro(
+              nodo.config
+                ?.esperaSegundos,
+              3
+            )
+          )
+        );
+
+      console.log(
+        "FLUJO ESPERANDO:",
+        {
+          clienteId,
+          flujoId,
+          nodoUid:
+            nodo.nodo_uid,
+          segundos,
+        }
+      );
+
+      await dormir(
+        segundos * 1000
+      );
+
+      nodoActual =
+        siguiente.get(
+          nodo.nodo_uid
+        ) || null;
+
+      continue;
+    }
+
+    if (
+      nodo.tipo ===
       "esperar_respuesta"
     ) {
       await actualizarEstado(
@@ -887,6 +1762,50 @@ export async function procesarFlujoCliente({
       siguiente.get(
         nodo.nodo_uid
       ) || null;
+  }
+
+  if (
+    pilaFlujo.length > 0
+  ) {
+    const retorno =
+      await retornarDesdeSubflujo({
+        pool,
+        clienteId,
+        whatsappQrId,
+        flujoRaizId,
+        pila: pilaFlujo,
+      });
+
+    if (retorno.reanudar) {
+      console.log(
+        "FLUJO REGRESAR AL PADRE:",
+        {
+          clienteId,
+          desdeFlujoId:
+            flujoId,
+          flujoPadreId:
+            retorno.flujoId,
+          nodoUid:
+            retorno.nodoUid,
+        }
+      );
+
+      return procesarFlujoCliente({
+        pool,
+        sock,
+        empresaId,
+        whatsappQrId,
+        clienteId,
+        telefono,
+        textoCliente,
+        tipoMensajeCliente,
+        jidRespuesta,
+        mediaDir,
+        _profundidadSubflujo:
+          _profundidadSubflujo +
+          1,
+      });
+    }
   }
 
   await actualizarEstado(

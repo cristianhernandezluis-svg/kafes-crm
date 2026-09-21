@@ -2957,6 +2957,9 @@ if (!esMio) {
         whatsappQrId,
         clienteId,
         telefono,
+        textoCliente:
+          textoGuardado || "",
+          tipoMensajeCliente: tipoMensaje || "text",
         jidRespuesta: jidFlujo,
         mediaDir: MEDIA_DIR,
       });

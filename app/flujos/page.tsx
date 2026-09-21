@@ -8,6 +8,7 @@ import {
   Controls,
   MiniMap,
   Handle,
+  NodeToolbar,
   Position,
   addEdge,
   applyEdgeChanges,
@@ -50,12 +51,409 @@ type ContenidoNodo = {
   segundos?: number;
 };
 
+type OperadorCondicion =
+  | "igual"
+  | "no_igual"
+  | "contiene"
+  | "no_contiene"
+  | "empieza_con"
+  | "termina_con"
+  | "tiene_valor"
+  | "sin_valor"
+  | "mayor_que"
+  | "menor_que"
+  | "mayor_igual"
+  | "menor_igual";
+
+type CampoCondicion =
+  | "ultimo_mensaje"
+  | "tipo_ultimo_mensaje"
+  | "telefono"
+  | "producto"
+  | "etapa"
+  | "score"
+  | "temperatura"
+  | "requiere_closer"
+  | "bot_activo"
+  | "seguimiento"
+  | "source_id"
+  | "grupo_distribucion"
+  | "closer_asignado"
+  | "usa_reemplazo"
+  | "canal"
+  | "flujo_id"
+  | "flujo_estado"
+  | "hora_actual"
+  | "dia_semana";
+
+type ReglaCondicion = {
+  id: string;
+  campo: CampoCondicion;
+  operador: OperadorCondicion;
+  valor?: string;
+};
+
+type GrupoCondicion = {
+  id: string;
+  nombre?: string;
+  modo: "todas" | "cualquiera";
+  reglas: ReglaCondicion[];
+};
+
 type DatosNodo = {
   titulo?: string;
   contenidos?: ContenidoNodo[];
   subtitulo?: string;
   tipoMensaje?: "omnichannel" | "webchat";
+  esperaSegundos?: number;
+  accionFlujo?:
+    | "activar_bot"
+    | "finalizar_flujo";
+  flujoDestinoId?: number | null;
+  flujoDestinoNombre?: string;
+
+  /*
+   * Compatibilidad con la primera versión de Condición.
+   * No eliminar: flujos antiguos pueden seguir teniendo estos campos.
+   */
+  condicionOperador?: OperadorCondicion;
+  condicionValor?: string;
+
+  /*
+   * Motor genérico de condiciones.
+   */
+  condicionGrupos?: GrupoCondicion[];
 };
+
+type TipoCampoCondicion =
+  | "texto"
+  | "numero"
+  | "booleano";
+
+type DefinicionCampoCondicion = {
+  id: CampoCondicion;
+  etiqueta: string;
+  categoria: string;
+  tipo: TipoCampoCondicion;
+};
+
+const CAMPOS_CONDICION: DefinicionCampoCondicion[] = [
+  {
+    id: "ultimo_mensaje",
+    etiqueta: "Último mensaje del usuario",
+    categoria: "Campos del sistema",
+    tipo: "texto",
+  },
+  {
+    id: "tipo_ultimo_mensaje",
+    etiqueta: "Tipo de último mensaje",
+    categoria: "Campos del sistema",
+    tipo: "texto",
+  },
+  {
+    id: "telefono",
+    etiqueta: "Número de teléfono",
+    categoria: "Cliente",
+    tipo: "texto",
+  },
+  {
+    id: "producto",
+    etiqueta: "Producto",
+    categoria: "CRM",
+    tipo: "texto",
+  },
+  {
+    id: "etapa",
+    etiqueta: "Etapa CRM",
+    categoria: "CRM",
+    tipo: "texto",
+  },
+  {
+    id: "score",
+    etiqueta: "Score",
+    categoria: "CRM",
+    tipo: "numero",
+  },
+  {
+    id: "temperatura",
+    etiqueta: "Temperatura",
+    categoria: "CRM",
+    tipo: "texto",
+  },
+  {
+    id: "requiere_closer",
+    etiqueta: "Requiere closer",
+    categoria: "CRM",
+    tipo: "booleano",
+  },
+  {
+    id: "bot_activo",
+    etiqueta: "Bot activo",
+    categoria: "CRM",
+    tipo: "booleano",
+  },
+  {
+    id: "seguimiento",
+    etiqueta: "Seguimiento programado",
+    categoria: "CRM",
+    tipo: "booleano",
+  },
+  {
+    id: "source_id",
+    etiqueta: "Post / sourceId",
+    categoria: "Distribución",
+    tipo: "texto",
+  },
+  {
+    id: "grupo_distribucion",
+    etiqueta: "Grupo de distribución",
+    categoria: "Distribución",
+    tipo: "numero",
+  },
+  {
+    id: "closer_asignado",
+    etiqueta: "Closer asignado",
+    categoria: "Distribución",
+    tipo: "numero",
+  },
+  {
+    id: "usa_reemplazo",
+    etiqueta: "Usa closer de reemplazo",
+    categoria: "Distribución",
+    tipo: "booleano",
+  },
+  {
+    id: "canal",
+    etiqueta: "Canal actual",
+    categoria: "Canal",
+    tipo: "texto",
+  },
+  {
+    id: "flujo_id",
+    etiqueta: "Flujo actual",
+    categoria: "Flujo",
+    tipo: "numero",
+  },
+  {
+    id: "flujo_estado",
+    etiqueta: "Estado del flujo",
+    categoria: "Flujo",
+    tipo: "texto",
+  },
+  {
+    id: "hora_actual",
+    etiqueta: "Hora actual",
+    categoria: "Fecha y hora",
+    tipo: "texto",
+  },
+  {
+    id: "dia_semana",
+    etiqueta: "Día actual de la semana",
+    categoria: "Fecha y hora",
+    tipo: "texto",
+  },
+];
+
+const ETIQUETAS_OPERADOR_CONDICION: Record<
+  OperadorCondicion,
+  string
+> = {
+  igual: "Es",
+  no_igual: "No es",
+  contiene: "Contiene",
+  no_contiene: "No contiene",
+  empieza_con: "Empieza por",
+  termina_con: "Termina en",
+  tiene_valor: "Tiene algún valor",
+  sin_valor: "No tiene valor",
+  mayor_que: "Mayor que",
+  menor_que: "Menor que",
+  mayor_igual: "Mayor o igual a",
+  menor_igual: "Menor o igual a",
+};
+
+function campoCondicion(
+  id: CampoCondicion
+) {
+  return (
+    CAMPOS_CONDICION.find(
+      (campo) => campo.id === id
+    ) || CAMPOS_CONDICION[0]
+  );
+}
+
+function operadoresParaCampo(
+  id: CampoCondicion
+): OperadorCondicion[] {
+  const tipo = campoCondicion(id).tipo;
+
+  if (tipo === "numero") {
+    return [
+      "igual",
+      "no_igual",
+      "mayor_que",
+      "menor_que",
+      "mayor_igual",
+      "menor_igual",
+      "tiene_valor",
+      "sin_valor",
+    ];
+  }
+
+  if (tipo === "booleano") {
+    return [
+      "igual",
+      "no_igual",
+    ];
+  }
+
+  return [
+    "igual",
+    "no_igual",
+    "contiene",
+    "no_contiene",
+    "empieza_con",
+    "termina_con",
+    "tiene_valor",
+    "sin_valor",
+  ];
+}
+
+function operadorUsaValor(
+  operador: OperadorCondicion
+) {
+  return ![
+    "tiene_valor",
+    "sin_valor",
+  ].includes(operador);
+}
+
+function crearReglaCondicion(): ReglaCondicion {
+  return {
+    id: idNuevo("regla"),
+    campo: "ultimo_mensaje",
+    operador: "contiene",
+    valor: "",
+  };
+}
+
+function crearGrupoCondicion(): GrupoCondicion {
+  return {
+    id: idNuevo("grupo-condicion"),
+    modo: "todas",
+    reglas: [
+      crearReglaCondicion(),
+    ],
+  };
+}
+
+function gruposCondicionDesdeDatos(
+  datos: DatosNodo
+): GrupoCondicion[] {
+  if (
+    Array.isArray(datos.condicionGrupos) &&
+    datos.condicionGrupos.length > 0
+  ) {
+    return datos.condicionGrupos.map(
+      (grupo, indice) => ({
+        id:
+          String(grupo?.id || "").trim() ||
+          `grupo-${indice + 1}`,
+        nombre: grupo?.nombre,
+        modo:
+          grupo?.modo === "cualquiera"
+            ? "cualquiera"
+            : "todas",
+        reglas:
+          Array.isArray(grupo?.reglas) &&
+          grupo.reglas.length > 0
+            ? grupo.reglas.map(
+                (regla, reglaIndice) => ({
+                  id:
+                    String(
+                      regla?.id || ""
+                    ).trim() ||
+                    `regla-${indice + 1}-${reglaIndice + 1}`,
+                  campo:
+                    (regla?.campo ||
+                      "ultimo_mensaje") as CampoCondicion,
+                  operador:
+                    (regla?.operador ||
+                      "contiene") as OperadorCondicion,
+                  valor:
+                    regla?.valor == null
+                      ? ""
+                      : String(regla.valor),
+                })
+              )
+            : [
+                {
+                  id: `regla-${indice + 1}-1`,
+                  campo: "ultimo_mensaje",
+                  operador: "contiene",
+                  valor: "",
+                },
+              ],
+      })
+    );
+  }
+
+  /*
+   * Migración en memoria del nodo antiguo SÍ/NO.
+   * El primer grupo seguirá utilizando handle "si";
+   * el fallback seguirá utilizando handle "no".
+   */
+  return [
+    {
+      id: "legacy",
+      modo: "todas",
+      reglas: [
+        {
+          id: "legacy-regla",
+          campo: "ultimo_mensaje",
+          operador:
+            datos.condicionOperador ||
+            "contiene",
+          valor:
+            datos.condicionValor || "",
+        },
+      ],
+    },
+  ];
+}
+
+function resumenGrupoCondicion(
+  grupo: GrupoCondicion
+) {
+  const primera = grupo.reglas[0];
+
+  if (!primera) {
+    return "Sin reglas";
+  }
+
+  const campo =
+    campoCondicion(primera.campo);
+
+  const operador =
+    ETIQUETAS_OPERADOR_CONDICION[
+      primera.operador
+    ] || primera.operador;
+
+  const valor =
+    operadorUsaValor(
+      primera.operador
+    ) &&
+    String(primera.valor || "").trim()
+      ? ` “${primera.valor}”`
+      : "";
+
+  const extra =
+    grupo.reglas.length > 1
+      ? ` +${grupo.reglas.length - 1}`
+      : "";
+
+  return `${campo.etiqueta} · ${operador}${valor}${extra}`;
+}
 
 type CloudinarySignatureResponse = {
   timestamp: number;
@@ -78,7 +476,110 @@ function idNuevo(prefijo: string) {
     .slice(2, 7)}`;
 }
 
+type AccionNodo =
+  | "preview"
+  | "inicial"
+  | "enlace"
+  | "id"
+  | "renombrar"
+  | "duplicar"
+  | "eliminar";
+
+function dispararAccionNodo(
+  nodeId: string,
+  accion: AccionNodo
+) {
+  window.dispatchEvent(
+    new CustomEvent("flujo:accion-nodo", {
+      detail: {
+        nodeId,
+        accion,
+      },
+    })
+  );
+}
+
+function BarraAccionesNodo({
+  nodeId,
+  selected,
+}: {
+  nodeId: string;
+  selected: boolean;
+}) {
+  if (!selected) return null;
+
+  const acciones: Array<{
+    accion: AccionNodo;
+    icono: string;
+    titulo: string;
+  }> = [
+    {
+      accion: "preview",
+      icono: "👁",
+      titulo: "Vista previa",
+    },
+    {
+      accion: "inicial",
+      icono: "▶",
+      titulo: "Asignar como paso inicial",
+    },
+    {
+      accion: "enlace",
+      icono: "🔗",
+      titulo: "Obtener enlace publicado",
+    },
+    {
+      accion: "id",
+      icono: "ID",
+      titulo: "Obtener ID de Paso",
+    },
+    {
+      accion: "renombrar",
+      icono: "T",
+      titulo: "Renombrar",
+    },
+    {
+      accion: "duplicar",
+      icono: "⧉",
+      titulo: "Duplicar",
+    },
+    {
+      accion: "eliminar",
+      icono: "🗑",
+      titulo: "Eliminar",
+    },
+  ];
+
+  return (
+    <NodeToolbar
+      isVisible={selected}
+      position={Position.Top}
+    >
+      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+        {acciones.map((item) => (
+          <button
+            key={item.accion}
+            type="button"
+            title={item.titulo}
+            onClick={(e) => {
+              e.stopPropagation();
+              dispararAccionNodo(
+                nodeId,
+                item.accion
+              );
+            }}
+            className="flex h-7 min-w-7 items-center justify-center rounded px-1 text-[10px] font-black text-slate-700 hover:bg-orange-50 hover:text-orange-600"
+          >
+            {item.icono}
+          </button>
+        ))}
+      </div>
+    </NodeToolbar>
+  );
+}
+
 function NodoInicio({
+  id,
   data,
   selected,
 }: NodeProps) {
@@ -92,6 +593,11 @@ function NodoInicio({
           : "border border-slate-300"
       }`}
     >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
       <div className="absolute -top-6 left-1 text-[10px] font-bold text-orange-500">
         ▶ Paso inicial
       </div>
@@ -189,6 +695,7 @@ function PreviewContenido({
 }
 
 function NodoMensaje({
+  id,
   data,
   selected,
 }: NodeProps) {
@@ -207,6 +714,11 @@ function NodoMensaje({
           : "border border-slate-300"
       }`}
     >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
       <Handle
         type="target"
         position={Position.Left}
@@ -250,6 +762,7 @@ function NodoMensaje({
 }
 
 function NodoEsperar({
+  id,
   data,
   selected,
 }: NodeProps) {
@@ -263,6 +776,11 @@ function NodoEsperar({
           : "border border-slate-300"
       }`}
     >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
       <Handle
         type="target"
         position={Position.Left}
@@ -271,7 +789,7 @@ function NodoEsperar({
 
       <div className="px-4 py-3">
         <p className="text-xs font-black">
-          ⏸ Esperar respuesta
+          ⏸ {d.titulo || "Esperar respuesta"}
         </p>
 
         <p className="mt-1 text-[11px] text-slate-500">
@@ -290,6 +808,7 @@ function NodoEsperar({
 }
 
 function NodoBot({
+  id,
   data,
   selected,
 }: NodeProps) {
@@ -303,6 +822,11 @@ function NodoBot({
           : "border border-green-500"
       }`}
     >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
       <Handle
         type="target"
         position={Position.Left}
@@ -310,7 +834,7 @@ function NodoBot({
       />
 
       <div className="rounded-t-xl bg-green-500 px-4 py-2 text-xs font-black text-white">
-        🤖 Activar bot
+        🤖 {d.titulo || "Activar bot"}
       </div>
 
       <div className="px-4 py-3 text-[11px] text-slate-500">
@@ -321,9 +845,267 @@ function NodoBot({
   );
 }
 
+function NodoIniciarFlujo({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const d = data as DatosNodo;
+
+  return (
+    <div
+      className={`relative min-w-[250px] rounded-xl bg-white text-slate-900 shadow-lg ${
+        selected
+          ? "border-2 border-orange-500"
+          : "border border-violet-300"
+      }`}
+    >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!h-3 !w-3 !bg-white"
+      />
+
+      <div className="rounded-t-xl border-b border-violet-200 bg-violet-50 px-4 py-2 text-xs font-black text-violet-800">
+        ↗ {d.titulo || "Iniciar Flujo"}
+      </div>
+
+      <div className="px-4 py-4">
+        <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/50 px-3 py-3 text-center">
+          <p className="text-[10px] font-black uppercase text-slate-500">
+            Enviar flujo
+          </p>
+
+          <p className="mt-1 max-w-[210px] truncate text-xs font-semibold text-slate-700">
+            {d.flujoDestinoNombre ||
+              "Click para escoger un flujo"}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end border-t border-slate-200 px-3 py-2">
+        <span className="mr-2 text-[10px] text-slate-500">
+          Continuar
+        </span>
+
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!relative !right-auto !top-auto !h-3 !w-3 !translate-x-0 !translate-y-0 !border !border-slate-400 !bg-white"
+        />
+      </div>
+    </div>
+  );
+}
+
+function NodoCondicion({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const d = data as DatosNodo;
+
+  const grupos =
+    gruposCondicionDesdeDatos(d);
+
+  return (
+    <div
+      className={`relative min-w-[270px] rounded-xl bg-white text-slate-900 shadow-lg ${
+        selected
+          ? "border-2 border-orange-500"
+          : "border border-emerald-300"
+      }`}
+    >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!h-3 !w-3 !bg-white"
+      />
+
+      <div className="rounded-t-xl border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800">
+        ▽ {d.titulo || "Condición"}
+      </div>
+
+      <div className="divide-y divide-slate-100">
+        {grupos.map(
+          (grupo, indice) => (
+            <div
+              key={grupo.id}
+              className="relative px-4 py-3"
+            >
+              <div className="pr-6">
+                <p className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                  Condición {indice + 1}
+                  {" · "}
+                  {grupo.modo ===
+                  "cualquiera"
+                    ? "CUALQUIERA"
+                    : "TODAS"}
+                </p>
+
+                <p className="mt-1 max-w-[220px] text-[11px] leading-4 text-slate-700">
+                  {resumenGrupoCondicion(
+                    grupo
+                  )}
+                </p>
+              </div>
+
+              <Handle
+                id={
+                  indice === 0
+                    ? "si"
+                    : `grupo:${grupo.id}`
+                }
+                type="source"
+                position={Position.Right}
+                className="!absolute !right-[-7px] !top-1/2 !h-3 !w-3 !-translate-y-1/2 !border !border-emerald-500 !bg-emerald-500"
+              />
+            </div>
+          )
+        )}
+      </div>
+
+      <div className="relative border-t border-slate-200 px-4 py-3">
+        <p className="max-w-[220px] pr-6 text-[10px] font-bold leading-4 text-rose-600">
+          El usuario no cumple ninguna
+          de estas condiciones
+        </p>
+
+        <Handle
+          id="no"
+          type="source"
+          position={Position.Right}
+          className="!absolute !right-[-7px] !top-1/2 !h-3 !w-3 !-translate-y-1/2 !border !border-rose-500 !bg-rose-500"
+        />
+      </div>
+    </div>
+  );
+}
+
+function NodoAccion({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const d = data as DatosNodo;
+
+  const accion =
+    d.accionFlujo ||
+    "activar_bot";
+
+  const descripcion =
+    accion === "finalizar_flujo"
+      ? "Finalizar flujo"
+      : "Activar bot";
+
+  return (
+    <div
+      className={`min-w-[220px] rounded-xl bg-white text-slate-900 shadow-lg ${
+        selected
+          ? "border-2 border-orange-500"
+          : "border border-violet-300"
+      }`}
+    >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!h-3 !w-3 !bg-white"
+      />
+
+      <div className="rounded-t-xl bg-violet-100 px-4 py-2 text-xs font-black text-violet-800">
+        ⚙ {d.titulo || "Acciones"}
+      </div>
+
+      <div className="px-4 py-3">
+        <p className="text-[11px] text-slate-500">
+          {descripcion}
+        </p>
+      </div>
+
+      {accion !== "finalizar_flujo" && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!h-3 !w-3 !bg-white"
+        />
+      )}
+    </div>
+  );
+}
+
+function NodoEsperarTiempo({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const d = data as DatosNodo;
+
+  const segundos = Math.max(
+    1,
+    Number(d.esperaSegundos || 3)
+  );
+
+  return (
+    <div
+      className={`min-w-[220px] rounded-xl bg-white text-slate-900 shadow-lg ${
+        selected
+          ? "border-2 border-orange-500"
+          : "border border-amber-400"
+      }`}
+    >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!h-3 !w-3 !bg-white"
+      />
+
+      <div className="rounded-t-xl bg-amber-100 px-4 py-2 text-xs font-black text-amber-800">
+        ⏱ {d.titulo || "Esperar"}
+      </div>
+
+      <div className="px-4 py-3">
+        <p className="text-[11px] text-slate-500">
+          Pausar {segundos} segundo
+          {segundos === 1 ? "" : "s"}
+        </p>
+      </div>
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!h-3 !w-3 !bg-white"
+      />
+    </div>
+  );
+}
+
 const nodeTypes = {
   inicio: NodoInicio,
   mensaje: NodoMensaje,
+  iniciar_flujo: NodoIniciarFlujo,
+  condicion: NodoCondicion,
+  accion: NodoAccion,
+  esperar_tiempo: NodoEsperarTiempo,
   esperar_respuesta: NodoEsperar,
   activar_bot: NodoBot,
 };
@@ -365,6 +1147,11 @@ export default function FlujosPage() {
 
   const [guardando, setGuardando] =
     useState(false);
+
+  const [
+    nodoPreviewId,
+    setNodoPreviewId,
+  ] = useState<string | null>(null);
 
   const [creando, setCreando] =
     useState(false);
@@ -661,6 +1448,311 @@ export default function FlujosPage() {
     [nodes, nodoSeleccionadoId]
   );
 
+  const nodoPreview = useMemo(
+    () =>
+      nodes.find(
+        (nodo) =>
+          nodo.id === nodoPreviewId
+      ) || null,
+    [nodes, nodoPreviewId]
+  );
+
+  useEffect(() => {
+    const manejarAccion = (
+      event: Event
+    ) => {
+      const detalle = (
+        event as CustomEvent<{
+          nodeId?: string;
+          accion?: AccionNodo;
+        }>
+      ).detail;
+
+      const nodeId = String(
+        detalle?.nodeId || ""
+      );
+
+      const accion =
+        detalle?.accion;
+
+      if (!nodeId || !accion) return;
+
+      const nodo = nodes.find(
+        (item) => item.id === nodeId
+      );
+
+      if (!nodo) return;
+
+      if (accion === "preview") {
+        setNodoPreviewId(nodeId);
+        return;
+      }
+
+      if (accion === "inicial") {
+        if (nodo.type === "inicio") {
+          alert(
+            "Este nodo ya es el paso inicial."
+          );
+          return;
+        }
+
+        const inicio = nodes.find(
+          (item) =>
+            item.type === "inicio"
+        );
+
+        if (!inicio) {
+          alert(
+            "No se encontro el nodo Paso inicial."
+          );
+          return;
+        }
+
+        setEdges((actuales) => [
+          ...actuales.filter(
+            (edge) =>
+              edge.source !== inicio.id
+          ),
+          {
+            id: idNuevo("conexion"),
+            source: inicio.id,
+            target: nodeId,
+            type: "smoothstep",
+          },
+        ]);
+
+        alert(
+          "Paso inicial actualizado."
+        );
+        return;
+      }
+
+      if (accion === "enlace") {
+        if (
+          !empresaId ||
+          !flujoActivo
+        ) {
+          alert(
+            "Primero abre un flujo."
+          );
+          return;
+        }
+
+        const params =
+          new URLSearchParams({
+            empresa_id:
+              String(empresaId),
+            flujo_id:
+              String(
+                flujoActivo.id
+              ),
+            nodo_uid:
+              nodeId,
+          });
+
+        const enlace =
+          `${window.location.origin}/flujos/preview?${params.toString()}`;
+
+        navigator.clipboard
+          .writeText(enlace)
+          .then(() =>
+            alert(
+              `Enlace publicado copiado:\n\n${enlace}`
+            )
+          )
+          .catch(() =>
+            window.prompt(
+              "Copia este enlace:",
+              enlace
+            )
+          );
+
+        return;
+      }
+
+      if (accion === "id") {
+        navigator.clipboard
+          .writeText(nodeId)
+          .then(() =>
+            alert(
+              `ID copiado: ${nodeId}`
+            )
+          )
+          .catch(() =>
+            alert(
+              `ID del paso: ${nodeId}`
+            )
+          );
+
+        return;
+      }
+
+      if (accion === "renombrar") {
+        const data =
+          nodo.data as DatosNodo;
+
+        const nombreActual =
+          data.titulo ||
+          (nodo.type ===
+          "esperar_respuesta"
+            ? "Esperar respuesta"
+            : nodo.type ===
+              "activar_bot"
+            ? "Activar bot"
+            : nodo.type === "inicio"
+            ? "Paso inicial"
+            : "Enviar mensaje");
+
+        const nuevoNombre =
+          window.prompt(
+            "Nuevo nombre del paso:",
+            nombreActual
+          );
+
+        if (
+          !nuevoNombre ||
+          !nuevoNombre.trim()
+        ) {
+          return;
+        }
+
+        setNodes((actuales) =>
+          actuales.map((item) =>
+            item.id === nodeId
+              ? {
+                  ...item,
+                  data: {
+                    ...item.data,
+                    titulo:
+                      nuevoNombre.trim(),
+                  },
+                }
+              : item
+          )
+        );
+
+        return;
+      }
+
+      if (accion === "duplicar") {
+        if (nodo.type === "inicio") {
+          alert(
+            "Paso inicial no se puede duplicar."
+          );
+          return;
+        }
+
+        const nuevoId = idNuevo(
+          String(
+            nodo.type || "nodo"
+          )
+        );
+
+        const dataClonada =
+          JSON.parse(
+            JSON.stringify(
+              nodo.data || {}
+            )
+          );
+
+        if (
+          dataClonada?.titulo
+        ) {
+          dataClonada.titulo =
+            `${dataClonada.titulo} copia`;
+        }
+
+        setNodes((actuales) => [
+          ...actuales,
+          {
+            ...nodo,
+            id: nuevoId,
+            selected: false,
+            position: {
+              x:
+                Number(
+                  nodo.position.x || 0
+                ) + 50,
+              y:
+                Number(
+                  nodo.position.y || 0
+                ) + 50,
+            },
+            data: dataClonada,
+          },
+        ]);
+
+        setNodoSeleccionadoId(
+          nuevoId
+        );
+
+        return;
+      }
+
+      if (accion === "eliminar") {
+        if (nodo.type === "inicio") {
+          alert(
+            "Paso inicial no se puede eliminar."
+          );
+          return;
+        }
+
+        const confirmar =
+          window.confirm(
+            "¿Eliminar este paso y sus conexiones?"
+          );
+
+        if (!confirmar) return;
+
+        setNodes((actuales) =>
+          actuales.filter(
+            (item) =>
+              item.id !== nodeId
+          )
+        );
+
+        setEdges((actuales) =>
+          actuales.filter(
+            (edge) =>
+              edge.source !== nodeId &&
+              edge.target !== nodeId
+          )
+        );
+
+        if (
+          nodoSeleccionadoId ===
+          nodeId
+        ) {
+          setNodoSeleccionadoId(
+            null
+          );
+        }
+
+        if (
+          nodoPreviewId === nodeId
+        ) {
+          setNodoPreviewId(null);
+        }
+      }
+    };
+
+    window.addEventListener(
+      "flujo:accion-nodo",
+      manejarAccion
+    );
+
+    return () => {
+      window.removeEventListener(
+        "flujo:accion-nodo",
+        manejarAccion
+      );
+    };
+  }, [
+    nodes,
+    nodoSeleccionadoId,
+    nodoPreviewId,
+  ]);
+
   const actualizarDataNodo = (
     nuevoData: Partial<DatosNodo>
   ) => {
@@ -736,6 +1828,110 @@ export default function FlujosPage() {
           titulo,
           tipoMensaje: "omnichannel",
           contenidos: [],
+        },
+      },
+    ]);
+
+    setNodoSeleccionadoId(id);
+  };
+
+  const agregarPasoIniciarFlujo = () => {
+    if (!flujoActivo) return;
+
+    const id =
+      idNuevo("iniciar-flujo");
+
+    const position =
+      obtenerPosicionNuevoPaso();
+
+    setNodes((actuales) => [
+      ...actuales,
+      {
+        id,
+        type: "iniciar_flujo",
+        position,
+        data: {
+          titulo: "Iniciar Flujo",
+          flujoDestinoId: null,
+          flujoDestinoNombre: "",
+        },
+      },
+    ]);
+
+    setNodoSeleccionadoId(id);
+  };
+
+  const agregarPasoCondicion = () => {
+    if (!flujoActivo) return;
+
+    const id = idNuevo("condicion");
+    const position =
+      obtenerPosicionNuevoPaso();
+
+    setNodes((actuales) => [
+      ...actuales,
+      {
+        id,
+        type: "condicion",
+        position,
+        data: {
+          titulo: "Condición",
+          condicionGrupos: [
+            crearGrupoCondicion(),
+          ],
+          /*
+           * Compatibilidad hacia atrás.
+           */
+          condicionOperador:
+            "contiene",
+          condicionValor: "",
+        },
+      },
+    ]);
+
+    setNodoSeleccionadoId(id);
+  };
+
+  const agregarPasoAccion = () => {
+    if (!flujoActivo) return;
+
+    const id = idNuevo("accion");
+    const position =
+      obtenerPosicionNuevoPaso();
+
+    setNodes((actuales) => [
+      ...actuales,
+      {
+        id,
+        type: "accion",
+        position,
+        data: {
+          titulo: "Acciones",
+          accionFlujo:
+            "activar_bot",
+        },
+      },
+    ]);
+
+    setNodoSeleccionadoId(id);
+  };
+
+  const agregarPasoEsperaTiempo = () => {
+    if (!flujoActivo) return;
+
+    const id = idNuevo("esperar-tiempo");
+    const position =
+      obtenerPosicionNuevoPaso();
+
+    setNodes((actuales) => [
+      ...actuales,
+      {
+        id,
+        type: "esperar_tiempo",
+        position,
+        data: {
+          titulo: "Esperar",
+          esperaSegundos: 3,
         },
       },
     ]);
@@ -1190,6 +2386,42 @@ export default function FlujosPage() {
                   className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-3 text-left text-sm"
                 >
                   💬 Enviar mensaje
+                </button>                <button
+                  onClick={
+                    agregarPasoIniciarFlujo
+                  }
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-left text-sm"
+                >
+                  ↗ Iniciar Flujo
+                </button>
+
+
+
+                <button
+                  onClick={
+                    agregarPasoCondicion
+                  }
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-left text-sm"
+                >
+                  ◇ Condición
+                </button>
+
+                <button
+                  onClick={
+                    agregarPasoAccion
+                  }
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-left text-sm"
+                >
+                  ⚙ Acciones
+                </button>
+
+                <button
+                  onClick={
+                    agregarPasoEsperaTiempo
+                  }
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-left text-sm"
+                >
+                  ⏱ Esperar
                 </button>
 
                 <button
@@ -1610,11 +2842,796 @@ export default function FlujosPage() {
                 </div>
               </div>
             </div>
+          )}          {nodoSeleccionado?.type ===
+            "iniciar_flujo" && (
+            <div className="p-4">
+              <button
+                onClick={() =>
+                  setNodoSeleccionadoId(
+                    null
+                  )
+                }
+                className="mb-4 text-xs text-orange-500"
+              >
+                ← Volver
+              </button>
+
+              <p className="text-xs font-black">
+                INICIAR OTRO FLUJO
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Ejecuta otro flujo y, cuando
+                ese flujo termine de forma
+                natural, vuelve a este punto
+                para continuar.
+              </p>
+
+              <label className="mt-5 block text-xs font-bold text-slate-500">
+                Flujo
+              </label>
+
+              <select
+                value={
+                  (
+                    nodoSeleccionado.data as DatosNodo
+                  ).flujoDestinoId || ""
+                }
+                onChange={(e) => {
+                  const idDestino =
+                    Number(
+                      e.target.value
+                    ) || null;
+
+                  const destino =
+                    flujos.find(
+                      (flujo) =>
+                        flujo.id ===
+                        idDestino
+                    );
+
+                  actualizarDataNodo({
+                    flujoDestinoId:
+                      idDestino,
+                    flujoDestinoNombre:
+                      destino?.nombre ||
+                      "",
+                  });
+                }}
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+              >
+                <option value="">
+                  No hay selección
+                </option>
+
+                {flujos
+                  .filter(
+                    (flujo) =>
+                      flujo.id !==
+                      flujoActivo?.id
+                  )
+                  .map((flujo) => (
+                    <option
+                      key={flujo.id}
+                      value={flujo.id}
+                    >
+                      {flujo.nombre}
+                    </option>
+                  ))}
+              </select>
+
+              {(
+                nodoSeleccionado.data as DatosNodo
+              ).flujoDestinoId ? (
+                <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-3">
+                  <p className="text-[10px] font-black uppercase text-violet-500">
+                    Flujo seleccionado
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {(
+                      nodoSeleccionado.data as DatosNodo
+                    ).flujoDestinoNombre ||
+                      `ID ${
+                        (
+                          nodoSeleccionado.data as DatosNodo
+                        ).flujoDestinoId
+                      }`}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-700">
+                  Selecciona un flujo antes de
+                  guardar. El flujo actual no
+                  aparece en la lista para
+                  evitar que se llame a sí
+                  mismo directamente.
+                </div>
+              )}
+
+              <div className="mt-4 rounded-xl bg-slate-100 p-3 text-xs leading-5 text-slate-600">
+                La salida Continuar se usará
+                cuando el subflujo termine.
+                En el siguiente paso
+                conectaremos la ejecución
+                persistente en WhatsApp QR y
+                la Vista previa.
+              </div>
+            </div>
           )}
 
-          {nodoSeleccionado &&
+
+
+                    {nodoSeleccionado?.type ===
+            "condicion" &&
+            (() => {
+              const datos =
+                nodoSeleccionado.data as DatosNodo;
+
+              const grupos =
+                gruposCondicionDesdeDatos(
+                  datos
+                );
+
+              const guardarGrupos = (
+                nuevos: GrupoCondicion[]
+              ) => {
+                actualizarDataNodo({
+                  condicionGrupos:
+                    nuevos,
+                });
+              };
+
+              return (
+                <div className="p-4">
+                  <button
+                    onClick={() =>
+                      setNodoSeleccionadoId(
+                        null
+                      )
+                    }
+                    className="mb-4 text-xs text-orange-500"
+                  >
+                    ← Volver
+                  </button>
+
+                  <p className="text-xs font-black">
+                    CONDICIÓN
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Crea grupos de reglas.
+                    Cada grupo genera una
+                    salida propia y la salida
+                    roja se usa cuando ninguno
+                    coincide.
+                  </p>
+
+                  <div className="mt-4 space-y-4">
+                    {grupos.map(
+                      (
+                        grupo,
+                        grupoIndice
+                      ) => (
+                        <div
+                          key={grupo.id}
+                          className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <p className="text-[11px] font-black text-slate-700">
+                                Condición{" "}
+                                {grupoIndice +
+                                  1}
+                              </p>
+                              <p className="text-[10px] text-emerald-600">
+                                Salida{" "}
+                                {grupoIndice ===
+                                0
+                                  ? "SÍ"
+                                  : `#${grupoIndice + 1}`}
+                              </p>
+                            </div>
+
+                            {grupos.length >
+                              1 && (
+                              <button
+                                onClick={() =>
+                                  guardarGrupos(
+                                    grupos.filter(
+                                      (
+                                        item
+                                      ) =>
+                                        item.id !==
+                                        grupo.id
+                                    )
+                                  )
+                                }
+                                className="text-xs font-bold text-rose-500"
+                                title="Eliminar condición"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+
+                          <label className="mt-3 block text-[10px] font-bold uppercase text-slate-500">
+                            ¿El usuario
+                            coincide con?
+                          </label>
+
+                          <select
+                            value={
+                              grupo.modo
+                            }
+                            onChange={(
+                              e
+                            ) => {
+                              guardarGrupos(
+                                grupos.map(
+                                  (
+                                    item
+                                  ) =>
+                                    item.id ===
+                                    grupo.id
+                                      ? {
+                                          ...item,
+                                          modo:
+                                            e
+                                              .target
+                                              .value ===
+                                            "cualquiera"
+                                              ? "cualquiera"
+                                              : "todas",
+                                        }
+                                      : item
+                                )
+                              );
+                            }}
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 outline-none"
+                          >
+                            <option value="todas">
+                              Todas las
+                              condiciones
+                              siguientes
+                            </option>
+                            <option value="cualquiera">
+                              Cualquiera de
+                              las condiciones
+                              siguientes
+                            </option>
+                          </select>
+
+                          <div className="mt-3 space-y-3">
+                            {grupo.reglas.map(
+                              (
+                                regla,
+                                reglaIndice
+                              ) => {
+                                const operadores =
+                                  operadoresParaCampo(
+                                    regla.campo
+                                  );
+
+                                const tipoCampo =
+                                  campoCondicion(
+                                    regla.campo
+                                  ).tipo;
+
+                                return (
+                                  <div
+                                    key={
+                                      regla.id
+                                    }
+                                    className="rounded-lg border border-slate-200 bg-white p-2"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[9px] font-bold uppercase text-slate-400">
+                                        Regla{" "}
+                                        {reglaIndice +
+                                          1}
+                                      </span>
+
+                                      {grupo
+                                        .reglas
+                                        .length >
+                                        1 && (
+                                        <button
+                                          onClick={() => {
+                                            guardarGrupos(
+                                              grupos.map(
+                                                (
+                                                  item
+                                                ) =>
+                                                  item.id ===
+                                                  grupo.id
+                                                    ? {
+                                                        ...item,
+                                                        reglas:
+                                                          item.reglas.filter(
+                                                            (
+                                                              r
+                                                            ) =>
+                                                              r.id !==
+                                                              regla.id
+                                                          ),
+                                                      }
+                                                    : item
+                                              )
+                                            );
+                                          }}
+                                          className="text-[10px] font-bold text-rose-500"
+                                        >
+                                          Quitar
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <select
+                                      value={
+                                        regla.campo
+                                      }
+                                      onChange={(
+                                        e
+                                      ) => {
+                                        const nuevoCampo =
+                                          e
+                                            .target
+                                            .value as CampoCondicion;
+
+                                        const nuevosOperadores =
+                                          operadoresParaCampo(
+                                            nuevoCampo
+                                          );
+
+                                        guardarGrupos(
+                                          grupos.map(
+                                            (
+                                              item
+                                            ) =>
+                                              item.id ===
+                                              grupo.id
+                                                ? {
+                                                    ...item,
+                                                    reglas:
+                                                      item.reglas.map(
+                                                        (
+                                                          r
+                                                        ) =>
+                                                          r.id ===
+                                                          regla.id
+                                                            ? {
+                                                                ...r,
+                                                                campo:
+                                                                  nuevoCampo,
+                                                                operador:
+                                                                  nuevosOperadores[
+                                                                    0
+                                                                  ],
+                                                                valor:
+                                                                  "",
+                                                              }
+                                                            : r
+                                                      ),
+                                                  }
+                                                : item
+                                          )
+                                        );
+                                      }}
+                                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 outline-none"
+                                    >
+                                      {[
+                                        ...new Set(
+                                          CAMPOS_CONDICION.map(
+                                            (
+                                              campo
+                                            ) =>
+                                              campo.categoria
+                                          )
+                                        ),
+                                      ].map(
+                                        (
+                                          categoria
+                                        ) => (
+                                          <optgroup
+                                            key={
+                                              categoria
+                                            }
+                                            label={
+                                              categoria
+                                            }
+                                          >
+                                            {CAMPOS_CONDICION.filter(
+                                              (
+                                                campo
+                                              ) =>
+                                                campo.categoria ===
+                                                categoria
+                                            ).map(
+                                              (
+                                                campo
+                                              ) => (
+                                                <option
+                                                  key={
+                                                    campo.id
+                                                  }
+                                                  value={
+                                                    campo.id
+                                                  }
+                                                >
+                                                  {
+                                                    campo.etiqueta
+                                                  }
+                                                </option>
+                                              )
+                                            )}
+                                          </optgroup>
+                                        )
+                                      )}
+                                    </select>
+
+                                    <select
+                                      value={
+                                        regla.operador
+                                      }
+                                      onChange={(
+                                        e
+                                      ) => {
+                                        const nuevoOperador =
+                                          e
+                                            .target
+                                            .value as OperadorCondicion;
+
+                                        guardarGrupos(
+                                          grupos.map(
+                                            (
+                                              item
+                                            ) =>
+                                              item.id ===
+                                              grupo.id
+                                                ? {
+                                                    ...item,
+                                                    reglas:
+                                                      item.reglas.map(
+                                                        (
+                                                          r
+                                                        ) =>
+                                                          r.id ===
+                                                          regla.id
+                                                            ? {
+                                                                ...r,
+                                                                operador:
+                                                                  nuevoOperador,
+                                                              }
+                                                            : r
+                                                      ),
+                                                  }
+                                                : item
+                                          )
+                                        );
+                                      }}
+                                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 outline-none"
+                                    >
+                                      {operadores.map(
+                                        (
+                                          operador
+                                        ) => (
+                                          <option
+                                            key={
+                                              operador
+                                            }
+                                            value={
+                                              operador
+                                            }
+                                          >
+                                            {
+                                              ETIQUETAS_OPERADOR_CONDICION[
+                                                operador
+                                              ]
+                                            }
+                                          </option>
+                                        )
+                                      )}
+                                    </select>
+
+                                    {operadorUsaValor(
+                                      regla.operador
+                                    ) &&
+                                      (tipoCampo ===
+                                      "booleano" ? (
+                                        <select
+                                          value={
+                                            regla.valor ||
+                                            "true"
+                                          }
+                                          onChange={(
+                                            e
+                                          ) => {
+                                            guardarGrupos(
+                                              grupos.map(
+                                                (
+                                                  item
+                                                ) =>
+                                                  item.id ===
+                                                  grupo.id
+                                                    ? {
+                                                        ...item,
+                                                        reglas:
+                                                          item.reglas.map(
+                                                            (
+                                                              r
+                                                            ) =>
+                                                              r.id ===
+                                                              regla.id
+                                                                ? {
+                                                                    ...r,
+                                                                    valor:
+                                                                      e
+                                                                        .target
+                                                                        .value,
+                                                                  }
+                                                                : r
+                                                          ),
+                                                      }
+                                                    : item
+                                              )
+                                            );
+                                          }}
+                                          className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 outline-none"
+                                        >
+                                          <option value="true">
+                                            Sí /
+                                            Verdadero
+                                          </option>
+                                          <option value="false">
+                                            No /
+                                            Falso
+                                          </option>
+                                        </select>
+                                      ) : (
+                                        <input
+                                          value={
+                                            regla.valor ||
+                                            ""
+                                          }
+                                          onChange={(
+                                            e
+                                          ) => {
+                                            guardarGrupos(
+                                              grupos.map(
+                                                (
+                                                  item
+                                                ) =>
+                                                  item.id ===
+                                                  grupo.id
+                                                    ? {
+                                                        ...item,
+                                                        reglas:
+                                                          item.reglas.map(
+                                                            (
+                                                              r
+                                                            ) =>
+                                                              r.id ===
+                                                              regla.id
+                                                                ? {
+                                                                    ...r,
+                                                                    valor:
+                                                                      e
+                                                                        .target
+                                                                        .value,
+                                                                  }
+                                                                : r
+                                                          ),
+                                                      }
+                                                    : item
+                                              )
+                                            );
+                                          }}
+                                          placeholder={
+                                            tipoCampo ===
+                                            "numero"
+                                              ? "Ejemplo: 80"
+                                              : "Valor"
+                                          }
+                                          className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 outline-none"
+                                        />
+                                      ))}
+                                  </div>
+                                );
+                              }
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              guardarGrupos(
+                                grupos.map(
+                                  (
+                                    item
+                                  ) =>
+                                    item.id ===
+                                    grupo.id
+                                      ? {
+                                          ...item,
+                                          reglas:
+                                            [
+                                              ...item.reglas,
+                                              crearReglaCondicion(),
+                                            ],
+                                        }
+                                      : item
+                                )
+                              );
+                            }}
+                            className="mt-3 w-full rounded-lg border border-dashed border-orange-300 px-3 py-2 text-xs font-bold text-orange-500"
+                          >
+                            + Condición
+                          </button>
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      guardarGrupos([
+                        ...grupos,
+                        crearGrupoCondicion(),
+                      ])
+                    }
+                    className="mt-4 w-full rounded-xl border border-dashed border-emerald-400 px-3 py-3 text-xs font-black text-emerald-600"
+                  >
+                    + Comprobar nueva
+                    condición
+                  </button>
+
+                  <div className="mt-4 rounded-xl bg-slate-100 p-3 text-xs leading-5 text-slate-600">
+                    Cada condición tiene su
+                    propia salida verde. La
+                    salida roja se ejecuta si
+                    ninguna condición coincide.
+                    La primera condición conserva
+                    la salida SÍ antigua y la
+                    salida roja conserva NO para
+                    no romper tus conexiones
+                    existentes.
+                  </div>
+                </div>
+              );
+            })()}
+
+          {nodoSeleccionado?.type ===
+            "accion" && (
+            <div className="p-4">
+              <button
+                onClick={() =>
+                  setNodoSeleccionadoId(
+                    null
+                  )
+                }
+                className="mb-4 text-xs text-orange-500"
+              >
+                ← Volver
+              </button>
+
+              <p className="text-xs font-black">
+                ACCIÓN DEL FLUJO
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Ejecuta una acción sin enviar un mensaje al cliente.
+              </p>
+
+              <label className="mt-5 block text-xs font-bold text-slate-500">
+                Acción
+              </label>
+
+              <select
+                value={
+                  (
+                    nodoSeleccionado.data as DatosNodo
+                  ).accionFlujo ||
+                  "activar_bot"
+                }
+                onChange={(e) =>
+                  actualizarDataNodo({
+                    accionFlujo:
+                      e.target.value as
+                        | "activar_bot"
+                        | "finalizar_flujo",
+                  })
+                }
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+              >
+                <option value="activar_bot">
+                  Activar bot
+                </option>
+
+                <option value="finalizar_flujo">
+                  Finalizar flujo
+                </option>
+              </select>
+
+              <div className="mt-4 rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
+                {(
+                  nodoSeleccionado.data as DatosNodo
+                ).accionFlujo ===
+                "finalizar_flujo"
+                  ? "Finaliza este flujo sin enviar el mensaje actual a OpenAI. El siguiente mensaje del cliente ya podrá continuar con el bot normal."
+                  : "Finaliza el flujo y permite que el mensaje actual continúe hacia el bot con OpenAI."}
+              </div>
+            </div>
+          )}
+
+          {nodoSeleccionado?.type ===
+            "esperar_tiempo" && (
+            <div className="p-4">
+              <button
+                onClick={() =>
+                  setNodoSeleccionadoId(
+                    null
+                  )
+                }
+                className="mb-4 text-xs text-orange-500"
+              >
+                ← Volver
+              </button>
+
+              <p className="text-xs font-black">
+                ESPERAR
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Pausa el flujo antes de continuar al siguiente paso.
+              </p>
+
+              <label className="mt-5 block text-xs font-bold text-slate-500">
+                Duración en segundos
+              </label>
+
+              <input
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                value={
+                  (
+                    nodoSeleccionado.data as DatosNodo
+                  ).esperaSegundos || 3
+                }
+                onChange={(e) =>
+                  actualizarDataNodo({
+                    esperaSegundos:
+                      Math.min(
+                        60,
+                        Math.max(
+                          1,
+                          Number(
+                            e.target.value ||
+                              1
+                          )
+                        )
+                      ),
+                  })
+                }
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+              />
+
+              <p className="mt-2 text-[11px] text-slate-500">
+                Por ahora admite de 1 a 60 segundos.
+              </p>
+            </div>
+          )}
+
+{nodoSeleccionado &&
             nodoSeleccionado.type !==
-              "mensaje" && (
+              "mensaje" &&
+            nodoSeleccionado.type !==
+              "condicion" &&
+            nodoSeleccionado.type !==
+              "accion" &&
+            nodoSeleccionado.type !==
+              "esperar_tiempo" && (
               <div className="p-4">
                 <button
                   onClick={() =>
@@ -1733,6 +3750,91 @@ export default function FlujosPage() {
           )}
         </section>
       </main>
+
+      {nodoPreview && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/45 p-4 pt-10">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  Seleccionar Canal
+                </h2>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Vista previa desde este paso
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setNodoPreviewId(null)
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full text-2xl text-slate-500 hover:bg-slate-100"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-7">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-slate-900 text-2xl">
+                    ▣
+                  </div>
+
+                  <div>
+                    <p className="font-semibold">
+                      Webchat
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Simula el flujo sin enviar mensajes reales.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      !empresaId ||
+                      !flujoActivo ||
+                      !nodoPreviewId
+                    ) {
+                      return;
+                    }
+
+                    const params =
+                      new URLSearchParams({
+                        empresa_id:
+                          String(empresaId),
+                        flujo_id:
+                          String(
+                            flujoActivo.id
+                          ),
+                        nodo_uid:
+                          nodoPreviewId,
+                      });
+
+                    window.open(
+                      `/flujos/preview?${params.toString()}`,
+                      "_blank",
+                      "noopener,noreferrer"
+                    );
+
+                    setNodoPreviewId(null);
+                  }}
+                  className="rounded-lg bg-orange-500 px-5 py-3 text-sm font-black text-white hover:bg-orange-600"
+                >
+                  Continuar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
