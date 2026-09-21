@@ -46,6 +46,13 @@ const opciones = [
     icono: "\u2699\uFE0F",
     texto: "Automatizaciones",
   },
+
+{
+  href: "/distribucion",
+  icono: "\uD83C\uDFAF",
+  texto: "Distribuci\u00f3n",
+},
+
   {
     href: "/reportes",
     icono: "\uD83D\uDCCA",
