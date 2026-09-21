@@ -18,6 +18,11 @@ type Cliente = {
   bot_activo?: boolean;
   modo_humano_permanente?: boolean;
   requiere_closer?: boolean;
+  handoff_motivo?: string | null;
+distribucion_post_id?: string | null;
+distribucion_grupo_id?: number | null;
+distribucion_closer_id?: number | null;
+distribucion_usando_reemplazo?: boolean;
   bot_producto?: string | null;
   bot_paso?: string | null;
   bot_contexto?: {
@@ -35,6 +40,12 @@ type Cliente = {
   ultimo_tipo?: string | null;
   ultimo_mensaje_fecha?: string | null;
   no_leidos?: number;
+};
+
+type Closer = {
+  id: number;
+  nombre: string;
+  disponible: boolean;
 };
 
 function etiquetaMensaje(tipo?: string | null, mensaje?: string | null) {
@@ -96,6 +107,10 @@ const [ventaAdelanto, setVentaAdelanto] = useState("");
 const [guardandoVenta, setGuardandoVenta] = useState(false);
 const [enviandoArchivo, setEnviandoArchivo] = useState(false);
 
+const [closers, setClosers] = useState<Closer[]>([]);
+const [closerSeleccionado, setCloserSeleccionado] = useState("");
+const [asignandoCloser, setAsignandoCloser] = useState(false);
+
 const [grabandoAudio, setGrabandoAudio] = useState(false);
 const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 const audioChunksRef = useRef<Blob[]>([]);
@@ -121,6 +136,7 @@ const cargarClientes = async () => {
   if (!qrId) {
   setWhatsappQrId(null);
   setClientes([]);
+  setClosers([]);
   setClienteActivo(null);
   setConversaciones([]);
   setMostrarConversacion(false);
@@ -142,13 +158,20 @@ setWhatsappQrId(nuevoQrId);
 
   const data = await res.json();
 
-  if (data.success) {
-    setClientes(data.chats);
-    setClienteActivo((actual) => {
-      if (!actual) return actual;
-      return data.chats.find((c: Cliente) => c.id === actual.id) || null;
-    });
-  }
+ if (data.success) {
+  setClientes(data.chats);
+  setClosers(Array.isArray(data.closers) ? data.closers : []);
+
+  setClienteActivo((actual) => {
+    if (!actual) return actual;
+
+    return (
+      data.chats.find(
+        (c: Cliente) => c.id === actual.id
+      ) || null
+    );
+  });
+}
 };
 
 const cargarPlantillas = async () => {
@@ -170,6 +193,57 @@ const cargarPlantillas = async () => {
 
   if (data.success) {
     setPlantillas(data.plantillas);
+  }
+};
+
+const asignarCloser = async () => {
+  if (
+    !clienteActivo ||
+    !whatsappQrId ||
+    !closerSeleccionado ||
+    asignandoCloser
+  ) {
+    return;
+  }
+
+  try {
+    setAsignandoCloser(true);
+
+    const res = await fetch("/api/chats", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        cliente_id: clienteActivo.id,
+        whatsapp_qr_id: whatsappQrId,
+        accion: "asignar_closer",
+        asesor_id: Number(closerSeleccionado),
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      alert(
+        data.error ||
+          "No se pudo asignar el closer"
+      );
+      return;
+    }
+
+    setCloserSeleccionado("");
+
+    await cargarClientes();
+  } catch (error) {
+    console.error(
+      "Error asignando closer:",
+      error
+    );
+
+    alert("Error asignando closer");
+  } finally {
+    setAsignandoCloser(false);
   }
 };
 
@@ -1284,6 +1358,125 @@ useEffect(() => {
   {clienteActivo.asesor || "Sin asesor"}
 </p>
         </div>
+
+{clienteActivo.requiere_closer &&
+  !clienteActivo.asesor && (
+    <div
+      className={`rounded-xl border p-3 ${
+        temaClaro
+          ? "border-amber-300 bg-amber-50"
+          : "border-amber-500/40 bg-amber-500/10"
+      }`}
+    >
+      <p
+        className={`text-xs font-black ${
+          temaClaro
+            ? "text-amber-800"
+            : "text-amber-300"
+        }`}
+      >
+        ⚠ PENDIENTE DE ASIGNACIÓN
+      </p>
+
+      <div className="mt-2 space-y-1 text-xs">
+        <p
+          className={
+            temaClaro
+              ? "text-slate-700"
+              : "text-slate-300"
+          }
+        >
+          Producto:{" "}
+          <span className="font-bold">
+            {nombreProductoBot(
+              clienteActivo.bot_producto
+            )}
+          </span>
+        </p>
+
+        <p
+          className={
+            temaClaro
+              ? "text-slate-700"
+              : "text-slate-300"
+          }
+        >
+          Motivo:{" "}
+          <span className="font-bold">
+            {clienteActivo.handoff_motivo
+              ? clienteActivo.handoff_motivo.replaceAll(
+                  "_",
+                  " "
+                )
+              : "Requiere atención humana"}
+          </span>
+        </p>
+      </div>
+
+      <select
+        value={closerSeleccionado}
+        onChange={(e) =>
+          setCloserSeleccionado(e.target.value)
+        }
+        className={`mt-3 w-full rounded-lg border px-3 py-2 text-xs outline-none ${
+          temaClaro
+            ? "border-slate-300 bg-white text-slate-900"
+            : "border-slate-700 bg-slate-900 text-white"
+        }`}
+      >
+        <option value="">
+          Seleccionar asesor
+        </option>
+
+        {closers
+          .filter(
+            (closer) =>
+              closer.disponible === true
+          )
+          .map((closer) => (
+            <option
+              key={closer.id}
+              value={closer.id}
+            >
+              {closer.nombre}
+            </option>
+          ))}
+      </select>
+
+      {closers.filter(
+        (closer) => closer.disponible
+      ).length === 0 && (
+        <p
+          className={`mt-2 text-[11px] font-bold ${
+            temaClaro
+              ? "text-red-600"
+              : "text-red-300"
+          }`}
+        >
+          No hay asesores disponibles.
+        </p>
+      )}
+
+      <button
+        type="button"
+        disabled={
+          !closerSeleccionado ||
+          asignandoCloser
+        }
+        onClick={asignarCloser}
+        className={`mt-2 w-full rounded-lg px-3 py-2 text-xs font-black text-white ${
+          !closerSeleccionado ||
+          asignandoCloser
+            ? "cursor-not-allowed bg-slate-400"
+            : "bg-amber-600 hover:bg-amber-700"
+        }`}
+      >
+        {asignandoCloser
+          ? "ASIGNANDO..."
+          : "ASIGNAR CLOSER"}
+      </button>
+    </div>
+  )}
 
         <div
   className={`rounded-xl border p-3 space-y-2 ${
