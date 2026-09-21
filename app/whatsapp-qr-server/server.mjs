@@ -1456,6 +1456,33 @@ const ultimoId = ids.length ? Math.max(...ids) : 0;
   const memoria = await obtenerMemoriaBot(pool, clienteId, whatsappQrId);
   const historial = await obtenerHistorialReciente(pool, clienteId, whatsappQrId, primerId);
 
+const asignacionDistribucion = await pool.query(
+  `
+  SELECT
+    bot_producto,
+    asesor
+  FROM clientes_whatsapp_qr
+  WHERE cliente_id = $1
+    AND whatsapp_qr_id = $2
+  LIMIT 1
+  `,
+  [clienteId, whatsappQrId]
+);
+
+const productoAsignado =
+  asignacionDistribucion.rows[0]?.bot_producto ||
+  productoQrSlug;
+
+const asesorAsignado =
+  asignacionDistribucion.rows[0]?.asesor ||
+  null;
+
+console.log("ASIGNACION BOT RESUELTA:", {
+  clienteId,
+  producto: productoAsignado,
+  asesor: asesorAsignado,
+});
+
   const respuestaBot = await decidirRespuestaBot({
   texto: textoBot,
   textoAccion: textoAccion || "",
@@ -1463,7 +1490,7 @@ const ultimoId = ids.length ? Math.max(...ids) : 0;
   memoria,
   historial,
   empresaId: empresaQrId,
-  productoPrincipal: productoQrSlug,
+  productoPrincipal: productoAsignado,
 });
 
   const mensajeMasNuevo = await pool.query(
@@ -1565,27 +1592,52 @@ if (
         ? motivoIA
         : detectarMotivoHandoff(textoAccion, textoBot);
 
-    const asesorResult = await pool.query(
-      `
-      SELECT u.nombre
-      FROM usuarios u
-      JOIN clientes c ON c.empresa_id = u.empresa_id
-      WHERE c.id = $1
-        AND u.rol = 'asesor'
-      ORDER BY u.id ASC
-      LIMIT 1
-      `,
-      [clienteId]
-    );
+const asesorAsignadoResult = await pool.query(
+  `
+  SELECT asesor
+  FROM clientes_whatsapp_qr
+  WHERE cliente_id = $1
+    AND whatsapp_qr_id = $2
+  LIMIT 1
+  `,
+  [clienteId, whatsappQrId]
+);
 
-    const asesor = asesorResult.rows[0]?.nombre || null;
+let asesor =
+  String(
+    asesorAsignadoResult.rows[0]?.asesor || ""
+  ).trim() || null;
+
+if (!asesor) {
+  const asesorFallbackResult = await pool.query(
+    `
+    SELECT u.nombre
+    FROM usuarios u
+    JOIN clientes c
+      ON c.empresa_id = u.empresa_id
+    WHERE c.id = $1
+      AND u.rol = 'asesor'
+    ORDER BY u.id ASC
+    LIMIT 1
+    `,
+    [clienteId]
+  );
+
+  asesor =
+    asesorFallbackResult.rows[0]?.nombre || null;
+}
+
+console.log("CLOSER HANDOFF RESUELTO:", {
+  clienteId,
+  asesor,
+});
 
     await pool.query(
       `
       UPDATE clientes_whatsapp_qr
       SET requiere_closer = true,
           handoff_motivo = $3,
-          asesor = COALESCE($2, asesor),
+          asesor = COALESCE(NULLIF(BTRIM(asesor), ''), $2),
           updated_at = NOW()
       WHERE cliente_id = $1
         AND whatsapp_qr_id = $4
@@ -2025,6 +2077,57 @@ if (!canalHistorialListo) {
          ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
         [empresaQrId, clienteContacto.rows[0].id, whatsappQrId]
       );
+if (!esMio && distribucionLead) {
+  await pool.query(
+    `
+    UPDATE clientes_whatsapp_qr
+    SET
+      bot_producto = $3,
+
+      asesor = COALESCE(
+        asesor,
+        $4
+      ),
+
+      bot_contexto =
+        COALESCE(bot_contexto, '{}'::jsonb)
+        ||
+        jsonb_build_object(
+          'post_id', $5,
+          'grupo_distribucion_id', $6,
+          'grupo_distribucion', $7,
+          'closer_usuario_id', $8,
+          'distribucion_usando_reemplazo', $9
+        ),
+
+      updated_at = NOW()
+
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $2
+    `,
+    [
+      clienteId,
+      whatsappQrId,
+      distribucionLead.productoSlug || null,
+      distribucionLead.closerNombre || null,
+      postIdDistribucion || null,
+      distribucionLead.grupoId || null,
+      distribucionLead.grupoNombre || null,
+      distribucionLead.closerId || null,
+      distribucionLead.usandoReemplazo === true,
+    ]
+  );
+
+  console.log("DISTRIBUCION GUARDADA EN CLIENTE:", {
+    clienteId,
+    postId: postIdDistribucion,
+    grupo: distribucionLead.grupoNombre,
+    producto: distribucionLead.productoSlug,
+    closer: distribucionLead.closerNombre,
+    usandoReemplazo:
+      distribucionLead.usandoReemplazo === true,
+  });
+}
     } catch (err) {
       console.error("Error importando contacto WhatsApp:", err);
     }
