@@ -2121,51 +2121,6 @@ if (!canalHistorialListo) {
         contenido.templateButtonReplyMessage?.selectedDisplayText ||
         "";
 
-const contextInfoDistribucion =
-  contenido.extendedTextMessage?.contextInfo ||
-  contenido.imageMessage?.contextInfo ||
-  contenido.videoMessage?.contextInfo ||
-  contenido.documentMessage?.contextInfo ||
-  null;
-
-const externalAdDistribucion =
-  contextInfoDistribucion?.externalAdReply || null;
-
-const postIdDistribucion = String(
-  externalAdDistribucion?.sourceId || ""
-).trim();
-
-let distribucionLead = null;
-
-if (
-  msg.key.fromMe !== true &&
-  empresaQrId &&
-  postIdDistribucion
-) {
-  try {
-    distribucionLead =
-      await resolverDistribucionPorPostId(pool, {
-        empresaId: empresaQrId,
-        postId: postIdDistribucion,
-      });
-
-    console.log("DISTRIBUCION LEAD:", {
-      postId: postIdDistribucion,
-      encontrada: Boolean(distribucionLead),
-      grupo: distribucionLead?.grupoNombre || null,
-      producto:
-        distribucionLead?.productoSlug || null,
-      closer:
-        distribucionLead?.closerNombre || null,
-    });
-  } catch (errorDistribucion) {
-    console.error(
-      "ERROR RESOLVIENDO DISTRIBUCION:",
-      errorDistribucion?.message || errorDistribucion
-    );
-  }
-}
-
 const contextInfoMeta =
   contenido.extendedTextMessage?.contextInfo ||
   contenido.imageMessage?.contextInfo ||
@@ -2475,6 +2430,49 @@ const texto =
   contenido.listResponseMessage?.title ||
   contenido.templateButtonReplyMessage?.selectedDisplayText ||
   "";
+
+const contextInfoDistribucion =
+  contenido.extendedTextMessage?.contextInfo ||
+  contenido.imageMessage?.contextInfo ||
+  contenido.videoMessage?.contextInfo ||
+  contenido.documentMessage?.contextInfo ||
+  null;
+
+const externalAdDistribucion =
+  contextInfoDistribucion?.externalAdReply || null;
+
+const postIdDistribucion = String(
+  externalAdDistribucion?.sourceId || ""
+).trim();
+
+let distribucionLead = null;
+
+if (
+  msg.key.fromMe !== true &&
+  empresaQrId &&
+  postIdDistribucion
+) {
+  try {
+    distribucionLead =
+      await resolverDistribucionPorPostId(pool, {
+        empresaId: empresaQrId,
+        postId: postIdDistribucion,
+      });
+
+    console.log("DISTRIBUCION LEAD:", {
+      postId: postIdDistribucion,
+      encontrada: Boolean(distribucionLead),
+      grupo: distribucionLead?.grupoNombre || null,
+      producto: distribucionLead?.productoSlug || null,
+      closer: distribucionLead?.closerNombre || null,
+    });
+  } catch (errorDistribucion) {
+    console.error(
+      "ERROR RESOLVIENDO DISTRIBUCION:",
+      errorDistribucion?.message || errorDistribucion
+    );
+  }
+}
 
 let tipoMensaje = "text";
 let textoGuardado = texto;
