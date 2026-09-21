@@ -649,7 +649,7 @@ if (
 
 const FOLLOWUP_1_MIN = Math.max(
   1,
-  Number(process.env.BOT_FOLLOWUP_1_MIN || 60)
+  Number(process.env.BOT_FOLLOWUP_1_MIN || 1440)
 );
 const FOLLOWUP_2_HORAS = Math.max(
   1,
