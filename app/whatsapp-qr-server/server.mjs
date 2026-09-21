@@ -47,6 +47,13 @@ async function prepararColumnasBot() {
       ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb,\n      ADD COLUMN IF NOT EXISTS handoff_motivo TEXT DEFAULT 'ninguno',\n      ADD COLUMN IF NOT EXISTS cerrado_por TEXT,\n      ADD COLUMN IF NOT EXISTS cerrado_at TIMESTAMPTZ,\n      ADD COLUMN IF NOT EXISTS humano_hasta TIMESTAMPTZ;
   `);
 
+await pool.query(`
+  ALTER TABLE clientes_whatsapp_qr
+    ADD COLUMN IF NOT EXISTS distribucion_post_id TEXT,
+    ADD COLUMN IF NOT EXISTS distribucion_grupo_id INTEGER,
+    ADD COLUMN IF NOT EXISTS distribucion_closer_id INTEGER,
+    ADD COLUMN IF NOT EXISTS distribucion_usando_reemplazo BOOLEAN DEFAULT false;
+`);
 
   await pool.query(`
     ALTER TABLE conversaciones
@@ -1594,42 +1601,100 @@ if (
 
 const asesorAsignadoResult = await pool.query(
   `
-  SELECT asesor
-  FROM clientes_whatsapp_qr
-  WHERE cliente_id = $1
-    AND whatsapp_qr_id = $2
+  SELECT
+    cwq.asesor,
+    cwq.distribucion_grupo_id,
+    cwq.distribucion_closer_id,
+
+    closer_distribucion.nombre
+      AS closer_distribucion_nombre
+
+  FROM clientes_whatsapp_qr cwq
+
+  LEFT JOIN usuarios closer_distribucion
+    ON closer_distribucion.id =
+       cwq.distribucion_closer_id
+   AND closer_distribucion.empresa_id =
+       cwq.empresa_id
+   AND closer_distribucion.rol = 'asesor'
+
+  WHERE cwq.cliente_id = $1
+    AND cwq.whatsapp_qr_id = $2
+
   LIMIT 1
   `,
   [clienteId, whatsappQrId]
 );
 
-let asesor =
-  String(
-    asesorAsignadoResult.rows[0]?.asesor || ""
-  ).trim() || null;
+const filaAsignacion =
+  asesorAsignadoResult.rows[0] || {};
 
-if (!asesor) {
-  const asesorFallbackResult = await pool.query(
-    `
-    SELECT u.nombre
-    FROM usuarios u
-    JOIN clientes c
-      ON c.empresa_id = u.empresa_id
-    WHERE c.id = $1
-      AND u.rol = 'asesor'
-    ORDER BY u.id ASC
-    LIMIT 1
-    `,
-    [clienteId]
-  );
+const tieneDistribucion =
+  Boolean(filaAsignacion.distribucion_grupo_id);
 
+const closerDistribucionId =
+  filaAsignacion.distribucion_closer_id
+    ? Number(filaAsignacion.distribucion_closer_id)
+    : null;
+
+let asesor = null;
+
+if (tieneDistribucion) {
+  if (closerDistribucionId) {
+    asesor =
+      String(
+        filaAsignacion.closer_distribucion_nombre ||
+        filaAsignacion.asesor ||
+        ""
+      ).trim() || null;
+  } else {
+    // El anuncio sí tiene distribución,
+    // pero principal y reemplazo están ausentes.
+    asesor = null;
+  }
+} else {
+  // Lead antiguo o sin distribución configurada.
   asesor =
-    asesorFallbackResult.rows[0]?.nombre || null;
+    String(filaAsignacion.asesor || "").trim() ||
+    null;
+
+  if (!asesor) {
+    const asesorFallbackResult = await pool.query(
+      `
+      SELECT u.nombre
+
+      FROM usuarios u
+
+      JOIN clientes c
+        ON c.empresa_id = u.empresa_id
+
+      LEFT JOIN closers_disponibilidad cd
+        ON cd.empresa_id = u.empresa_id
+       AND cd.usuario_id = u.id
+
+      WHERE c.id = $1
+        AND u.rol = 'asesor'
+        AND COALESCE(cd.disponible, true) = true
+
+      ORDER BY u.id ASC
+      LIMIT 1
+      `,
+      [clienteId]
+    );
+
+    asesor =
+      asesorFallbackResult.rows[0]?.nombre ||
+      null;
+  }
 }
 
 console.log("CLOSER HANDOFF RESUELTO:", {
   clienteId,
+  tieneDistribucion,
+  closerDistribucionId,
   asesor,
+  pendienteAsignacion:
+    tieneDistribucion && !asesor,
 });
 
     await pool.query(
@@ -1637,12 +1702,21 @@ console.log("CLOSER HANDOFF RESUELTO:", {
       UPDATE clientes_whatsapp_qr
       SET requiere_closer = true,
           handoff_motivo = $3,
-          asesor = COALESCE(NULLIF(BTRIM(asesor), ''), $2),
+          asesor = CASE
+  WHEN $5 = true THEN $2
+  ELSE COALESCE(NULLIF(BTRIM(asesor), ''), $2)
+END,
           updated_at = NOW()
       WHERE cliente_id = $1
         AND whatsapp_qr_id = $4
       `,
-      [clienteId, asesor, handoffMotivo, whatsappQrId]
+      [
+  clienteId,
+  asesor,
+  handoffMotivo,
+  whatsappQrId,
+  tieneDistribucion,
+]
     );
 
     console.log(
@@ -2077,57 +2151,7 @@ if (!canalHistorialListo) {
          ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
         [empresaQrId, clienteContacto.rows[0].id, whatsappQrId]
       );
-if (!esMio && distribucionLead) {
-  await pool.query(
-    `
-    UPDATE clientes_whatsapp_qr
-    SET
-      bot_producto = $3,
 
-      asesor = COALESCE(
-        asesor,
-        $4
-      ),
-
-      bot_contexto =
-        COALESCE(bot_contexto, '{}'::jsonb)
-        ||
-        jsonb_build_object(
-          'post_id', $5,
-          'grupo_distribucion_id', $6,
-          'grupo_distribucion', $7,
-          'closer_usuario_id', $8,
-          'distribucion_usando_reemplazo', $9
-        ),
-
-      updated_at = NOW()
-
-    WHERE cliente_id = $1
-      AND whatsapp_qr_id = $2
-    `,
-    [
-      clienteId,
-      whatsappQrId,
-      distribucionLead.productoSlug || null,
-      distribucionLead.closerNombre || null,
-      postIdDistribucion || null,
-      distribucionLead.grupoId || null,
-      distribucionLead.grupoNombre || null,
-      distribucionLead.closerId || null,
-      distribucionLead.usandoReemplazo === true,
-    ]
-  );
-
-  console.log("DISTRIBUCION GUARDADA EN CLIENTE:", {
-    clienteId,
-    postId: postIdDistribucion,
-    grupo: distribucionLead.grupoNombre,
-    producto: distribucionLead.productoSlug,
-    closer: distribucionLead.closerNombre,
-    usandoReemplazo:
-      distribucionLead.usandoReemplazo === true,
-  });
-}
     } catch (err) {
       console.error("Error importando contacto WhatsApp:", err);
     }
@@ -2696,6 +2720,75 @@ RETURNING id
      ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
     [empresaQrId, clienteId, whatsappQrId]
   );
+
+if (!esMio && distribucionLead) {
+  await pool.query(
+    `
+    UPDATE clientes_whatsapp_qr
+    SET
+      bot_producto = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN COALESCE($3, bot_producto)
+        ELSE bot_producto
+      END,
+
+      asesor = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN $4
+        ELSE asesor
+      END,
+
+      distribucion_post_id = COALESCE(
+        distribucion_post_id,
+        $5
+      ),
+
+      distribucion_closer_id = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN $7
+        ELSE distribucion_closer_id
+      END,
+
+      distribucion_usando_reemplazo = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN $8
+        ELSE distribucion_usando_reemplazo
+      END,
+
+      distribucion_grupo_id = COALESCE(
+        distribucion_grupo_id,
+        $6
+      ),
+
+      updated_at = NOW()
+
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $2
+    `,
+    [
+      clienteId,
+      whatsappQrId,
+      distribucionLead.productoSlug || null,
+      distribucionLead.closerNombre || null,
+      postIdDistribucion || null,
+      distribucionLead.grupoId || null,
+      distribucionLead.closerId || null,
+      distribucionLead.usandoReemplazo === true,
+    ]
+  );
+
+  console.log("DISTRIBUCION GUARDADA EN CLIENTE:", {
+    clienteId,
+    postId: postIdDistribucion,
+    grupoId: distribucionLead.grupoId,
+    grupo: distribucionLead.grupoNombre,
+    producto: distribucionLead.productoSlug,
+    closerId: distribucionLead.closerId,
+    closer: distribucionLead.closerNombre,
+    usandoReemplazo:
+      distribucionLead.usandoReemplazo === true,
+  });
+}
 
   if (!esMio) {
     await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
