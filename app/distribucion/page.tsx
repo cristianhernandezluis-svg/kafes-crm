@@ -11,11 +11,22 @@ type PostDistribucion = {
   activo: boolean;
 };
 
+type FlujoDistribucion = {
+  id: number;
+  nombre: string;
+  slug: string | null;
+  producto_slug: string | null;
+  activo: boolean;
+};
+
 type GrupoDistribucion = {
   id: number;
   nombre: string;
   producto_slug: string | null;
   bot_slug: string | null;
+  flujo_id: number | null;
+  flujo_nombre: string | null;
+  flujo_slug: string | null;
   closer_principal_id: number | null;
   closer_principal_nombre: string | null;
   closer_reemplazo_id: number | null;
@@ -37,6 +48,7 @@ type FormularioGrupo = {
   id: number | null;
   nombre: string;
   producto_slug: string;
+  flujo_id: string;
   closer_principal_id: string;
   closer_reemplazo_id: string;
   activo: boolean;
@@ -47,6 +59,7 @@ const formularioVacio: FormularioGrupo = {
   id: null,
   nombre: "",
   producto_slug: "",
+  flujo_id: "",
   closer_principal_id: "",
   closer_reemplazo_id: "",
   activo: true,
@@ -58,6 +71,7 @@ export default function DistribucionPage() {
 
   const [empresaId, setEmpresaId] = useState<number | null>(null);
   const [grupos, setGrupos] = useState<GrupoDistribucion[]>([]);
+  const [flujos, setFlujos] = useState<FlujoDistribucion[]>([]);
   const [closers, setClosers] = useState<Closer[]>([]);
 
   const [formulario, setFormulario] =
@@ -86,6 +100,9 @@ const [cambiandoCloserId, setCambiandoCloserId] =
       id: grupo.id,
       nombre: grupo.nombre || "",
       producto_slug: grupo.producto_slug || "",
+      flujo_id: grupo.flujo_id
+        ? String(grupo.flujo_id)
+        : "",
       closer_principal_id: grupo.closer_principal_id
         ? String(grupo.closer_principal_id)
         : "",
@@ -126,6 +143,7 @@ const [cambiandoCloserId, setCambiandoCloserId] =
         data.grupos || [];
 
       setGrupos(nuevosGrupos);
+      setFlujos(data.flujos || []);
       setClosers(data.closers || []);
 
       if (grupoSeleccionado) {
@@ -261,6 +279,9 @@ const [cambiandoCloserId, setCambiandoCloserId] =
 
           // Por ahora el bot usa el mismo slug del producto.
           bot_slug: formulario.producto_slug.trim(),
+
+          flujo_id:
+            formulario.flujo_id || null,
 
           closer_principal_id:
             formulario.closer_principal_id || null,
@@ -493,6 +514,17 @@ async function cambiarDisponibilidadCloser(
 
                         <div className="flex justify-between mt-1 text-xs">
                           <span className="text-slate-500">
+                            Flujo
+                          </span>
+
+                          <span className="font-semibold text-right">
+                            {grupo.flujo_nombre ||
+                              "Sin flujo"}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between mt-1 text-xs">
+                          <span className="text-slate-500">
                             Closer
                           </span>
 
@@ -579,6 +611,43 @@ async function cambiarDisponibilidadCloser(
                       placeholder="broca-escalonada"
                       className={`w-full border rounded-xl px-4 py-3 mt-2 outline-none focus:border-green-500 ${input}`}
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-500">
+                      Flujo de primer contacto
+                    </label>
+
+                    <select
+                      value={formulario.flujo_id}
+                      onChange={(e) =>
+                        setFormulario((actual) => ({
+                          ...actual,
+                          flujo_id: e.target.value,
+                        }))
+                      }
+                      className={`w-full border rounded-xl px-4 py-3 mt-2 outline-none focus:border-green-500 ${input}`}
+                    >
+                      <option value="">
+                        Sin flujo
+                      </option>
+
+                      {flujos.map((flujo) => (
+                        <option
+                          key={flujo.id}
+                          value={flujo.id}
+                        >
+                          {flujo.nombre}
+                          {flujo.producto_slug
+                            ? ` - ${flujo.producto_slug}`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+
+                    <p className="text-[11px] text-slate-500 mt-2">
+                      Este flujo se ejecutará antes de activar el bot con OpenAI.
+                    </p>
                   </div>
 
                   <div>

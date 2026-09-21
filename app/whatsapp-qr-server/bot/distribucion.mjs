@@ -22,6 +22,10 @@ export async function resolverDistribucionPorPostId(
       g.producto_slug,
       g.bot_slug,
 
+      f.id AS flujo_id,
+      f.nombre AS flujo_nombre,
+      f.slug AS flujo_slug,
+
       g.closer_principal_id,
       principal.nombre AS closer_principal_nombre,
 
@@ -47,6 +51,11 @@ export async function resolverDistribucionPorPostId(
     JOIN grupos_distribucion g
       ON g.id = p.grupo_id
      AND g.empresa_id = p.empresa_id
+
+    LEFT JOIN flujos_bot f
+      ON f.id = g.flujo_id
+     AND f.empresa_id = g.empresa_id
+     AND f.activo = true
 
     LEFT JOIN usuarios principal
       ON principal.id = g.closer_principal_id
@@ -118,6 +127,10 @@ export async function resolverDistribucionPorPostId(
 
     productoSlug: fila.producto_slug,
     botSlug: fila.bot_slug,
+
+    flujoId: fila.flujo_id || null,
+    flujoNombre: fila.flujo_nombre || null,
+    flujoSlug: fila.flujo_slug || null,
 
     closerPrincipalId: fila.closer_principal_id,
     closerPrincipalNombre:

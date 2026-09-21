@@ -11,6 +11,10 @@ import { crearBufferMensajes } from "./bot/buffer-mensajes.mjs";
 import { obtenerMultimediaProducto } from "./bot/catalogo.mjs";
 import { transcribirAudio, analizarImagen, analizarDocumento, analizarVideo } from "./bot/media-ai.mjs";
 import { resolverDistribucionPorPostId } from "./bot/distribucion.mjs";
+import {
+  prepararEsquemaFlujos,
+  procesarFlujoCliente,
+} from "./bot/flujos.mjs";
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -54,6 +58,8 @@ await pool.query(`
     ADD COLUMN IF NOT EXISTS distribucion_closer_id INTEGER,
     ADD COLUMN IF NOT EXISTS distribucion_usando_reemplazo BOOLEAN DEFAULT false;
 `);
+
+  await prepararEsquemaFlujos(pool);
 
   await pool.query(`
     ALTER TABLE conversaciones
@@ -2601,6 +2607,66 @@ if (
   }
 }
 
+let estadoFlujoPrevio = null;
+
+if (
+  msg.key.fromMe !== true &&
+  empresaQrId &&
+  whatsappQrId &&
+  telefono
+) {
+  try {
+    const estadoFlujoPrevioResult =
+      await pool.query(
+        `
+        SELECT
+          cwq.distribucion_flujo_id,
+          cwq.flujo_estado
+        FROM clientes c
+        JOIN clientes_whatsapp_qr cwq
+          ON cwq.cliente_id = c.id
+         AND cwq.empresa_id = c.empresa_id
+        WHERE c.empresa_id = $1
+          AND c.telefono = $2
+          AND cwq.whatsapp_qr_id = $3
+        LIMIT 1
+        `,
+        [
+          empresaQrId,
+          telefono,
+          whatsappQrId,
+        ]
+      );
+
+    estadoFlujoPrevio =
+      estadoFlujoPrevioResult.rows[0] ||
+      null;
+  } catch (errorEstadoFlujo) {
+    console.error(
+      "ERROR LEYENDO ESTADO PREVIO DEL FLUJO:",
+      errorEstadoFlujo?.message ||
+        errorEstadoFlujo
+    );
+  }
+}
+
+const flujoFijoAntesIA =
+  msg.key.fromMe !== true &&
+  (
+    Boolean(
+      distribucionLead?.flujoId
+    ) ||
+    (
+      Boolean(
+        estadoFlujoPrevio
+          ?.distribucion_flujo_id
+      ) &&
+      estadoFlujoPrevio
+        ?.flujo_estado !==
+        "completado"
+    )
+  );
+
 let tipoMensaje = "text";
 let textoGuardado = texto;
 
@@ -2638,7 +2704,11 @@ let mediaAnalisis = null;
       await writeFile(`${MEDIA_DIR}/${mediaId}`, bufferMedia);
       if (!filename) filename = mediaId;
 
-      if (tipoMensaje === "audio" && !esMio) {
+      if (
+        tipoMensaje === "audio" &&
+        !esMio &&
+        !flujoFijoAntesIA
+      ) {
         try {
           mediaAnalisis = await transcribirAudio(`${MEDIA_DIR}/${mediaId}`);
           console.log("AUDIO TRANSCRITO:", mediaAnalisis);
@@ -2648,7 +2718,11 @@ let mediaAnalisis = null;
         }
       }
 
-      if (tipoMensaje === "image" && !esMio) {
+      if (
+        tipoMensaje === "image" &&
+        !esMio &&
+        !flujoFijoAntesIA
+      ) {
         try {
           mediaAnalisis = await analizarImagen(`${MEDIA_DIR}/${mediaId}`, mimeType || "image/jpeg");
           console.log("IMAGEN ANALIZADA:", mediaAnalisis);
@@ -2657,7 +2731,11 @@ let mediaAnalisis = null;
           mediaAnalisis = null;
         }
       }
-      if (tipoMensaje === "video" && !esMio) {
+      if (
+        tipoMensaje === "video" &&
+        !esMio &&
+        !flujoFijoAntesIA
+      ) {
         try {
           mediaAnalisis = await analizarVideo(MEDIA_DIR + "/" + mediaId);
           console.log("VIDEO ANALIZADO:", mediaAnalisis);
@@ -2667,7 +2745,12 @@ let mediaAnalisis = null;
         }
       }
 
-      if (tipoMensaje === "document" && mimeType === "application/pdf" && !esMio) {
+      if (
+        tipoMensaje === "document" &&
+        mimeType === "application/pdf" &&
+        !esMio &&
+        !flujoFijoAntesIA
+      ) {
         try {
           mediaAnalisis = await analizarDocumento(`${MEDIA_DIR}/${mediaId}`, filename || "documento.pdf");
           console.log("PDF ANALIZADO");
@@ -2755,6 +2838,12 @@ if (!esMio && distribucionLead) {
         ELSE distribucion_usando_reemplazo
       END,
 
+      distribucion_flujo_id = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN $9
+        ELSE distribucion_flujo_id
+      END,
+
       distribucion_grupo_id = COALESCE(
         distribucion_grupo_id,
         $6
@@ -2774,6 +2863,7 @@ if (!esMio && distribucionLead) {
       distribucionLead.grupoId || null,
       distribucionLead.closerId || null,
       distribucionLead.usandoReemplazo === true,
+      distribucionLead.flujoId || null,
     ]
   );
 
@@ -2785,6 +2875,10 @@ if (!esMio && distribucionLead) {
     producto: distribucionLead.productoSlug,
     closerId: distribucionLead.closerId,
     closer: distribucionLead.closerNombre,
+    flujoId:
+      distribucionLead.flujoId || null,
+    flujo:
+      distribucionLead.flujoNombre || null,
     usandoReemplazo:
       distribucionLead.usandoReemplazo === true,
   });
@@ -2846,6 +2940,132 @@ if (mensajeGuardado.rowCount === 0) {
 }
 
 console.log("Mensaje guardado en PostgreSQL");
+
+let resultadoFlujo = null;
+
+if (!esMio) {
+  try {
+    const jidFlujo =
+      msg.key.remoteJidAlt ||
+      `${telefono}@s.whatsapp.net`;
+
+    resultadoFlujo =
+      await procesarFlujoCliente({
+        pool,
+        sock,
+        empresaId: empresaQrId,
+        whatsappQrId,
+        clienteId,
+        telefono,
+        jidRespuesta: jidFlujo,
+        mediaDir: MEDIA_DIR,
+      });
+
+    console.log(
+      "FLUJO PRIMER CONTACTO:",
+      {
+        clienteId,
+        ...resultadoFlujo,
+      }
+    );
+  } catch (errorFlujo) {
+    console.error(
+      "ERROR EJECUTANDO FLUJO:",
+      errorFlujo?.message ||
+        errorFlujo
+    );
+
+    resultadoFlujo = null;
+  }
+}
+
+if (
+  !esMio &&
+  resultadoFlujo?.botActivado === true &&
+  mediaContenido &&
+  !mediaAnalisis
+) {
+  try {
+    if (
+      tipoMensaje === "audio" &&
+      mediaId
+    ) {
+      mediaAnalisis =
+        await transcribirAudio(
+          `${MEDIA_DIR}/${mediaId}`
+        );
+    } else if (
+      tipoMensaje === "image" &&
+      mediaId
+    ) {
+      mediaAnalisis =
+        await analizarImagen(
+          `${MEDIA_DIR}/${mediaId}`,
+          mimeType ||
+            "image/jpeg"
+        );
+    } else if (
+      tipoMensaje === "video" &&
+      mediaId
+    ) {
+      mediaAnalisis =
+        await analizarVideo(
+          `${MEDIA_DIR}/${mediaId}`
+        );
+    } else if (
+      tipoMensaje === "document" &&
+      mimeType ===
+        "application/pdf" &&
+      mediaId
+    ) {
+      mediaAnalisis =
+        await analizarDocumento(
+          `${MEDIA_DIR}/${mediaId}`,
+          filename ||
+            "documento.pdf"
+        );
+    }
+
+    if (mediaAnalisis) {
+      await pool.query(
+        `
+        UPDATE conversaciones
+        SET media_analisis = $2
+        WHERE id = $1
+        `,
+        [
+          mensajeGuardado.rows[0].id,
+          mediaAnalisis,
+        ]
+      );
+    }
+  } catch (
+    errorAnalisisPostFlujo
+  ) {
+    console.error(
+      "ERROR ANALIZANDO MEDIA TRAS ACTIVAR BOT:",
+      errorAnalisisPostFlujo
+        ?.message ||
+        errorAnalisisPostFlujo
+    );
+  }
+}
+
+if (
+  resultadoFlujo?.consumido ===
+  true
+) {
+  console.log(
+    "MENSAJE CONSUMIDO POR FLUJO FIJO:",
+    {
+      clienteId,
+      motivo:
+        resultadoFlujo.motivo,
+    }
+  );
+
+  continue;
+}
 
       const textoBot = [texto, mediaAnalisis ? `[ANALISIS INTERNO DEL ARCHIVO - NO ES TEXTO DEL CLIENTE]: ${mediaAnalisis}` : ""]
         .filter(Boolean)

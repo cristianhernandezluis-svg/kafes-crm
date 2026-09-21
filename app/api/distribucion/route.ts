@@ -29,6 +29,9 @@ export async function GET(request: Request) {
         g.nombre,
         g.producto_slug,
         g.bot_slug,
+        g.flujo_id,
+        f.nombre AS flujo_nombre,
+        f.slug AS flujo_slug,
         g.closer_principal_id,
         principal.nombre AS closer_principal_nombre,
         g.closer_reemplazo_id,
@@ -37,6 +40,9 @@ export async function GET(request: Request) {
         g.created_at,
         g.updated_at
       FROM grupos_distribucion g
+      LEFT JOIN flujos_bot f
+        ON f.id = g.flujo_id
+       AND f.empresa_id = g.empresa_id
       LEFT JOIN usuarios principal
         ON principal.id = g.closer_principal_id
       LEFT JOIN usuarios reemplazo
@@ -60,6 +66,22 @@ export async function GET(request: Request) {
       FROM posts_distribucion
       WHERE empresa_id = $1
       ORDER BY id ASC
+      `,
+      [empresaId]
+    );
+
+    const flujosResult = await pool.query(
+      `
+      SELECT
+        id,
+        nombre,
+        slug,
+        producto_slug,
+        activo
+      FROM flujos_bot
+      WHERE empresa_id = $1
+        AND activo = true
+      ORDER BY nombre ASC
       `,
       [empresaId]
     );
@@ -95,6 +117,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       grupos,
+      flujos: flujosResult.rows,
       closers: closersResult.rows,
     });
   } catch (error) {
@@ -124,6 +147,10 @@ export async function POST(request: Request) {
     const botSlug = String(
       body.bot_slug || body.producto_slug || ""
     ).trim();
+
+    const flujoId = body.flujo_id
+      ? Number(body.flujo_id)
+      : null;
 
     const closerPrincipalId = body.closer_principal_id
       ? Number(body.closer_principal_id)
@@ -167,6 +194,26 @@ export async function POST(request: Request) {
 
     await client.query("BEGIN");
 
+    if (flujoId) {
+      const flujoResult = await client.query(
+        `
+        SELECT id
+        FROM flujos_bot
+        WHERE id = $1
+          AND empresa_id = $2
+          AND activo = true
+        LIMIT 1
+        `,
+        [flujoId, empresaId]
+      );
+
+      if (flujoResult.rowCount === 0) {
+        throw new Error(
+          "El flujo seleccionado no existe o no pertenece a esta empresa"
+        );
+      }
+    }
+
     let idFinal: number;
 
     if (grupoId) {
@@ -179,7 +226,8 @@ export async function POST(request: Request) {
           bot_slug = $5,
           closer_principal_id = $6,
           closer_reemplazo_id = $7,
-          activo = $8,
+          flujo_id = $8,
+          activo = $9,
           updated_at = NOW()
         WHERE id = $1
           AND empresa_id = $2
@@ -193,6 +241,7 @@ export async function POST(request: Request) {
           botSlug || null,
           closerPrincipalId,
           closerReemplazoId,
+          flujoId,
           activo,
         ]
       );
@@ -212,9 +261,10 @@ export async function POST(request: Request) {
           bot_slug,
           closer_principal_id,
           closer_reemplazo_id,
+          flujo_id,
           activo
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id
         `,
         [
@@ -224,6 +274,7 @@ export async function POST(request: Request) {
           botSlug || null,
           closerPrincipalId,
           closerReemplazoId,
+          flujoId,
           activo,
         ]
       );
