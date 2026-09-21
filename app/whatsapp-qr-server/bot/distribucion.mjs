@@ -25,14 +25,22 @@ export async function resolverDistribucionPorPostId(
       g.closer_principal_id,
       principal.nombre AS closer_principal_nombre,
 
-      COALESCE(cd.disponible, true) AS closer_principal_disponible,
+      COALESCE(
+        cd_principal.disponible,
+        true
+      ) AS closer_principal_disponible,
 
       COALESCE(
-        cd.reemplazo_usuario_id,
+        cd_principal.reemplazo_usuario_id,
         g.closer_reemplazo_id
       ) AS closer_reemplazo_id,
 
-      reemplazo.nombre AS closer_reemplazo_nombre
+      reemplazo.nombre AS closer_reemplazo_nombre,
+
+      COALESCE(
+        cd_reemplazo.disponible,
+        true
+      ) AS closer_reemplazo_disponible
 
     FROM posts_distribucion p
 
@@ -42,16 +50,27 @@ export async function resolverDistribucionPorPostId(
 
     LEFT JOIN usuarios principal
       ON principal.id = g.closer_principal_id
+     AND principal.empresa_id = g.empresa_id
+     AND principal.rol = 'asesor'
 
-    LEFT JOIN closers_disponibilidad cd
-      ON cd.empresa_id = g.empresa_id
-     AND cd.usuario_id = g.closer_principal_id
+    LEFT JOIN closers_disponibilidad cd_principal
+      ON cd_principal.empresa_id = g.empresa_id
+     AND cd_principal.usuario_id = g.closer_principal_id
 
     LEFT JOIN usuarios reemplazo
       ON reemplazo.id = COALESCE(
-        cd.reemplazo_usuario_id,
+        cd_principal.reemplazo_usuario_id,
         g.closer_reemplazo_id
       )
+     AND reemplazo.empresa_id = g.empresa_id
+     AND reemplazo.rol = 'asesor'
+
+    LEFT JOIN closers_disponibilidad cd_reemplazo
+      ON cd_reemplazo.empresa_id = g.empresa_id
+     AND cd_reemplazo.usuario_id = COALESCE(
+       cd_principal.reemplazo_usuario_id,
+       g.closer_reemplazo_id
+     )
 
     WHERE p.empresa_id = $1
       AND p.post_id = $2
@@ -70,15 +89,25 @@ export async function resolverDistribucionPorPostId(
   const fila = result.rows[0];
 
   const principalDisponible =
+    Boolean(fila.closer_principal_id) &&
     fila.closer_principal_disponible !== false;
 
-  const closerId = principalDisponible
-    ? fila.closer_principal_id
-    : fila.closer_reemplazo_id;
+  const reemplazoDisponible =
+    Boolean(fila.closer_reemplazo_id) &&
+    fila.closer_reemplazo_disponible !== false;
 
-  const closerNombre = principalDisponible
-    ? fila.closer_principal_nombre
-    : fila.closer_reemplazo_nombre;
+  let closerId = null;
+  let closerNombre = null;
+  let usandoReemplazo = false;
+
+  if (principalDisponible) {
+    closerId = fila.closer_principal_id;
+    closerNombre = fila.closer_principal_nombre;
+  } else if (reemplazoDisponible) {
+    closerId = fila.closer_reemplazo_id;
+    closerNombre = fila.closer_reemplazo_nombre;
+    usandoReemplazo = true;
+  }
 
   return {
     postId: fila.post_id,
@@ -96,10 +125,17 @@ export async function resolverDistribucionPorPostId(
 
     principalDisponible,
 
+    closerReemplazoId:
+      fila.closer_reemplazo_id || null,
+
+    closerReemplazoNombre:
+      fila.closer_reemplazo_nombre || null,
+
+    reemplazoDisponible,
+
     closerId: closerId || null,
     closerNombre: closerNombre || null,
 
-    usandoReemplazo:
-      !principalDisponible && Boolean(closerId),
+    usandoReemplazo,
   };
 }
