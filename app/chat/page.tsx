@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTemaCRM } from "@/components/TemaProvider";
 import { useEffect, useRef, useState } from "react";
 import VerificarSuscripcion from "@/components/VerificarSuscripcion";
 import Sidebar from "../components/Sidebar";
@@ -77,18 +78,7 @@ type Plantilla = {
 };
 
 export default function ChatsPage() {
-const [temaClaro, setTemaClaro] = useState(false);
-
-useEffect(() => {
-  const temaGuardado = localStorage.getItem("tema-crm");
-  setTemaClaro(temaGuardado === "claro");
-}, []);
-
-const cambiarTema = () => {
-  const nuevoTemaClaro = !temaClaro;
-  setTemaClaro(nuevoTemaClaro);
-  localStorage.setItem("tema-crm", nuevoTemaClaro ? "claro" : "oscuro");
-};
+const { temaClaro, cambiarTema } = useTemaCRM();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [whatsappQrId, setWhatsappQrId] = useState<number | null>(null);
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);

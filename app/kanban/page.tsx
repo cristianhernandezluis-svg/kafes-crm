@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTemaCRM } from "@/components/TemaProvider";
 import { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 
@@ -81,20 +82,7 @@ function formatearFechaHora(fecha?: string | null) {
 }
 
 export default function KanbanPage() {
-const [temaClaro, setTemaClaro] = useState(false);
-
-useEffect(() => {
-  const temaGuardado = localStorage.getItem("tema-crm");
-  setTemaClaro(temaGuardado === "claro");
-}, []);
-
-const cambiarTema = () => {
-  setTemaClaro((actual) => {
-    const nuevoTema = !actual;
-    localStorage.setItem("tema-crm", nuevoTema ? "claro" : "oscuro");
-    return nuevoTema;
-  });
-};
+const { temaClaro, cambiarTema } = useTemaCRM();
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
 const [cargando, setCargando] = useState(true);

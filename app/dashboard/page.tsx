@@ -8,6 +8,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { useTemaCRM } from "@/components/TemaProvider";
 import { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 
@@ -59,28 +60,7 @@ type Conversacion = {
 };
 
 export default function Home() {
-const [temaClaro, setTemaClaro] = useState(false);
-
-useEffect(() => {
-  const temaGuardado = localStorage.getItem("tema-crm");
-
-  if (temaGuardado === "claro") {
-    setTemaClaro(true);
-  }
-}, []);
-
-const cambiarTema = () => {
-  setTemaClaro((actual) => {
-    const nuevoTema = !actual;
-
-    localStorage.setItem(
-      "tema-crm",
-      nuevoTema ? "claro" : "oscuro"
-    );
-
-    return nuevoTema;
-  });
-};
+const { temaClaro, cambiarTema } = useTemaCRM();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [metricasDashboard, setMetricasDashboard] = useState({
     conversaciones_hoy: 0,

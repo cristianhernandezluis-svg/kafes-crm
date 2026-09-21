@@ -1,6 +1,7 @@
 import "./globals.css";
 import Script from "next/script";
-
+import { cookies } from "next/headers";
+import { TemaProvider } from "@/components/TemaProvider";
 import { Poppins } from "next/font/google";
 
 const poppins = Poppins({
@@ -13,13 +14,20 @@ export const metadata = {
   description: "Herramientas profesionales",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+
+  const temaInicial =
+    cookieStore.get("tema-crm")?.value === "claro"
+      ? "claro"
+      : "oscuro";
+
   return (
-    <html lang="es">
+    <html lang="es" data-tema={temaInicial}>
       <body className={poppins.className}>
 
         {/* META PIXEL */}
@@ -93,7 +101,9 @@ export default function RootLayout({
           `}
         </Script>
 
-        {children}
+        <TemaProvider temaInicial={temaInicial}>
+          {children}
+        </TemaProvider>
 
       </body>
     </html>
