@@ -66,6 +66,8 @@ export default function DistribucionPage() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
+const [cambiandoCloserId, setCambiandoCloserId] =
+  useState<number | null>(null);
 
   const fondo = temaClaro
     ? "bg-slate-50 text-slate-900"
@@ -300,6 +302,62 @@ export default function DistribucionPage() {
       setGuardando(false);
     }
   }
+
+async function cambiarDisponibilidadCloser(
+  usuarioId: number,
+  disponible: boolean
+) {
+  if (!empresaId) return;
+
+  try {
+    setCambiandoCloserId(usuarioId);
+    setMensaje("");
+
+    const response = await fetch("/api/distribucion", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        empresa_id: empresaId,
+        usuario_id: usuarioId,
+        disponible,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.error || "No se pudo cambiar la disponibilidad"
+      );
+    }
+
+    setClosers((actuales) =>
+      actuales.map((closer) =>
+        closer.id === usuarioId
+          ? { ...closer, disponible }
+          : closer
+      )
+    );
+
+    setMensaje(
+      disponible
+        ? `${data.nombre} ahora está DISPONIBLE.`
+        : `${data.nombre} ahora está AUSENTE.`
+    );
+  } catch (error) {
+    console.error(error);
+
+    setMensaje(
+      error instanceof Error
+        ? error.message
+        : "Error cambiando disponibilidad"
+    );
+  } finally {
+    setCambiandoCloserId(null);
+  }
+}
 
   return (
     <div className={`min-h-screen flex ${fondo}`}>
@@ -557,8 +615,80 @@ export default function DistribucionPage() {
                         </option>
                       ))}
                     </select>
-                  </div>
 
+{formulario.closer_principal_id && (() => {
+  const closerPrincipal = closers.find(
+    (closer) =>
+      String(closer.id) ===
+      formulario.closer_principal_id
+  );
+
+  if (!closerPrincipal) return null;
+
+  const cambiando =
+    cambiandoCloserId === closerPrincipal.id;
+
+  return (
+    <div
+      className={`mt-3 border rounded-xl p-4 ${
+        closerPrincipal.disponible
+          ? "border-green-500/30 bg-green-500/10"
+          : "border-red-500/30 bg-red-500/10"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-500">
+            Estado del closer
+          </p>
+
+          <p
+            className={`font-black mt-1 ${
+              closerPrincipal.disponible
+                ? "text-green-500"
+                : "text-red-500"
+            }`}
+          >
+            {closerPrincipal.disponible
+              ? "🟢 DISPONIBLE"
+              : "🔴 AUSENTE"}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled={cambiando}
+          onClick={() =>
+            cambiarDisponibilidadCloser(
+              closerPrincipal.id,
+              !closerPrincipal.disponible
+            )
+          }
+          className={`px-4 py-2 rounded-lg text-xs font-black disabled:opacity-50 ${
+            closerPrincipal.disponible
+              ? "bg-red-500/15 text-red-500 hover:bg-red-500/25"
+              : "bg-green-500/15 text-green-500 hover:bg-green-500/25"
+          }`}
+        >
+          {cambiando
+            ? "Cambiando..."
+            : closerPrincipal.disponible
+            ? "Marcar AUSENTE"
+            : "Marcar DISPONIBLE"}
+        </button>
+      </div>
+
+      {!closerPrincipal.disponible &&
+        formulario.closer_reemplazo_id && (
+          <p className="text-xs text-slate-500 mt-3">
+            Los nuevos leads usarán el closer de reemplazo.
+          </p>
+        )}
+    </div>
+  );
+})()}
+
+</div>
                   <div>
                     <label className="text-xs font-bold text-slate-500">
                       Reemplazo

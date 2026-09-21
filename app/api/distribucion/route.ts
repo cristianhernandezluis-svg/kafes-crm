@@ -313,3 +313,103 @@ export async function POST(request: Request) {
     client.release();
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+
+    const empresaId = Number(body.empresa_id);
+    const usuarioId = Number(body.usuario_id);
+    const disponible = body.disponible;
+
+    if (!empresaId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "empresa_id es obligatorio",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!usuarioId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "usuario_id es obligatorio",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (typeof disponible !== "boolean") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "disponible debe ser true o false",
+        },
+        { status: 400 }
+      );
+    }
+
+    const closerResult = await pool.query(
+      `
+      SELECT id, nombre
+      FROM usuarios
+      WHERE id = $1
+        AND empresa_id = $2
+        AND rol = 'asesor'
+      LIMIT 1
+      `,
+      [usuarioId, empresaId]
+    );
+
+    if (closerResult.rowCount === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Closer no encontrado",
+        },
+        { status: 404 }
+      );
+    }
+
+    await pool.query(
+      `
+      INSERT INTO closers_disponibilidad (
+        empresa_id,
+        usuario_id,
+        disponible,
+        updated_at
+      )
+      VALUES ($1, $2, $3, NOW())
+
+      ON CONFLICT (empresa_id, usuario_id)
+      DO UPDATE SET
+        disponible = EXCLUDED.disponible,
+        updated_at = NOW()
+      `,
+      [empresaId, usuarioId, disponible]
+    );
+
+    return NextResponse.json({
+      success: true,
+      usuario_id: usuarioId,
+      nombre: closerResult.rows[0].nombre,
+      disponible,
+    });
+  } catch (error) {
+    console.error(
+      "ERROR CAMBIANDO DISPONIBILIDAD CLOSER:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "No se pudo cambiar la disponibilidad",
+      },
+      { status: 500 }
+    );
+  }
+}
