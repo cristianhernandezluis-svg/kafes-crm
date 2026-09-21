@@ -726,6 +726,70 @@ async function cambiarDisponibilidadCloser(
                           </option>
                         ))}
                     </select>
+{formulario.closer_reemplazo_id && (() => {
+  const closerReemplazo = closers.find(
+    (closer) =>
+      String(closer.id) ===
+      formulario.closer_reemplazo_id
+  );
+
+  if (!closerReemplazo) return null;
+
+  const cambiando =
+    cambiandoCloserId === closerReemplazo.id;
+
+  return (
+    <div
+      className={`mt-3 border rounded-xl p-4 ${
+        closerReemplazo.disponible
+          ? "border-green-500/30 bg-green-500/10"
+          : "border-red-500/30 bg-red-500/10"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-500">
+            Estado del reemplazo
+          </p>
+
+          <p
+            className={`font-black mt-1 ${
+              closerReemplazo.disponible
+                ? "text-green-500"
+                : "text-red-500"
+            }`}
+          >
+            {closerReemplazo.disponible
+              ? "🟢 DISPONIBLE"
+              : "🔴 AUSENTE"}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled={cambiando}
+          onClick={() =>
+            cambiarDisponibilidadCloser(
+              closerReemplazo.id,
+              !closerReemplazo.disponible
+            )
+          }
+          className={`px-4 py-2 rounded-lg text-xs font-black disabled:opacity-50 ${
+            closerReemplazo.disponible
+              ? "bg-red-500/15 text-red-500 hover:bg-red-500/25"
+              : "bg-green-500/15 text-green-500 hover:bg-green-500/25"
+          }`}
+        >
+          {cambiando
+            ? "Cambiando..."
+            : closerReemplazo.disponible
+            ? "Marcar AUSENTE"
+            : "Marcar DISPONIBLE"}
+        </button>
+      </div>
+    </div>
+  );
+})()}
                   </div>
                 </div>
 
