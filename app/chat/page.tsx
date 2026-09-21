@@ -1596,7 +1596,11 @@ useEffect(() => {
 <p className={temaClaro ? "text-xs text-slate-600" : "text-xs text-slate-300"}>
   Closer:{" "}
   <span className={temaClaro ? "text-slate-900 font-bold" : "text-white font-bold"}>
-    {clienteActivo.requiere_closer ? "Requiere closer" : "Aun no"}
+    {clienteActivo.asesor
+  ? `Asignado a ${clienteActivo.asesor}`
+  : clienteActivo.requiere_closer
+    ? "Pendiente de asignación"
+    : "Aun no"}
   </span>
 </p>
 
