@@ -1100,7 +1100,65 @@ export async function prepararEsquemaFlujos(
   );
 }
 
-export async function procesarFlujoCliente({
+const colasFlujoPorCliente =
+  new Map();
+
+export async function procesarFlujoCliente(
+  args
+) {
+  const clave = [
+    args?.empresaId || "",
+    args?.whatsappQrId || "",
+    args?.clienteId || "",
+  ].join(":");
+
+  const anterior =
+    colasFlujoPorCliente.get(
+      clave
+    ) || Promise.resolve();
+
+  const actual = anterior
+    .catch(() => {})
+    .then(async () => {
+      console.log(
+        "FLUJO CLIENTE PROCESANDO EN COLA:",
+        {
+          clave,
+          clienteId:
+            args?.clienteId,
+          texto:
+            String(
+              args?.textoCliente ||
+                ""
+            ).slice(0, 100),
+        }
+      );
+
+      return procesarFlujoClienteInterno(
+        args
+      );
+    })
+    .finally(() => {
+      if (
+        colasFlujoPorCliente.get(
+          clave
+        ) === actual
+      ) {
+        colasFlujoPorCliente.delete(
+          clave
+        );
+      }
+    });
+
+  colasFlujoPorCliente.set(
+    clave,
+    actual
+  );
+
+  return actual;
+}
+
+async function procesarFlujoClienteInterno({
   pool,
   sock,
   empresaId,
@@ -1296,7 +1354,7 @@ export async function procesarFlujoCliente({
         });
 
       if (retorno.reanudar) {
-        return procesarFlujoCliente({
+        return procesarFlujoClienteInterno({
           pool,
           sock,
           empresaId,
@@ -1509,7 +1567,7 @@ export async function procesarFlujoCliente({
         }
       );
 
-      return procesarFlujoCliente({
+      return procesarFlujoClienteInterno({
         pool,
         sock,
         empresaId,
@@ -1790,7 +1848,7 @@ export async function procesarFlujoCliente({
         }
       );
 
-      return procesarFlujoCliente({
+      return procesarFlujoClienteInterno({
         pool,
         sock,
         empresaId,
