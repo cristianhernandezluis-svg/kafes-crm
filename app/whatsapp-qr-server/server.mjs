@@ -2805,83 +2805,110 @@ RETURNING id
   );
 
 if (!esMio && distribucionLead) {
-  await pool.query(
-    `
-    UPDATE clientes_whatsapp_qr
-    SET
-      bot_producto = CASE
-        WHEN distribucion_grupo_id IS NULL
-        THEN COALESCE($3, bot_producto)
-        ELSE bot_producto
-      END,
+  const actualizacionDistribucion =
+    await pool.query(
+      `
+      UPDATE clientes_whatsapp_qr
+      SET
+        bot_producto =
+          COALESCE($3, bot_producto),
 
-      asesor = CASE
-        WHEN distribucion_grupo_id IS NULL
-        THEN $4
-        ELSE asesor
-      END,
+        asesor = $4,
 
-      distribucion_post_id = COALESCE(
+        distribucion_post_id = $5,
+
+        distribucion_grupo_id = $6,
+
+        distribucion_closer_id = $7,
+
+        distribucion_usando_reemplazo = $8,
+
+        distribucion_flujo_id = $9,
+
+        -- Reiniciar la ejecucion del flujo para el nuevo producto
+        flujo_ejecucion_id = NULL,
+        flujo_pila = '[]'::jsonb,
+        flujo_estado = 'sin_iniciar',
+        flujo_nodo_uid = NULL,
+        flujo_iniciado_at = NULL,
+        flujo_completado_at = NULL,
+
+        -- Reiniciar el paso comercial del producto anterior
+        bot_paso = NULL,
+
+        -- Conservar solamente datos generales del cliente.
+        -- Se eliminan uso, precio, presentacion y seguimientos
+        -- pertenecientes al producto anterior.
+        bot_contexto =
+          jsonb_strip_nulls(
+            jsonb_build_object(
+              'ciudad',
+                COALESCE(bot_contexto, '{}'::jsonb)->'ciudad',
+              'dni',
+                COALESCE(bot_contexto, '{}'::jsonb)->'dni',
+              'nombre',
+                COALESCE(bot_contexto, '{}'::jsonb)->'nombre'
+            )
+          ),
+
+        updated_at = NOW()
+
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
+        AND distribucion_post_id IS DISTINCT FROM $5
+
+      RETURNING
+        bot_producto,
         distribucion_post_id,
-        $5
-      ),
-
-      distribucion_closer_id = CASE
-        WHEN distribucion_grupo_id IS NULL
-        THEN $7
-        ELSE distribucion_closer_id
-      END,
-
-      distribucion_usando_reemplazo = CASE
-        WHEN distribucion_grupo_id IS NULL
-        THEN $8
-        ELSE distribucion_usando_reemplazo
-      END,
-
-      distribucion_flujo_id = CASE
-        WHEN distribucion_grupo_id IS NULL
-        THEN $9
-        ELSE distribucion_flujo_id
-      END,
-
-      distribucion_grupo_id = COALESCE(
         distribucion_grupo_id,
-        $6
-      ),
+        distribucion_flujo_id,
+        flujo_estado
+      `,
+      [
+        clienteId,
+        whatsappQrId,
+        distribucionLead.productoSlug || null,
+        distribucionLead.closerNombre || null,
+        postIdDistribucion || null,
+        distribucionLead.grupoId || null,
+        distribucionLead.closerId || null,
+        distribucionLead.usandoReemplazo === true,
+        distribucionLead.flujoId || null,
+      ]
+    );
 
-      updated_at = NOW()
-
-    WHERE cliente_id = $1
-      AND whatsapp_qr_id = $2
-    `,
-    [
-      clienteId,
-      whatsappQrId,
-      distribucionLead.productoSlug || null,
-      distribucionLead.closerNombre || null,
-      postIdDistribucion || null,
-      distribucionLead.grupoId || null,
-      distribucionLead.closerId || null,
-      distribucionLead.usandoReemplazo === true,
-      distribucionLead.flujoId || null,
-    ]
-  );
-
-  console.log("DISTRIBUCION GUARDADA EN CLIENTE:", {
-    clienteId,
-    postId: postIdDistribucion,
-    grupoId: distribucionLead.grupoId,
-    grupo: distribucionLead.grupoNombre,
-    producto: distribucionLead.productoSlug,
-    closerId: distribucionLead.closerId,
-    closer: distribucionLead.closerNombre,
-    flujoId:
-      distribucionLead.flujoId || null,
-    flujo:
-      distribucionLead.flujoNombre || null,
-    usandoReemplazo:
-      distribucionLead.usandoReemplazo === true,
-  });
+  if (actualizacionDistribucion.rowCount > 0) {
+    console.log(
+      "NUEVO POST / PRODUCTO ASIGNADO:",
+      {
+        clienteId,
+        postId: postIdDistribucion,
+        producto:
+          distribucionLead.productoSlug ||
+          null,
+        grupoId:
+          distribucionLead.grupoId ||
+          null,
+        flujoId:
+          distribucionLead.flujoId ||
+          null,
+        flujo:
+          distribucionLead.flujoNombre ||
+          null,
+        closer:
+          distribucionLead.closerNombre ||
+          null,
+      }
+    );
+  } else {
+    console.log(
+      "DISTRIBUCION YA EXISTENTE - NO SE REINICIA:",
+      {
+        clienteId,
+        postId: postIdDistribucion,
+      }
+    );
+  }
 }
 
   if (!esMio) {
