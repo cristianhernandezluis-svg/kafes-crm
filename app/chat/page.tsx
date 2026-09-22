@@ -247,54 +247,77 @@ const asignarCloser = async () => {
   }
 };
 
-  const abrirConversacion = async (cliente: Cliente) => {
+const abrirConversacion = async (cliente: Cliente) => {
   if (!whatsappQrId) return;
 
-  if (clienteActivo && clienteActivo.id !== cliente.id) {
-    await fetch("/api/chats", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        cliente_id: clienteActivo.id,
-        whatsapp_qr_id: whatsappQrId,
-        accion: "liberar",
-      }),
-    });
-  }
+  const clienteAnterior = clienteActivo;
 
+  // Cambia visualmente de chat de inmediato
   setMostrarConversacion(true);
   setClienteActivo(cliente);
 
-await fetch("/api/chats", {
-  method: "PATCH",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    cliente_id: cliente.id,
-    whatsapp_qr_id: whatsappQrId,
-    accion: "tomar",
-  }),
-});
+  // Liberar/tomar sin bloquear la carga de mensajes
+  void (async () => {
+    try {
+      if (
+        clienteAnterior &&
+        clienteAnterior.id !== cliente.id
+      ) {
+        await fetch("/api/chats", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            cliente_id: clienteAnterior.id,
+            whatsapp_qr_id: whatsappQrId,
+            accion: "liberar",
+          }),
+        });
+      }
 
-cargarClientes();
+      await fetch("/api/chats", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cliente_id: cliente.id,
+          whatsapp_qr_id: whatsappQrId,
+          accion: "tomar",
+        }),
+      });
 
-    const res = await fetch(`/api/conversaciones/${cliente.id}?whatsapp_qr_id=${whatsappQrId}`, {
+      cargarClientes();
+    } catch (error) {
+      console.error(
+        "Error actualizando asignacion del chat:",
+        error
+      );
+    }
+  })();
+
+  // Los mensajes se empiezan a pedir inmediatamente
+  const res = await fetch(
+    `/api/conversaciones/${cliente.id}?whatsapp_qr_id=${whatsappQrId}`,
+    {
       cache: "no-store",
-    });
+    }
+  );
 
-    const data = await res.json();
+  const data = await res.json();
 
-    if (data.success) {
-  setConversaciones(data.conversaciones);
+  if (data.success) {
+    setConversaciones(data.conversaciones);
 
-  setTimeout(() => {
-    mensajesFinRef.current?.scrollIntoView({
-      behavior: "auto",
-      block: "end",
-    });
-  }, 500);
-}
-  };
-
+    setTimeout(() => {
+      mensajesFinRef.current?.scrollIntoView({
+        behavior: "auto",
+        block: "end",
+      });
+    }, 100);
+  }
+};
   const enviarMensaje = async () => {
     if (!clienteActivo || !whatsappQrId || !mensajeNuevo.trim()) return;
 
