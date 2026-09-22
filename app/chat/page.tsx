@@ -718,27 +718,45 @@ const detenerGrabacion = () => {
   }
 };
 
-  useEffect(() => {
+useEffect(() => {
+  // Carga inicial de la lista y plantillas
   cargarClientes();
   cargarPlantillas();
 
-  const intervalo = setInterval(async () => {
+  // La lista completa ya no se descarga cada 5 segundos.
+  // 30 segundos es suficiente para refrescar el sidebar.
+  const intervaloClientes = setInterval(() => {
     cargarClientes();
+  }, 30000);
 
-    if (clienteActivo && whatsappQrId) {
+  return () => clearInterval(intervaloClientes);
+}, []);
+
+useEffect(() => {
+  if (!clienteActivo || !whatsappQrId) return;
+
+  const clienteId = clienteActivo.id;
+  const qrId = whatsappQrId;
+
+  const actualizarConversacionActiva = async () => {
+    try {
       await fetch("/api/chats", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          cliente_id: clienteActivo.id,
-          whatsapp_qr_id: whatsappQrId,
+          cliente_id: clienteId,
+          whatsapp_qr_id: qrId,
           accion: "tomar",
         }),
       });
 
       const res = await fetch(
-        `/api/conversaciones/${clienteActivo.id}?whatsapp_qr_id=${whatsappQrId}`,
-        { cache: "no-store" }
+        `/api/conversaciones/${clienteId}?whatsapp_qr_id=${qrId}`,
+        {
+          cache: "no-store",
+        }
       );
 
       const data = await res.json();
@@ -746,10 +764,22 @@ const detenerGrabacion = () => {
       if (data.success) {
         setConversaciones(data.conversaciones);
       }
+    } catch (error) {
+      console.error(
+        "Error actualizando conversación activa:",
+        error
+      );
     }
-  }, 5000);
+  };
 
-  return () => clearInterval(intervalo);
+  // Solo el chat que estás mirando se refresca cada 5 segundos.
+  const intervaloConversacion = setInterval(
+    actualizarConversacionActiva,
+    5000
+  );
+
+  return () =>
+    clearInterval(intervaloConversacion);
 }, [clienteActivo?.id, whatsappQrId]);
 useEffect(() => {
   if (clientes.length === 0 || clienteActivo) return;
