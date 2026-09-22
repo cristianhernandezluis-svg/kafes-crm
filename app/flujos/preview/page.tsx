@@ -455,6 +455,11 @@ export default function FlujoPreviewPage() {
   const [esperando, setEsperando] =
     useState(false);
 
+const [
+  botPreviewActivo,
+  setBotPreviewActivo,
+] = useState(false);
+
   const [ejecutando, setEjecutando] =
     useState(false);
 
@@ -469,6 +474,22 @@ export default function FlujoPreviewPage() {
 
   const [cargando, setCargando] =
     useState(true);
+
+const memoriaBotRef = useRef<
+  Record<string, unknown>
+>({
+  paso: "conversacion",
+  contexto: {
+    presentacion_enviada: true,
+  },
+});
+
+const historialBotRef = useRef<
+  Array<{
+    rol: "cliente" | "bot";
+    texto: string;
+  }>
+>([]);
 
   const nodoEsperandoRef =
     useRef<string | null>(null);
@@ -593,14 +614,180 @@ export default function FlujoPreviewPage() {
     [conexiones]
   );
 
-  const agregarMensaje = useCallback(
-    (mensaje: MensajePreview) => {
-      setMensajes((actuales) => [
-        ...actuales,
-        mensaje,
-      ]);
+const agregarMensaje = useCallback(
+  (mensaje: MensajePreview) => {
+    if (
+      mensaje.tipo === "texto" &&
+      (
+        mensaje.lado === "bot" ||
+        mensaje.lado === "cliente"
+      )
+    ) {
+      historialBotRef.current = [
+        ...historialBotRef.current,
+        {
+          rol: mensaje.lado,
+          texto: mensaje.texto,
+        },
+      ].slice(-30);
+    }
+
+    setMensajes((actuales) => [
+      ...actuales,
+      mensaje,
+    ]);
+  },
+  []
+);
+
+const consultarBotPreview =
+  useCallback(
+    async (textoCliente: string) => {
+      const texto =
+        String(
+          textoCliente || ""
+        ).trim();
+
+      if (
+        !texto ||
+        !empresaId
+      ) {
+        setEsperando(true);
+        return;
+      }
+
+      try {
+        setEjecutando(true);
+        setEsperando(false);
+        setEscribiendo(true);
+
+        const response =
+          await fetch(
+            "/api/flujos/preview-ia",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                empresaId,
+                texto,
+                memoria:
+                  memoriaBotRef.current,
+                historial:
+                  historialBotRef.current,
+              }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data?.ok
+        ) {
+          throw new Error(
+            data?.error ||
+              "No se pudo consultar al bot."
+          );
+        }
+
+        const resultado =
+          data?.resultado;
+
+        if (!resultado) {
+          throw new Error(
+            "El bot no devolvió una respuesta."
+          );
+        }
+
+        if (
+          resultado.memoria &&
+          typeof resultado.memoria ===
+            "object"
+        ) {
+          memoriaBotRef.current =
+            resultado.memoria;
+        }
+
+        setEscribiendo(false);
+
+        const apertura =
+          String(
+            resultado.apertura || ""
+          ).trim();
+
+        if (apertura) {
+          agregarMensaje({
+            id: idTemporal(),
+            lado: "bot",
+            tipo: "texto",
+            texto: apertura,
+          });
+        }
+
+        const mensaje =
+          String(
+            resultado.mensaje || ""
+          ).trim();
+
+        if (mensaje) {
+          agregarMensaje({
+            id: idTemporal(),
+            lado: "bot",
+            tipo: "texto",
+            texto: mensaje,
+          });
+        }
+
+        if (
+          resultado.multimedia &&
+          resultado.multimedia !==
+            "ninguno"
+        ) {
+          agregarMensaje({
+            id: idTemporal(),
+            lado: "sistema",
+            tipo: "sistema",
+            texto:
+              `Multimedia solicitada por IA: ${resultado.multimedia}`,
+          });
+        }
+
+        setBotPreviewActivo(true);
+
+        // El chat queda abierto
+        // para seguir conversando.
+        setEsperando(true);
+      } catch (error) {
+        setEscribiendo(false);
+
+        console.error(
+          "ERROR BOT PREVIEW:",
+          error
+        );
+
+        agregarMensaje({
+          id: idTemporal(),
+          lado: "sistema",
+          tipo: "sistema",
+          texto:
+            error instanceof Error
+              ? `Error IA: ${error.message}`
+              : "Error consultando al bot.",
+        });
+
+        setEsperando(true);
+      } finally {
+        setEjecutando(false);
+      }
     },
-    []
+    [
+      agregarMensaje,
+      empresaId,
+    ]
   );
 
   const ejecutarDesde = useCallback(
@@ -1120,15 +1307,28 @@ export default function FlujoPreviewPage() {
               return;
             }
 
-            agregarMensaje({
-              id: idTemporal(),
-              lado: "sistema",
-              tipo: "sistema",
-              texto:
-                "🤖 Aquí se activaría el bot con OpenAI. La vista previa no consume OpenAI.",
-            });
+            setBotPreviewActivo(true);
 
-            return;
+agregarMensaje({
+  id: idTemporal(),
+  lado: "sistema",
+  tipo: "sistema",
+  texto:
+    "🤖 Bot con OpenAI activado.",
+});
+
+if (
+  ultimoTextoClienteRef.current
+    .trim()
+) {
+  await consultarBotPreview(
+    ultimoTextoClienteRef.current
+  );
+} else {
+  setEsperando(true);
+}
+
+return;
           }
 
           if (
@@ -1191,24 +1391,37 @@ export default function FlujoPreviewPage() {
           }
 
           if (
-            nodo.tipo ===
-            "activar_bot"
-          ) {
-            agregarMensaje({
-              id: idTemporal(),
-              lado: "sistema",
-              tipo: "sistema",
-              texto:
-                "🤖 Aquí se activaría el bot con OpenAI. La vista previa no consume OpenAI.",
-            });
+  nodo.tipo ===
+  "activar_bot"
+) {
+  setBotPreviewActivo(true);
 
-            return;
-          }
+  agregarMensaje({
+    id: idTemporal(),
+    lado: "sistema",
+    tipo: "sistema",
+    texto:
+      "🤖 Bot con OpenAI activado.",
+  });
+
+  if (
+    ultimoTextoClienteRef.current
+      .trim()
+  ) {
+    await consultarBotPreview(
+      ultimoTextoClienteRef.current
+    );
+  } else {
+    setEsperando(true);
+  }
+
+  return;
+} 
 
           actual =
-            grafo.siguientePorId.get(
-              nodo.nodo_uid
-            ) || null;
+  grafo?.siguientePorId.get(
+    nodo.nodo_uid
+  ) || null;
         }
 
         agregarMensaje({
@@ -1223,10 +1436,11 @@ export default function FlujoPreviewPage() {
       }
     },
     [
-      agregarMensaje,
-      ejecutando,
-      empresaId,
-    ]
+  agregarMensaje,
+  consultarBotPreview,
+  ejecutando,
+  empresaId,
+]
   );
 
   useEffect(() => {
@@ -1382,6 +1596,14 @@ grafoActualRef.current =
 
     setInput("");
     setEsperando(false);
+
+if (botPreviewActivo) {
+  void consultarBotPreview(
+    texto
+  );
+
+  return;
+}
 
     const nodoEsperando =
       nodoEsperandoRef.current;

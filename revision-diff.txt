@@ -1,0 +1,159 @@
+diff --git a/app/whatsapp-qr-server/bot/cerebro.mjs b/app/whatsapp-qr-server/bot/cerebro.mjs
+index 6d3bfd8..ab9e096 100644
+--- a/app/whatsapp-qr-server/bot/cerebro.mjs
++++ b/app/whatsapp-qr-server/bot/cerebro.mjs
+@@ -154,6 +154,7 @@ export async function decidirRespuestaBot({
+   memoria = {},
+   historial = [],
+   empresaId = null,
++  productoPrincipal = null,
+ }) {
+   if (!texto || !texto.trim()) {
+     return null;
+@@ -161,11 +162,12 @@ export async function decidirRespuestaBot({
+ 
+   try {
+     const analisis = await consultarIA({
+-      mensaje: texto,
+-      memoria,
+-      historial,
+-      empresaId,
+-    });
++  mensaje: texto,
++  memoria,
++  historial,
++  empresaId,
++  productoPrincipal,
++});
+ 
+     if (!analisis) {
+       return await respuestaRespaldo(texto, memoria, empresaId);
+@@ -273,7 +275,7 @@ const mensajeFinal = datosPago
+       handoff,
+       memoria: {
+         producto,
+-        paso: memoria.paso === "postventa" ? "postventa" : "conversacion",
++        paso: analisis.fase_venta === "postventa" ? "postventa" : "conversacion",
+         contexto,
+       },
+       analisis,
+diff --git a/app/whatsapp-qr-server/bot/ia.mjs b/app/whatsapp-qr-server/bot/ia.mjs
+index 04de208..a76d667 100644
+--- a/app/whatsapp-qr-server/bot/ia.mjs
++++ b/app/whatsapp-qr-server/bot/ia.mjs
+@@ -70,11 +70,16 @@ export async function consultarIA(input) {
+       ? input?.historial || []
+       : [];
+ 
+-  const empresaId =
++    const empresaId =
+     typeof input === "object"
+       ? Number(input?.empresaId || input?.empresa_id || 0) || null
+       : null;
+ 
++  const productoPrincipal =
++    typeof input === "object"
++      ? input?.productoPrincipal || null
++      : null;
++
+   const catalogoEmpresa = await obtenerCatalogoEmpresa(empresaId);
+ 
+   const venta = memoria?.venta || null;
+@@ -101,6 +106,15 @@ Zona horaria: America/Lima (UTC-05:00)
+ CATALOGO REAL:
+ ${JSON.stringify(prepararCatalogo(catalogoEmpresa), null, 2)}
+ 
++PRODUCTO PRINCIPAL DE ESTE NUMERO DE WHATSAPP:
++${productoPrincipal || "ninguno"}
++
++REGLA DE PRODUCTO PRINCIPAL:
++- Si el mensaje actual es ambiguo, corto o generico, por ejemplo: "precio", "info", "informacion", "me interesa", "cuanto", "hola", "quiero saber", asume que se refiere al PRODUCTO PRINCIPAL DE ESTE NUMERO DE WHATSAPP.
++- Si el cliente menciona explicitamente otro producto, prioriza el producto mencionado en el MENSAJE ACTUAL.
++- La memoria o una compra anterior NO deben reemplazar al producto principal cuando el mensaje actual es una consulta comercial nueva y ambigua.
++- Usa la memoria e historial como contexto, pero no permitas que un producto antiguo domine una consulta nueva.
++
+ POLITICAS COMERCIALES REALES:
+ ${JSON.stringify(obtenerPoliticasComerciales(), null, 2)}
+ 
+@@ -191,10 +205,21 @@ REGLAS POSTVENTA:
+ - No hagas handoff_closer si puedes responder correctamente con los datos reales disponibles.
+ `;
+ 
+-  const promptActivo =
+-    memoria?.paso === "postventa"
+-      ? PROMPT_POSTVENTA
+-      : PROMPT_VENDEDOR;
++  const mensajeActualNormalizado = String(mensaje || "")
++  .normalize("NFD")
++  .replace(/[\u0300-\u036f]/g, "")
++  .toLowerCase()
++  .trim();
++
++const consultaPostventaActual =
++  /\b(mi pedido|mi compra|mi envio|mi guia|numero de guia|donde esta mi pedido|cuando llega mi pedido|cuanto debo|cuanto me falta pagar|saldo pendiente|adelanto que pague|ya pague)\b/.test(
++    mensajeActualNormalizado
++  );
++
++const promptActivo =
++  consultaPostventaActual
++    ? PROMPT_POSTVENTA
++    : PROMPT_VENDEDOR;
+ 
+   const response = await client.responses.parse({
+     model: "gpt-5.6-terra",
+diff --git a/app/whatsapp-qr-server/server.mjs b/app/whatsapp-qr-server/server.mjs
+index 4bb4983..af50370 100644
+--- a/app/whatsapp-qr-server/server.mjs
++++ b/app/whatsapp-qr-server/server.mjs
+@@ -60,6 +60,7 @@ let qrActual = null;
+ let estado = "desconectado";
+ let whatsappQrId = null;
+ let empresaQrId = null;
++let productoQrSlug = null;
+ const telefonoPorLidHistorial = new Map();
+ 
+ function estadoDesdeWAMessageStatus(status) {
+@@ -179,11 +180,19 @@ async function actualizarEstadoMensajeWhatsApp(
+ async function cargarIntegracionQr() {
+   const key = process.env.WHATSAPP_SESSION_KEY;
+   if (!key) throw new Error("WHATSAPP_SESSION_KEY no configurado");
+-  const r = await pool.query("SELECT id, empresa_id FROM integraciones_whatsapp_qr WHERE session_key=$1 LIMIT 1", [key]);
++  const r = await pool.query(
++  "SELECT id, empresa_id, producto_slug FROM integraciones_whatsapp_qr WHERE session_key=$1 LIMIT 1",
++  [key]
++);
+   if (!r.rows[0]) throw new Error("Integracion QR no encontrada");
+   whatsappQrId = r.rows[0].id;
+   empresaQrId = r.rows[0].empresa_id;
+-  console.log("Integracion QR cargada:", { whatsappQrId, empresaQrId });
++productoQrSlug = r.rows[0].producto_slug || null;
++  console.log("Integracion QR cargada:", {
++  whatsappQrId,
++  empresaQrId,
++  productoQrSlug,
++});
+ }
+ 
+ function normalizarTexto(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+@@ -1048,13 +1057,14 @@ async function procesarLoteBot(lote) {
+   const historial = await obtenerHistorialReciente(pool, clienteId, primerId);
+ 
+   const respuestaBot = await decidirRespuestaBot({
+-    texto: textoBot,
+-    textoAccion: textoAccion || "",
+-    calificacion,
+-    memoria,
+-    historial,
+-      empresaId: empresaQrId,
+-  });
++  texto: textoBot,
++  textoAccion: textoAccion || "",
++  calificacion,
++  memoria,
++  historial,
++  empresaId: empresaQrId,
++  productoPrincipal: productoQrSlug,
++});
+ 
+   const analisisCRM = respuestaBot?.analisis || null;
+ 

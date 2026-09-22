@@ -1,0 +1,3591 @@
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import qrcode from "qrcode";
+import pg from "pg";
+import { mkdir, writeFile, readFile, readdir, rm, stat } from "node:fs/promises";
+import { decidirRespuestaBot } from "./bot/cerebro.mjs";
+import { obtenerMemoriaBot, guardarMemoriaBot } from "./bot/memoria.mjs";
+import { obtenerHistorialReciente } from "./bot/historial.mjs";
+import { crearBufferMensajes } from "./bot/buffer-mensajes.mjs";
+import { obtenerMultimediaProducto } from "./bot/catalogo.mjs";
+import { transcribirAudio, analizarImagen, analizarDocumento, analizarVideo } from "./bot/media-ai.mjs";
+import { resolverDistribucionPorPostId } from "./bot/distribucion.mjs";
+import {
+  prepararEsquemaFlujos,
+  procesarFlujoCliente,
+} from "./bot/flujos.mjs";
+
+import makeWASocket, {
+  useMultiFileAuthState,
+  DisconnectReason,
+  fetchLatestWaWebVersion,
+  downloadMediaMessage,
+} from "@whiskeysockets/baileys";
+
+const { Pool } = pg;
+
+function extensionMedia(mime = "") {
+  const tipo = mime.split(";")[0].toLowerCase();
+  const mapa = { "image/jpeg":"jpg", "image/png":"png", "image/webp":"webp", "video/mp4":"mp4", "audio/ogg":"ogg", "audio/mpeg":"mp3", "audio/mp4":"m4a", "application/pdf":"pdf" };
+  return mapa[tipo] || tipo.split("/")[1] || "bin";
+}
+
+const MEDIA_DIR = "./auth/media";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+async function prepararColumnasBot() {
+  await pool.query(`
+    ALTER TABLE clientes
+      ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS temperatura TEXT DEFAULT 'frio',
+      ADD COLUMN IF NOT EXISTS bot_activo BOOLEAN DEFAULT true,
+      ADD COLUMN IF NOT EXISTS requiere_closer BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS bot_senales JSONB DEFAULT '[]'::jsonb,\n      ADD COLUMN IF NOT EXISTS bot_producto TEXT,\n      ADD COLUMN IF NOT EXISTS bot_paso TEXT,\n      ADD COLUMN IF NOT EXISTS bot_contexto JSONB DEFAULT '{}'::jsonb,\n      ADD COLUMN IF NOT EXISTS handoff_motivo TEXT DEFAULT 'ninguno',\n      ADD COLUMN IF NOT EXISTS cerrado_por TEXT,\n      ADD COLUMN IF NOT EXISTS cerrado_at TIMESTAMPTZ,\n      ADD COLUMN IF NOT EXISTS humano_hasta TIMESTAMPTZ;
+  `);
+
+await pool.query(`
+  ALTER TABLE clientes_whatsapp_qr
+    ADD COLUMN IF NOT EXISTS distribucion_post_id TEXT,
+    ADD COLUMN IF NOT EXISTS distribucion_grupo_id INTEGER,
+    ADD COLUMN IF NOT EXISTS distribucion_closer_id INTEGER,
+    ADD COLUMN IF NOT EXISTS distribucion_usando_reemplazo BOOLEAN DEFAULT false;
+`);
+
+  await prepararEsquemaFlujos(pool);
+
+  await pool.query(`
+    ALTER TABLE conversaciones
+      ADD COLUMN IF NOT EXISTS estado_whatsapp TEXT,
+      ADD COLUMN IF NOT EXISTS enviado_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS entregado_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS leido_whatsapp_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS reproducido_at TIMESTAMPTZ;
+  `);
+}
+
+let sock;
+let qrActual = null;
+let estado = "desconectado";
+let whatsappQrId = null;
+let empresaQrId = null;
+let productoQrSlug = null;
+let numeroWhatsappActual = null;
+let resolviendoCanalPromise = null;
+const telefonoPorLidHistorial = new Map();
+
+function estadoDesdeWAMessageStatus(status) {
+  const numero = Number(status);
+  if (numero === 2) return "enviado";
+  if (numero === 3) return "entregado";
+  if (numero === 4) return "leido";
+  if (numero === 5) return "reproducido";
+
+  const texto = String(status || "").toUpperCase();
+  if (texto === "SERVER_ACK") return "enviado";
+  if (texto === "DELIVERY_ACK") return "entregado";
+  if (texto === "READ") return "leido";
+  if (texto === "PLAYED") return "reproducido";
+  return null;
+}
+
+function rangoEstadoWhatsApp(estadoWhatsApp) {
+  if (estadoWhatsApp === "enviado") return 1;
+  if (estadoWhatsApp === "entregado") return 2;
+  if (estadoWhatsApp === "leido") return 3;
+  if (estadoWhatsApp === "reproducido") return 4;
+  return 0;
+}
+
+function fechaDesdeTimestampWhatsApp(valor) {
+  if (valor === null || valor === undefined) return null;
+
+  let numero = null;
+
+  if (typeof valor === "number") numero = valor;
+  else if (typeof valor === "bigint") numero = Number(valor);
+  else if (typeof valor === "string") numero = Number(valor);
+  else if (typeof valor?.toNumber === "function") numero = valor.toNumber();
+
+  if (!Number.isFinite(numero) || numero <= 0) return null;
+
+  const ms = numero > 1000000000000 ? numero : numero * 1000;
+  const fecha = new Date(ms);
+
+  return Number.isFinite(fecha.getTime()) ? fecha : null;
+}
+
+async function actualizarEstadoMensajeWhatsApp(
+  whatsappMessageId,
+  nuevoEstado,
+  fechaEvento = null
+) {
+  if (!whatsappMessageId || !nuevoEstado || !whatsappQrId) return null;
+
+  const rangoNuevo = rangoEstadoWhatsApp(nuevoEstado);
+  if (!rangoNuevo) return null;
+
+  const fecha =
+    fechaEvento instanceof Date && Number.isFinite(fechaEvento.getTime())
+      ? fechaEvento
+      : new Date();
+
+  const result = await pool.query(
+    `
+    UPDATE conversaciones
+    SET estado_whatsapp = CASE
+          WHEN (
+            CASE COALESCE(estado_whatsapp, '')
+              WHEN 'enviado' THEN 1
+              WHEN 'entregado' THEN 2
+              WHEN 'leido' THEN 3
+              WHEN 'reproducido' THEN 4
+              ELSE 0
+            END
+          ) <= $2
+          THEN $1
+          ELSE estado_whatsapp
+        END,
+        enviado_at = CASE
+          WHEN $1 = 'enviado' THEN COALESCE(enviado_at, $5)
+          ELSE enviado_at
+        END,
+        entregado_at = CASE
+          WHEN $1 = 'entregado' THEN COALESCE(entregado_at, $5)
+          ELSE entregado_at
+        END,
+        leido_whatsapp_at = CASE
+          WHEN $1 = 'leido' THEN COALESCE(leido_whatsapp_at, $5)
+          ELSE leido_whatsapp_at
+        END,
+        reproducido_at = CASE
+          WHEN $1 = 'reproducido' THEN COALESCE(reproducido_at, $5)
+          ELSE reproducido_at
+        END
+    WHERE whatsapp_message_id = $3
+      AND whatsapp_qr_id = $4
+      AND remitente IN ('bot', 'asesor')
+    RETURNING id, cliente_id, estado_whatsapp
+    `,
+    [nuevoEstado, rangoNuevo, String(whatsappMessageId), whatsappQrId, fecha]
+  );
+
+  if (result.rowCount > 0) {
+    const row = result.rows[0];
+    console.log(
+      "WHATSAPP ESTADO:",
+      row.id,
+      "CLIENTE:",
+      row.cliente_id,
+      "MENSAJE:",
+      String(whatsappMessageId),
+      "->",
+      String(row.estado_whatsapp || nuevoEstado).toUpperCase()
+    );
+    return row;
+  }
+
+  return null;
+}
+
+async function cargarIntegracionQr() {
+  const key = process.env.WHATSAPP_SESSION_KEY;
+
+  if (!key) {
+    throw new Error("WHATSAPP_SESSION_KEY no configurado");
+  }
+
+  const r = await pool.query(
+    `
+    SELECT
+      id,
+      empresa_id,
+      whatsapp_qr_id_activo
+    FROM whatsapp_qr_sesiones
+    WHERE session_key = $1
+    LIMIT 1
+    `,
+    [key]
+  );
+
+  if (!r.rows[0]) {
+    throw new Error("Sesion QR no encontrada");
+  }
+
+  empresaQrId = r.rows[0].empresa_id;
+
+  whatsappQrId = null;
+  productoQrSlug = null;
+  numeroWhatsappActual = null;
+
+  console.log("Sesion QR cargada:", {
+    sessionKey: key,
+    empresaQrId,
+    whatsappQrId,
+  });
+}
+
+async function resolverIntegracionPorNumero(numeroWhatsapp) {
+  if (!empresaQrId) {
+    throw new Error("empresaQrId no disponible");
+  }
+
+  if (!numeroWhatsapp) {
+    throw new Error("Numero de WhatsApp no disponible");
+  }
+
+const sesionAnterior = await pool.query(
+  `
+  SELECT whatsapp_qr_id_activo
+  FROM whatsapp_qr_sesiones
+  WHERE session_key = $1
+  LIMIT 1
+  `,
+  [process.env.WHATSAPP_SESSION_KEY]
+);
+
+const whatsappQrIdAnterior =
+  sesionAnterior.rows[0]?.whatsapp_qr_id_activo || null;
+
+  const existente = await pool.query(
+    `
+    SELECT id, empresa_id, numero_whatsapp, producto_slug
+    FROM integraciones_whatsapp_qr
+    WHERE empresa_id = $1
+      AND numero_whatsapp = $2
+    LIMIT 1
+    `,
+    [empresaQrId, numeroWhatsapp]
+  );
+
+  let integracion;
+
+  if (existente.rows[0]) {
+    integracion = existente.rows[0];
+  } else {
+    const creada = await pool.query(
+      `
+      INSERT INTO integraciones_whatsapp_qr (
+        empresa_id,
+        nombre,
+        numero_whatsapp,
+        session_key,
+        estado
+      )
+      VALUES ($1, $2, $3, NULL, 'conectado')
+      RETURNING id, empresa_id, numero_whatsapp, producto_slug
+      `,
+      [
+        empresaQrId,
+        `WhatsApp ${numeroWhatsapp}`,
+        numeroWhatsapp,
+      ]
+    );
+
+    integracion = creada.rows[0];
+  }
+
+  whatsappQrId = integracion.id;
+  productoQrSlug = integracion.producto_slug || null;
+
+if (
+  whatsappQrIdAnterior &&
+  whatsappQrIdAnterior !== whatsappQrId
+) {
+  await pool.query(
+    `
+    UPDATE integraciones_whatsapp_qr
+    SET estado = 'desconectado',
+        updated_at = NOW()
+    WHERE id = $1
+    `,
+    [whatsappQrIdAnterior]
+  );
+
+  console.log("CANAL WHATSAPP ANTERIOR DESCONECTADO:", {
+    whatsappQrIdAnterior,
+    whatsappQrIdNuevo: whatsappQrId,
+  });
+}
+
+  await pool.query(
+    `
+    UPDATE integraciones_whatsapp_qr
+    SET estado = 'conectado',
+        updated_at = NOW()
+    WHERE id = $1
+    `,
+    [whatsappQrId]
+  );
+
+  await pool.query(
+    `
+    UPDATE whatsapp_qr_sesiones
+    SET whatsapp_qr_id_activo = $1,
+        estado = 'conectado',
+        updated_at = NOW()
+    WHERE session_key = $2
+    `,
+    [whatsappQrId, process.env.WHATSAPP_SESSION_KEY]
+  );
+
+  console.log("CANAL WHATSAPP RESUELTO:", {
+    whatsappQrId,
+    empresaQrId,
+    numeroWhatsappActual,
+    productoQrSlug,
+  });
+
+  return integracion;
+}
+
+async function esperarCanalWhatsApp(timeoutMs = 5000) {
+  const inicio = Date.now();
+
+  while (!empresaQrId || !whatsappQrId) {
+    if (resolviendoCanalPromise) {
+      try {
+        await resolviendoCanalPromise;
+      } catch (error) {
+        console.error(
+          "ERROR ESPERANDO CANAL WHATSAPP:",
+          error?.message || error
+        );
+      }
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    if (Date.now() - inicio >= timeoutMs) {
+      break;
+    }
+  }
+
+  return Boolean(empresaQrId && whatsappQrId);
+}
+
+function normalizarTexto(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+
+function extraerMontoComprobante(analisis) {
+  const textoOriginal = String(analisis || "");
+  const texto = normalizarTexto(textoOriginal);
+
+  const estructurado = textoOriginal.match(
+    /COMPROBANTE_MONTO:\s*([0-9]+(?:[.,][0-9]{1,2})?|null)/i
+  );
+
+  if (estructurado) {
+    if (String(estructurado[1]).toLowerCase() === "null") {
+      return null;
+    }
+
+    const monto = Number(String(estructurado[1]).replace(",", "."));
+
+    if (Number.isFinite(monto) && monto > 0 && monto <= 100000) {
+      return monto;
+    }
+  }
+
+  const pareceComprobante =
+    /\b(comprobante|voucher|yapeaste|yape|plin|transferencia|deposito|pago realizado)\b/.test(
+      texto
+    );
+
+  if (!pareceComprobante) {
+    return null;
+  }
+
+  const patrones = [
+    /(?:s\s*\/\s*|s\s*\/\.\s*)([0-9]+(?:[.,][0-9]{1,2})?)/i,
+    /\b(?:monto|importe|total pagado|pago de|pagado)\s*[:=-]?\s*(?:s\s*\/\s*)?([0-9]+(?:[.,][0-9]{1,2})?)/i,
+  ];
+
+  for (const patron of patrones) {
+    const match = textoOriginal.match(patron);
+    if (!match) continue;
+
+    const monto = Number(String(match[1]).replace(",", "."));
+
+    if (Number.isFinite(monto) && monto > 0 && monto <= 100000) {
+      return monto;
+    }
+  }
+
+  return null;
+}
+
+function detectarMotivoHandoff(textoAccion,textoBot){const accion=normalizarTexto(textoAccion);const completo=normalizarTexto(textoBot);const archivo=String(textoBot||'').includes('[ANALISIS INTERNO DEL ARCHIVO');if(archivo&&/\b(comprobante|voucher|constancia|pago realizado|transferencia realizada|deposito realizado)\b/.test(completo))return 'validar_pago';if(/\b(asesor|persona|humano|vendedor)\b/.test(accion))return 'pide_humano';return 'bot_no_puede';}
+
+const ETAPAS_AUTOMATICAS = new Set([
+  "mantener",
+  "Nuevo",
+  "Interesado",
+  "Calificado",
+  "Seguimiento",
+  "Pago por validar",
+  "Descartado",
+]);
+
+function resolverEtapaAutomatica(etapaActual, etapaSugerida) {
+  const actual = String(etapaActual || "").trim();
+  const sugerida = String(etapaSugerida || "").trim();
+
+  if (!ETAPAS_AUTOMATICAS.has(sugerida) || sugerida === "mantener") {
+    return null;
+  }
+
+  if (["Pag\u00f3 Adelanto", "Enviado", "Entregado"].includes(actual)) {
+    return null;
+  }
+
+  // Un comprobante pendiente queda aqui hasta validacion humana.
+  if (actual === "Pago por validar") {
+    return null;
+  }
+
+  // Nunca retroceder a Nuevo.
+  if (sugerida === "Nuevo") {
+    return !actual || actual === "Nuevo" ? "Nuevo" : null;
+  }
+
+  // Estados disparados por senal explicita del mensaje actual.
+  if (
+    sugerida === "Pago por validar" ||
+    sugerida === "Seguimiento" ||
+    sugerida === "Descartado"
+  ) {
+    return sugerida;
+  }
+
+  // Una oportunidad puede reactivarse si vuelve con interes real.
+  if (["Descartado", "Seguimiento", "No Responde"].includes(actual)) {
+    return ["Interesado", "Calificado"].includes(sugerida)
+      ? sugerida
+      : null;
+  }
+
+  const rango = {
+    Nuevo: 0,
+    Interesado: 1,
+    Calificado: 2,
+  };
+
+  const actualRango = Object.prototype.hasOwnProperty.call(rango, actual)
+    ? rango[actual]
+    : -1;
+
+  const sugeridoRango = Object.prototype.hasOwnProperty.call(rango, sugerida)
+    ? rango[sugerida]
+    : -1;
+
+  if (sugeridoRango < 0) return null;
+
+  return sugeridoRango >= actualRango ? sugerida : null;
+}
+
+function calificarMensajeCliente(texto) {
+  const t = normalizarTexto(String(texto || ""));
+
+  const limpio = t
+    .replace(/[¡!¿?.,;:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const senales = [];
+
+  // Entradas genéricas desde publicidad:
+  // NO deben subir a TIBIO.
+  const entradasNeutras = [
+    "hola",
+    "info",
+    "informacion",
+    "mas informacion",
+    "quiero informacion",
+    "quiero mas informacion",
+    "hola quiero informacion",
+    "hola quiero mas informacion",
+  ];
+
+  if (entradasNeutras.includes(limpio)) {
+    return { senales: [] };
+  }
+
+  // Preguntar solo el precio es todavía una señal débil.
+  if (
+    /^(precio|el precio|cuanto|cuanto cuesta|cuanto vale|costo)$/.test(limpio)
+  ) {
+    senales.push("precio");
+  }
+
+  // Ubicación real del cliente.
+  if (
+    /\b(soy de|vivo en|estoy en|me encuentro en|ciudad|distrito|provincia|departamento)\b/.test(t)
+  ) {
+    senales.push("ubicacion");
+  }
+
+  // Interés por el envío.
+  if (
+    /\b(envio|envios|delivery|entrega|entregan|llega|llegan|shalom|olva|agencia)\b/.test(t)
+  ) {
+    senales.push("envio");
+  }
+
+  // Preguntas que demuestran evaluación real del producto.
+  if (
+    /\b(garantia|garantía)\b/.test(t)
+  ) {
+    senales.push("garantia");
+  }
+
+  if (
+    /\b(sirve|funciona|compatible|puedo usar|se puede usar|para porcelanato|para ceramica|para granito|para marmol)\b/.test(t)
+  ) {
+    senales.push("compatibilidad");
+  }
+
+  // Interés expresado claramente.
+  if (
+    /\b(me interesa|estoy interesado|estoy interesada|me interesa bastante|quisiera comprar despues)\b/.test(t)
+  ) {
+    senales.push("interes");
+  }
+
+  // Intención clara de compra.
+  if (
+    /\b(quiero comprar|deseo comprar|voy a comprar|lo compro|la compro|quiero uno|quiero una|separame uno|separame una|reservame uno|reservame una|quiero hacer el pedido|como hago el pedido|como hago para comprar|como compro|como pido)\b/.test(t)
+  ) {
+    senales.push("intencion_compra");
+  }
+
+  // Intención de pago = cliente muy avanzado.
+  if (
+    /\b(yape|plin|transferencia|transferir|deposito|depositar|voy a pagar|quiero pagar|te pago|pasame tu yape|numero de yape)\b/.test(t)
+  ) {
+    senales.push("pago");
+  }
+
+  // Urgencia por sí sola no basta para convertirlo en caliente.
+  if (
+    /\b(hoy|ahorita|ahora mismo|ya mismo|urgente)\b/.test(t)
+  ) {
+    senales.push("urgencia");
+  }
+
+  return { senales };
+}
+
+const PESOS_SENALES = {
+  precio: 10,
+  envio: 25,
+  ubicacion: 25,
+  garantia: 25,
+  compatibilidad: 25,
+  interes: 25,
+  pago: 80,
+  intencion_compra: 80,
+  urgencia: 20,
+};
+
+async function actualizarCalificacionCliente(
+  clienteId,
+  whatsappQrId,
+  texto,
+  senalesExtra = [],
+  permitirPausado = false
+) {
+  const detectado = calificarMensajeCliente(texto);
+
+  const extras = Array.isArray(senalesExtra)
+    ? senalesExtra.filter(Boolean)
+    : [];
+
+  await pool.query(
+    `UPDATE clientes_whatsapp_qr
+     SET bot_activo=true, humano_hasta=NULL, updated_at=NOW()
+     WHERE cliente_id=$1
+       AND whatsapp_qr_id=$2
+       AND bot_activo=false
+       AND COALESCE(modo_humano_permanente, false)=false
+       AND (humano_hasta IS NULL OR humano_hasta <= NOW())`
+,    [clienteId,whatsappQrId]
+  );
+
+  const r=await pool.query(
+    `SELECT COALESCE(bot_senales,'[]'::jsonb) AS bot_senales,
+            COALESCE(bot_activo,true) AS bot_activo
+     FROM clientes_whatsapp_qr
+     WHERE cliente_id=$1
+       AND whatsapp_qr_id=$2
+     LIMIT 1`,
+    [clienteId,whatsappQrId]
+  );
+
+  if (!r.rows[0]) return null;
+
+if (
+  r.rows[0].bot_activo === false &&
+  !permitirPausado
+) {
+  return null;
+}
+
+  const anteriores=Array.isArray(r.rows[0].bot_senales)?r.rows[0].bot_senales:[];
+  const senales = [
+  ...new Set([
+    ...anteriores,
+    ...detectado.senales,
+    ...extras,
+  ]),
+];
+  const score=Math.min(100,senales.reduce((t,x)=>t+(PESOS_SENALES[x]||0),0));
+  const temperatura=score>=80?'caliente':score>=25?'tibio':'frio';
+
+  await pool.query(
+    `UPDATE clientes_whatsapp_qr
+     SET bot_senales=$1::jsonb, score=$2, temperatura=$3, updated_at=NOW()
+     WHERE cliente_id=$4
+       AND whatsapp_qr_id=$5`,
+    [JSON.stringify(senales),score,temperatura,clienteId,whatsappQrId]
+  );
+
+  return {senales,score,temperatura,requiereCloser:false};
+}
+
+
+const FOLLOWUP_1_MIN = Math.max(
+  1,
+  Number(process.env.BOT_FOLLOWUP_1_MIN || 1440)
+);
+const FOLLOWUP_2_HORAS = Math.max(
+  1,
+  Number(process.env.BOT_FOLLOWUP_2_HORAS || 24)
+);
+const FOLLOWUP_3_HORAS = Math.max(
+  1,
+  Number(process.env.BOT_FOLLOWUP_3_HORAS || 48)
+);
+const FOLLOWUP_CIERRE_HORAS = Math.max(
+  1,
+  Number(process.env.BOT_FOLLOWUP_CIERRE_HORAS || 24)
+);
+
+let seguimientoSilencioEnCurso = false;
+
+function fechaDesdeAhora(ms) {
+  return new Date(Date.now() + ms);
+}
+
+async function cancelarSeguimientoSilencio(clienteId, whatsappQrId) {
+  await pool.query(
+    `
+    UPDATE clientes_whatsapp_qr
+    SET proximo_seguimiento = CASE
+          WHEN COALESCE(bot_contexto->>'seguimiento_silencio_activo', 'false') = 'true'
+            OR COALESCE(bot_contexto->>'seguimiento_explicito_activo', 'false') = 'true'
+          THEN NULL
+          ELSE proximo_seguimiento
+        END,
+        bot_contexto = COALESCE(bot_contexto, '{}'::jsonb) ||
+          jsonb_build_object(
+            'seguimiento_silencio_activo', false,
+            'seguimiento_silencio_intento', 0,
+            'seguimiento_explicito_activo', false,
+            'seguimiento_explicito_para', NULL
+          )
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $2
+    `,
+    [clienteId, whatsappQrId]
+  );
+}
+
+function resolverFechaSeguimientoExplicito(analisisCRM) {
+  const raw = String(analisisCRM?.seguimiento_fecha || "").trim();
+
+  if (raw) {
+    const fecha = new Date(raw);
+    const ahora = Date.now();
+    const maximo = ahora + 366 * 24 * 60 * 60 * 1000;
+
+    if (
+      Number.isFinite(fecha.getTime()) &&
+      fecha.getTime() > ahora + 30 * 1000 &&
+      fecha.getTime() <= maximo
+    ) {
+      return { fecha, origen: "ia" };
+    }
+  }
+
+  return {
+    fecha: new Date(Date.now() + 48 * 60 * 60 * 1000),
+    origen: "respaldo_48h",
+  };
+}
+
+async function programarSeguimientoExplicito({
+  clienteId,
+  whatsappQrId,
+  analisisCRM,
+  requiereCloserIA,
+}) {
+  if (requiereCloserIA === true) {
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+    return;
+  }
+
+  const seguimientoPara = String(analisisCRM?.seguimiento_para || "").trim();
+  const { fecha, origen } = resolverFechaSeguimientoExplicito(analisisCRM);
+
+  const result = await pool.query(
+    `
+    UPDATE clientes_whatsapp_qr
+    SET etapa = CASE
+          WHEN etapa IN ('Nuevo', 'Interesado', 'Calificado', 'Seguimiento')
+          THEN 'Seguimiento'
+          ELSE etapa
+        END,
+        proximo_seguimiento = $2,
+        bot_contexto = COALESCE(bot_contexto, '{}'::jsonb) ||
+          jsonb_build_object(
+            'seguimiento_silencio_activo', false,
+            'seguimiento_silencio_intento', 0,
+            'seguimiento_explicito_activo', true,
+            'seguimiento_explicito_para', NULLIF($3, '')
+          ),
+        updated_at = NOW()
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $4
+      AND bot_activo = true
+      AND COALESCE(requiere_closer, false) = false
+      AND etapa NOT IN (
+        'Pago por validar',
+        'Pagó Adelanto',
+        'Enviado',
+        'Entregado',
+        'Descartado'
+      )
+    RETURNING id
+    `,
+    [clienteId, fecha, seguimientoPara, whatsappQrId]
+  );
+
+  if (result.rowCount > 0) {
+    console.log(
+      "SEGUIMIENTO EXPLICITO PROGRAMADO:",
+      clienteId,
+      fecha.toISOString(),
+      "ORIGEN:",
+      origen,
+      "PARA:",
+      seguimientoPara || "sin detalle"
+    );
+  }
+}
+
+function mensajeSeguimientoExplicito() {
+  return "Hola 👋 Quedamos en retomar tu consulta por estas horas. ¿Deseas continuar con tu pedido?";
+}
+
+let seguimientoExplicitoEnCurso = false;
+
+async function procesarSeguimientosExplicitos() {
+  if (seguimientoExplicitoEnCurso) return;
+  if (!sock || estado !== "conectado" || !empresaQrId || !whatsappQrId) return;
+
+  seguimientoExplicitoEnCurso = true;
+
+  try {
+    const pendientes = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.telefono,
+        cwq.etapa,
+        cwq.bot_contexto->>'seguimiento_explicito_para' AS seguimiento_para,
+        ult.remitente AS ultimo_remitente
+      FROM clientes c
+      JOIN clientes_whatsapp_qr cwq
+        ON cwq.cliente_id = c.id
+       AND cwq.empresa_id = c.empresa_id
+       AND cwq.whatsapp_qr_id = $2
+      LEFT JOIN LATERAL (
+        SELECT conv.remitente
+        FROM conversaciones conv
+        WHERE conv.cliente_id = c.id
+          AND conv.whatsapp_qr_id = $2
+        ORDER BY conv.created_at DESC, conv.id DESC
+        LIMIT 1
+      ) ult ON true
+      WHERE c.empresa_id = $1
+        AND cwq.proximo_seguimiento IS NOT NULL
+        AND cwq.proximo_seguimiento <= NOW()
+        AND COALESCE(cwq.bot_contexto->>'seguimiento_explicito_activo', 'false') = 'true'
+        AND cwq.bot_activo = true
+        AND COALESCE(cwq.requiere_closer, false) = false
+        AND (cwq.humano_hasta IS NULL OR cwq.humano_hasta <= NOW())
+        AND cwq.etapa NOT IN (
+          'Pago por validar',
+          'Pagó Adelanto',
+          'Enviado',
+          'Entregado',
+          'Descartado'
+        )
+      ORDER BY cwq.proximo_seguimiento ASC
+      LIMIT 20
+      `,
+      [empresaQrId, whatsappQrId]
+    );
+
+    for (const cliente of pendientes.rows) {
+      try {
+        const clienteId = Number(cliente.id);
+        const telefono = String(cliente.telefono || "").replace(/\D/g, "");
+
+        if (!clienteId || !telefono) {
+          if (clienteId) await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+          continue;
+        }
+
+        if (cliente.ultimo_remitente !== "bot") {
+          await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+          console.log(
+            "SEGUIMIENTO EXPLICITO CANCELADO POR NUEVA INTERACCION:",
+            clienteId,
+            cliente.ultimo_remitente || "sin remitente"
+          );
+          continue;
+        }
+
+        const mensaje = mensajeSeguimientoExplicito();
+        const jid = `${telefono}@s.whatsapp.net`;
+        const enviado = await sock.sendMessage(jid, { text: mensaje });
+
+        await pool.query(
+          `
+          INSERT INTO conversaciones (
+            cliente_id,
+            telefono,
+            whatsapp_message_id,
+            mensaje,
+            remitente,
+            tipo,
+            empresa_id,
+            whatsapp_qr_id,
+            estado_whatsapp,
+            enviado_at,
+            canal
+          )
+          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'enviado', NOW(), 'qr')
+          ON CONFLICT (whatsapp_message_id)
+          WHERE whatsapp_message_id IS NOT NULL
+          DO UPDATE SET
+            mensaje = EXCLUDED.mensaje,
+            remitente = 'bot',
+            estado_whatsapp = COALESCE(conversaciones.estado_whatsapp, EXCLUDED.estado_whatsapp),
+            enviado_at = COALESCE(conversaciones.enviado_at, EXCLUDED.enviado_at)
+          `,
+          [
+            clienteId,
+            telefono,
+            enviado?.key?.id || null,
+            mensaje,
+            empresaQrId,
+            whatsappQrId,
+          ]
+        );
+
+        const siguienteSilencio = fechaDesdeAhora(FOLLOWUP_1_MIN * 60 * 1000);
+
+        await pool.query(
+          `
+          UPDATE clientes_whatsapp_qr
+          SET proximo_seguimiento = $2,
+              cantidad_seguimientos = COALESCE(cantidad_seguimientos, 0) + 1,
+              bot_contexto = COALESCE(bot_contexto, '{}'::jsonb) ||
+                jsonb_build_object(
+                  'seguimiento_explicito_activo', false,
+                  'seguimiento_explicito_para', NULL,
+                  'seguimiento_silencio_activo', true,
+                  'seguimiento_silencio_intento', 0
+                ),
+              updated_at = NOW()
+          WHERE cliente_id = $1
+            AND whatsapp_qr_id = $3
+          `,
+          [clienteId, siguienteSilencio, whatsappQrId]
+        );
+
+        console.log(
+          "SEGUIMIENTO EXPLICITO ENVIADO:",
+          clienteId,
+          "SIGUIENTE SILENCIO:",
+          siguienteSilencio.toISOString()
+        );
+      } catch (errorCliente) {
+        console.error(
+          "ERROR SEGUIMIENTO EXPLICITO CLIENTE:",
+          cliente?.id,
+          errorCliente?.message || errorCliente
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      "ERROR MOTOR SEGUIMIENTO EXPLICITO:",
+      error?.message || error
+    );
+  } finally {
+    seguimientoExplicitoEnCurso = false;
+  }
+}
+
+function esPostergacionCliente(texto) {
+  const t = normalizarTexto(String(texto || ""));
+
+  return [
+    /\bpor ahora no\b/,
+    /\bpor el momento no\b/,
+    /\b(?:x\s+)?ahora no\b/,
+    /\bahorita no\b/,
+    /\bmas adelante\b/,
+    /\bsera mas adelante\b/,
+    /\bmejor mas adelante\b/,
+    /\bno puedo ahora\b/,
+    /\bno puedo ahorita\b/,
+    /\bcuando pueda\b/,
+    /\bcuando tenga dinero\b/,
+    /\bcuando tenga plata\b/,
+    /\btengo unos? problemitas?\b/,
+    /\btengo problemas? ahorita\b/,
+  ].some((regex) => regex.test(t));
+}
+
+async function programarSeguimientoSilencio({
+  clienteId,
+  whatsappQrId,
+  analisisCRM,
+  requiereCloserIA,
+  textoCliente,
+}) {
+  const esPostergacion = esPostergacionCliente(textoCliente);
+
+  const tieneFechaExplicita =
+    String(analisisCRM?.seguimiento_fecha || "").trim() !== "";
+
+  // Ej:
+  // "más adelante", "por ahora no", "ahorita no".
+  // Si NO dio una fecha concreta, no perseguirlo con otro ciclo.
+  if (esPostergacion && !tieneFechaExplicita) {
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+
+    await pool.query(
+      `
+      UPDATE clientes_whatsapp_qr
+      SET etapa = CASE
+            WHEN etapa IN (
+              'Nuevo',
+              'Interesado',
+              'Calificado',
+              'No Responde'
+            )
+            THEN 'Seguimiento'
+            ELSE etapa
+          END,
+          proximo_seguimiento = NULL,
+          bot_contexto =
+            COALESCE(bot_contexto, '{}'::jsonb) ||
+            jsonb_build_object(
+              'seguimiento_silencio_activo', false,
+              'seguimiento_silencio_intento', 0,
+              'seguimiento_explicito_activo', false,
+              'seguimiento_explicito_para', NULL
+            ),
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
+        AND etapa NOT IN (
+          'Pago por validar',
+          'Pagó Adelanto',
+          'Enviado',
+          'Entregado',
+          'Descartado'
+        )
+      `,
+      [clienteId, whatsappQrId]
+    );
+
+    console.log(
+      "POSTERGACION SIN FECHA -> SIN SEGUIMIENTO AUTOMATICO:",
+      clienteId
+    );
+
+    return;
+  }
+
+  // Si el cliente sí dio una fecha concreta:
+  // "escríbeme mañana", "el viernes", etc.
+  if (analisisCRM?.seguimiento === true) {
+    await programarSeguimientoExplicito({
+      clienteId,
+      whatsappQrId,
+      analisisCRM,
+      requiereCloserIA,
+    });
+    return;
+  }
+
+  if (requiereCloserIA === true) {
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+    return;
+  }
+
+  // Si la IA lo clasificó como Seguimiento pero no existe
+  // una fecha explícita, tampoco arrancar seguimiento por silencio.
+  if (
+    String(analisisCRM?.etapa_sugerida || "").trim() === "Seguimiento"
+  ) {
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+    return;
+  }
+
+  const proximaFecha = fechaDesdeAhora(
+    FOLLOWUP_1_MIN * 60 * 1000
+  );
+
+  const result = await pool.query(
+    `
+    UPDATE clientes_whatsapp_qr
+    SET proximo_seguimiento = $2,
+        bot_contexto = jsonb_set(
+          jsonb_set(
+            COALESCE(bot_contexto, '{}'::jsonb),
+            '{seguimiento_silencio_activo}',
+            'true'::jsonb,
+            true
+          ),
+          '{seguimiento_silencio_intento}',
+          '0'::jsonb,
+          true
+        ),
+        updated_at = NOW()
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $3
+      AND bot_activo = true
+      AND COALESCE(requiere_closer, false) = false
+      AND etapa NOT IN (
+        'Seguimiento',
+        'Pago por validar',
+        'Pagó Adelanto',
+        'Enviado',
+        'Entregado',
+        'Descartado'
+      )
+    RETURNING id
+    `,
+    [clienteId, proximaFecha, whatsappQrId]
+  );
+
+  if (result.rowCount > 0) {
+    console.log(
+      "SEGUIMIENTO SILENCIO PROGRAMADO:",
+      clienteId,
+      proximaFecha.toISOString()
+    );
+  }
+}
+
+function mensajeSeguimientoSilencio(intento) {
+  if (intento === 0) {
+    return "Hola 👋 ¿Pudiste revisar la información que te envié? Si deseas, te ayudo a completar tu pedido.";
+  }
+
+  if (intento === 1) {
+    return "Hola nuevamente 👋 ¿Aún estás interesado en el producto? Si tienes alguna duda antes de pedirlo, dime y te ayudo.";
+  }
+
+  return "Hola 👋 Te escribo por última vez para saber si todavía deseas continuar con tu pedido. Si más adelante lo necesitas, con gusto te ayudamos.";
+}
+
+async function procesarSeguimientosSilencio() {
+  if (seguimientoSilencioEnCurso) return;
+  if (!sock || estado !== "conectado" || !empresaQrId || !whatsappQrId) return;
+
+  seguimientoSilencioEnCurso = true;
+
+  try {
+    const pendientes = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.telefono,
+        cwq.etapa,
+        CASE
+          WHEN COALESCE(cwq.bot_contexto->>'seguimiento_silencio_intento', '') ~ '^[0-9]+$'
+          THEN (cwq.bot_contexto->>'seguimiento_silencio_intento')::int
+          ELSE 0
+        END AS intento,
+        ult.remitente AS ultimo_remitente,
+        ult.estado_whatsapp AS ultimo_estado_whatsapp,
+        ult.entregado_at AS ultimo_entregado_at,
+        ult.leido_whatsapp_at AS ultimo_leido_whatsapp_at,
+        ult.created_at AS ultimo_mensaje_at
+      FROM clientes c
+      JOIN clientes_whatsapp_qr cwq
+        ON cwq.cliente_id = c.id
+       AND cwq.empresa_id = c.empresa_id
+       AND cwq.whatsapp_qr_id = $2
+      LEFT JOIN LATERAL (
+        SELECT
+          conv.remitente,
+          conv.estado_whatsapp,
+          conv.entregado_at,
+          conv.leido_whatsapp_at,
+          conv.created_at
+        FROM conversaciones conv
+        WHERE conv.cliente_id = c.id
+          AND conv.whatsapp_qr_id = $2
+        ORDER BY conv.created_at DESC, conv.id DESC
+        LIMIT 1
+      ) ult ON true
+      WHERE c.empresa_id = $1
+        AND cwq.proximo_seguimiento IS NOT NULL
+        AND cwq.proximo_seguimiento <= NOW()
+        AND COALESCE(cwq.bot_contexto->>'seguimiento_silencio_activo', 'false') = 'true'
+        AND cwq.bot_activo = true
+        AND COALESCE(cwq.requiere_closer, false) = false
+        AND (cwq.humano_hasta IS NULL OR cwq.humano_hasta <= NOW())
+        AND cwq.etapa NOT IN (
+          'Pago por validar',
+          'Pagó Adelanto',
+          'Enviado',
+          'Entregado',
+          'Descartado'
+        )
+      ORDER BY cwq.proximo_seguimiento ASC
+      LIMIT 20
+      `,
+      [empresaQrId, whatsappQrId]
+    );
+
+    for (const cliente of pendientes.rows) {
+      try {
+        const clienteId = Number(cliente.id);
+        const telefono = String(cliente.telefono || "").replace(/\D/g, "");
+        const intento = Number(cliente.intento || 0);
+
+        if (!clienteId || !telefono) {
+          if (clienteId) await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+          continue;
+        }
+
+        if (cliente.ultimo_remitente !== "bot") {
+          await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+          console.log(
+            "SEGUIMIENTO SILENCIO CANCELADO POR NUEVA INTERACCION:",
+            clienteId,
+            cliente.ultimo_remitente || "sin remitente"
+          );
+          continue;
+        }
+
+        const estadoUltimoWhatsApp = String(
+          cliente.ultimo_estado_whatsapp || ""
+        ).toLowerCase();
+
+        const ultimoFueLeido =
+          estadoUltimoWhatsApp === "leido" ||
+          estadoUltimoWhatsApp === "reproducido";
+
+        const ultimoFueEntregado =
+          estadoUltimoWhatsApp === "entregado" ||
+          ultimoFueLeido;
+
+        const estadoWhatsAppConocido = [
+          "enviado",
+          "entregado",
+          "leido",
+          "reproducido",
+        ].includes(estadoUltimoWhatsApp);
+
+        if (!ultimoFueLeido && estadoWhatsAppConocido) {
+          let esperarWhatsApp = true;
+          let motivoEspera = "NO ENTREGADO";
+
+          if (ultimoFueEntregado) {
+            motivoEspera = "ENTREGADO SIN LEER";
+
+            const referenciaEntrega =
+              cliente.ultimo_entregado_at || cliente.ultimo_mensaje_at;
+
+            const fechaEntrega = referenciaEntrega
+              ? new Date(referenciaEntrega)
+              : null;
+
+            const limiteSinLecturaMs =
+              FOLLOWUP_2_HORAS * 60 * 60 * 1000;
+
+            if (
+              fechaEntrega &&
+              Number.isFinite(fechaEntrega.getTime()) &&
+              Date.now() - fechaEntrega.getTime() >= limiteSinLecturaMs
+            ) {
+              esperarWhatsApp = false;
+
+              console.log(
+                "SEGUIMIENTO SILENCIO SIN CONFIRMACION DE LECTURA -> CONTINUA:",
+                clienteId,
+                "HORAS:",
+                FOLLOWUP_2_HORAS
+              );
+            }
+          }
+
+          if (esperarWhatsApp) {
+            const proximaRevision = fechaDesdeAhora(
+              FOLLOWUP_1_MIN * 60 * 1000
+            );
+
+            await pool.query(
+              `
+              UPDATE clientes_whatsapp_qr
+              SET proximo_seguimiento = $2,
+                  updated_at = NOW()
+              WHERE cliente_id = $1
+                AND whatsapp_qr_id = $3
+                AND COALESCE(
+                  bot_contexto->>'seguimiento_silencio_activo',
+                  'false'
+                ) = 'true'
+              `,
+              [clienteId, proximaRevision, whatsappQrId]
+            );
+
+            console.log(
+              "SEGUIMIENTO SILENCIO ESPERA WHATSAPP:",
+              clienteId,
+              motivoEspera,
+              "ESTADO:",
+              estadoUltimoWhatsApp,
+              "REVISION:",
+              proximaRevision.toISOString()
+            );
+
+            continue;
+          }
+        }
+
+        if (intento >= 3) {
+          await pool.query(
+            `
+            UPDATE clientes_whatsapp_qr
+            SET etapa = CASE
+                  WHEN etapa IN ('Nuevo', 'Interesado', 'Calificado', 'Seguimiento')
+                  THEN 'No Responde'
+                  ELSE etapa
+                END,
+                proximo_seguimiento = NULL,
+                bot_contexto = jsonb_set(
+                  jsonb_set(
+                    COALESCE(bot_contexto, '{}'::jsonb),
+                    '{seguimiento_silencio_activo}',
+                    'false'::jsonb,
+                    true
+                  ),
+                  '{seguimiento_silencio_intento}',
+                  to_jsonb(3),
+                  true
+                ),
+                updated_at = NOW()
+            WHERE cliente_id = $1
+              AND whatsapp_qr_id = $2
+            `,
+            [clienteId, whatsappQrId]
+          );
+
+          console.log(
+            "SEGUIMIENTO SILENCIO FINALIZADO -> NO RESPONDE:",
+            clienteId
+          );
+          continue;
+        }
+
+        const mensaje = mensajeSeguimientoSilencio(intento);
+        const jid = `${telefono}@s.whatsapp.net`;
+        const enviado = await sock.sendMessage(jid, { text: mensaje });
+
+        await pool.query(
+          `
+          INSERT INTO conversaciones (
+            cliente_id,
+            telefono,
+            whatsapp_message_id,
+            mensaje,
+            remitente,
+            tipo,
+            empresa_id,
+            whatsapp_qr_id,
+            estado_whatsapp,
+            enviado_at,
+            canal
+          )
+          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'enviado', NOW(), 'qr')
+          ON CONFLICT (whatsapp_message_id)
+          WHERE whatsapp_message_id IS NOT NULL
+          DO UPDATE SET
+            mensaje = EXCLUDED.mensaje,
+            remitente = 'bot',
+            estado_whatsapp = COALESCE(conversaciones.estado_whatsapp, EXCLUDED.estado_whatsapp),
+            enviado_at = COALESCE(conversaciones.enviado_at, EXCLUDED.enviado_at)
+          `,
+          [
+            clienteId,
+            telefono,
+            enviado?.key?.id || null,
+            mensaje,
+            empresaQrId,
+            whatsappQrId,
+          ]
+        );
+
+        const nuevoIntento = intento + 1;
+
+        let siguienteMs;
+        if (nuevoIntento === 1) {
+          siguienteMs = FOLLOWUP_2_HORAS * 60 * 60 * 1000;
+        } else if (nuevoIntento === 2) {
+          siguienteMs = FOLLOWUP_3_HORAS * 60 * 60 * 1000;
+        } else {
+          siguienteMs = FOLLOWUP_CIERRE_HORAS * 60 * 60 * 1000;
+        }
+
+        const proximaFecha = fechaDesdeAhora(siguienteMs);
+
+        await pool.query(
+          `
+          UPDATE clientes_whatsapp_qr
+          SET etapa = CASE
+                WHEN etapa IN ('Nuevo', 'Interesado', 'Calificado')
+                THEN 'Seguimiento'
+                ELSE etapa
+              END,
+              proximo_seguimiento = $2,
+              cantidad_seguimientos = COALESCE(cantidad_seguimientos, 0) + 1,
+              bot_contexto = jsonb_set(
+                jsonb_set(
+                  COALESCE(bot_contexto, '{}'::jsonb),
+                  '{seguimiento_silencio_activo}',
+                  'true'::jsonb,
+                  true
+                ),
+                '{seguimiento_silencio_intento}',
+                to_jsonb($3::int),
+                true
+              ),
+              updated_at = NOW()
+          WHERE cliente_id = $1
+            AND whatsapp_qr_id = $4
+          `,
+          [clienteId, proximaFecha, nuevoIntento, whatsappQrId]
+        );
+
+        console.log(
+          "SEGUIMIENTO SILENCIO ENVIADO:",
+          clienteId,
+          "INTENTO:",
+          nuevoIntento,
+          "SIGUIENTE:",
+          proximaFecha.toISOString()
+        );
+      } catch (errorCliente) {
+        console.error(
+          "ERROR SEGUIMIENTO SILENCIO CLIENTE:",
+          cliente?.id,
+          errorCliente?.message || errorCliente
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      "ERROR MOTOR SEGUIMIENTO SILENCIO:",
+      error?.message || error
+    );
+  } finally {
+    seguimientoSilencioEnCurso = false;
+  }
+}
+
+async function procesarLoteBot(lote) {
+  if (!Array.isArray(lote) || lote.length === 0) return;
+
+  const ultimo = lote[lote.length - 1];
+  const clienteId = ultimo.clienteId;
+  const telefono = ultimo.telefono;
+  const jidRespuesta = ultimo.jidRespuesta || `${telefono}@s.whatsapp.net`;
+
+  const ids = lote
+    .map((item) => Number(item.idConversacion))
+    .filter((id) => Number.isFinite(id));
+
+  const primerId = ids.length ? Math.min(...ids) : Number.MAX_SAFE_INTEGER;
+
+const ultimoId = ids.length ? Math.max(...ids) : 0;
+
+  const partesBot = lote.map((item) => item.textoBot).filter(Boolean);
+  const partesAccion = lote.map((item) => item.textoAccion).filter(Boolean);
+
+  const textoBot =
+    partesBot.length > 1
+      ? `MENSAJES CONSECUTIVOS DEL CLIENTE - responde una sola vez al conjunto:\n${partesBot.join("\n")}`
+      : (partesBot[0] || "");
+
+  const textoAccion = partesAccion.join("\n").trim();
+
+  if (!textoBot) return;
+
+  console.log("BUFFER BOT PROCESANDO:", {
+    clienteId,
+    mensajes: lote.length,
+    primerId,
+  });
+
+  let calificacion = await actualizarCalificacionCliente(
+    clienteId,
+    whatsappQrId,
+    textoAccion || ""
+  );
+
+  console.log("CALIFICACION BOT:", calificacion);
+
+  if (!calificacion || calificacion.requiereCloser) return;
+
+  const memoria = await obtenerMemoriaBot(pool, clienteId, whatsappQrId);
+  const historial = await obtenerHistorialReciente(pool, clienteId, whatsappQrId, primerId);
+
+const asignacionDistribucion = await pool.query(
+  `
+  SELECT
+    bot_producto,
+    asesor
+  FROM clientes_whatsapp_qr
+  WHERE cliente_id = $1
+    AND whatsapp_qr_id = $2
+  LIMIT 1
+  `,
+  [clienteId, whatsappQrId]
+);
+
+const productoAsignado =
+  asignacionDistribucion.rows[0]?.bot_producto ||
+  productoQrSlug;
+
+const asesorAsignado =
+  asignacionDistribucion.rows[0]?.asesor ||
+  null;
+
+console.log("ASIGNACION BOT RESUELTA:", {
+  clienteId,
+  producto: productoAsignado,
+  asesor: asesorAsignado,
+});
+
+  const respuestaBot = await decidirRespuestaBot({
+  texto: textoBot,
+  textoAccion: textoAccion || "",
+  calificacion,
+  memoria,
+  historial,
+  empresaId: empresaQrId,
+  productoPrincipal: productoAsignado,
+});
+
+  const mensajeMasNuevo = await pool.query(
+  `
+  SELECT id
+  FROM conversaciones
+  WHERE cliente_id = $1
+    AND whatsapp_qr_id = $2
+    AND remitente = 'cliente'
+    AND id > $3
+  ORDER BY id DESC
+  LIMIT 1
+  `,
+  [clienteId, whatsappQrId, ultimoId]
+);
+
+if (mensajeMasNuevo.rowCount > 0) {
+  console.log("RESPUESTA BOT DESCARTADA POR MENSAJE MAS NUEVO:", {
+    clienteId,
+    loteHasta: ultimoId,
+    nuevoId: mensajeMasNuevo.rows[0].id,
+  });
+
+  return;
+}
+
+  const analisisCRM = respuestaBot?.analisis || null;
+
+const ciudadDetectada = String(
+  analisisCRM?.ciudad || ""
+).trim();
+
+if (
+  ciudadDetectada &&
+  !calificacion?.senales?.includes("ubicacion")
+) {
+  const recalificacion = await actualizarCalificacionCliente(
+  clienteId,
+  whatsappQrId,
+  "",
+  ["ubicacion"],
+  true
+);
+
+  if (recalificacion) {
+    calificacion = recalificacion;
+
+    console.log("CALIFICACION ACTUALIZADA POR CIUDAD IA:", {
+      clienteId,
+      ciudad: ciudadDetectada,
+      senales: recalificacion.senales,
+      score: recalificacion.score,
+      temperatura: recalificacion.temperatura,
+    });
+  }
+}
+
+  const etapaAutomatica = resolverEtapaAutomatica(
+    memoria?.etapa,
+    analisisCRM?.etapa_sugerida
+  );
+
+  if (etapaAutomatica && etapaAutomatica !== memoria?.etapa) {
+    await pool.query(
+      `
+      UPDATE clientes_whatsapp_qr
+      SET etapa = $2,
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $3
+      `,
+      [clienteId, etapaAutomatica, whatsappQrId]
+    );
+
+    memoria.etapa = etapaAutomatica;
+
+    console.log(
+      "ETAPA CRM BOT:",
+      clienteId,
+      "->",
+      etapaAutomatica,
+      "|",
+      analisisCRM?.motivo_etapa || "sin motivo"
+    );
+  }
+
+  const requiereCloserIA =
+    respuestaBot?.handoff === true ||
+    analisisCRM?.requiere_closer === true ||
+    etapaAutomatica === "Pago por validar";
+
+  if (requiereCloserIA) {
+    const motivoIA = String(analisisCRM?.motivo_closer || "").trim();
+
+    const handoffMotivo =
+      etapaAutomatica === "Pago por validar"
+        ? "validar_pago"
+        : motivoIA && motivoIA !== "ninguno"
+        ? motivoIA
+        : detectarMotivoHandoff(textoAccion, textoBot);
+
+const asesorAsignadoResult = await pool.query(
+  `
+  SELECT
+    cwq.asesor,
+    cwq.distribucion_grupo_id,
+    cwq.distribucion_closer_id,
+
+    closer_distribucion.nombre
+      AS closer_distribucion_nombre
+
+  FROM clientes_whatsapp_qr cwq
+
+  LEFT JOIN usuarios closer_distribucion
+    ON closer_distribucion.id =
+       cwq.distribucion_closer_id
+   AND closer_distribucion.empresa_id =
+       cwq.empresa_id
+   AND closer_distribucion.rol = 'asesor'
+
+  WHERE cwq.cliente_id = $1
+    AND cwq.whatsapp_qr_id = $2
+
+  LIMIT 1
+  `,
+  [clienteId, whatsappQrId]
+);
+
+const filaAsignacion =
+  asesorAsignadoResult.rows[0] || {};
+
+const tieneDistribucion =
+  Boolean(filaAsignacion.distribucion_grupo_id);
+
+const closerDistribucionId =
+  filaAsignacion.distribucion_closer_id
+    ? Number(filaAsignacion.distribucion_closer_id)
+    : null;
+
+let asesor = null;
+
+if (tieneDistribucion) {
+  if (closerDistribucionId) {
+    asesor =
+      String(
+        filaAsignacion.closer_distribucion_nombre ||
+        filaAsignacion.asesor ||
+        ""
+      ).trim() || null;
+  } else {
+    // El anuncio sí tiene distribución,
+    // pero principal y reemplazo están ausentes.
+    asesor = null;
+  }
+} else {
+  // Lead antiguo o sin distribución configurada.
+  asesor =
+    String(filaAsignacion.asesor || "").trim() ||
+    null;
+
+  if (!asesor) {
+    const asesorFallbackResult = await pool.query(
+      `
+      SELECT u.nombre
+
+      FROM usuarios u
+
+      JOIN clientes c
+        ON c.empresa_id = u.empresa_id
+
+      LEFT JOIN closers_disponibilidad cd
+        ON cd.empresa_id = u.empresa_id
+       AND cd.usuario_id = u.id
+
+      WHERE c.id = $1
+        AND u.rol = 'asesor'
+        AND COALESCE(cd.disponible, true) = true
+
+      ORDER BY u.id ASC
+      LIMIT 1
+      `,
+      [clienteId]
+    );
+
+    asesor =
+      asesorFallbackResult.rows[0]?.nombre ||
+      null;
+  }
+}
+
+console.log("CLOSER HANDOFF RESUELTO:", {
+  clienteId,
+  tieneDistribucion,
+  closerDistribucionId,
+  asesor,
+  pendienteAsignacion:
+    tieneDistribucion && !asesor,
+});
+
+    await pool.query(
+      `
+      UPDATE clientes_whatsapp_qr
+      SET requiere_closer = true,
+          handoff_motivo = $3,
+          asesor = CASE
+  WHEN $5 = true THEN $2
+  ELSE COALESCE(NULLIF(BTRIM(asesor), ''), $2)
+END,
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $4
+      `,
+      [
+  clienteId,
+  asesor,
+  handoffMotivo,
+  whatsappQrId,
+  tieneDistribucion,
+]
+    );
+
+    console.log(
+      "ALERTA CLOSER:",
+      clienteId,
+      "MOTIVO:",
+      handoffMotivo,
+      "ASESOR:",
+      asesor || "SIN ASESOR"
+    );
+  }
+
+  if (respuestaBot?.memoria) {
+    await guardarMemoriaBot(pool, clienteId, whatsappQrId, respuestaBot.memoria);
+  }
+
+  if (!respuestaBot?.mensaje) return;
+
+  const largo = String(respuestaBot.mensaje).length;
+  const demoraHumanaMs = Math.min(
+    4000,
+    1500 + Math.floor(largo * 7) + Math.floor(Math.random() * 700)
+  );
+
+  console.log("DEMORA HUMANA BOT:", demoraHumanaMs, "ms");
+
+  try {
+    await sock?.sendPresenceUpdate?.("composing", jidRespuesta);
+  } catch {}
+
+  await new Promise((resolve) => setTimeout(resolve, demoraHumanaMs));
+
+  try {
+    await sock?.sendPresenceUpdate?.("paused", jidRespuesta);
+  } catch {}
+
+const mensajeDuranteEspera = await pool.query(
+  `
+  SELECT id
+  FROM conversaciones
+  WHERE cliente_id = $1
+    AND whatsapp_qr_id = $2
+    AND remitente = 'cliente'
+    AND id > $3
+  ORDER BY id DESC
+  LIMIT 1
+  `,
+  [clienteId, whatsappQrId, ultimoId]
+);
+
+if (mensajeDuranteEspera.rowCount > 0) {
+  console.log("RESPUESTA BOT CANCELADA DURANTE DEMORA:", {
+    clienteId,
+    loteHasta: ultimoId,
+    nuevoId: mensajeDuranteEspera.rows[0].id,
+  });
+
+  return;
+}
+
+  const multimediaSolicitada = respuestaBot?.multimedia || "ninguno";
+
+  const pausaMultimedia = () =>
+    new Promise((resolve) =>
+      setTimeout(resolve, 700 + Math.floor(Math.random() * 700))
+    );
+
+  const enviarMultimediaBot = async ({
+    archivo,
+    tipo,
+    caption = undefined,
+  }) => {
+    const esUrlRemota = /^https?:\/\//i.test(String(archivo));
+    let bufferArchivo;
+    let mimeType = null;
+
+    if (esUrlRemota) {
+      const respuestaArchivo = await fetch(archivo);
+
+      if (!respuestaArchivo.ok) {
+        throw new Error(`HTTP ${respuestaArchivo.status} descargando multimedia: ${archivo}`);
+      }
+
+      mimeType = respuestaArchivo.headers.get('content-type')?.split(';')[0] || null;
+      bufferArchivo = Buffer.from(await respuestaArchivo.arrayBuffer());
+    } else {
+      bufferArchivo = await readFile(archivo);
+    }
+
+    let enviado;
+
+    if (tipo === 'foto') {
+      if (!mimeType) {
+        const ruta = String(archivo).toLowerCase();
+        mimeType = ruta.endsWith('.png') ? 'image/png' : ruta.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+      }
+      enviado = await sock.sendMessage(jidRespuesta, {
+        image: bufferArchivo,
+        ...(caption ? { caption } : {}),
+      });
+    } else if (tipo === 'video') {
+      mimeType = mimeType || 'video/mp4';
+      enviado = await sock.sendMessage(jidRespuesta, {
+        video: bufferArchivo,
+        ...(caption ? { caption } : {}),
+      });
+    } else if (tipo === 'audio') {
+      const ruta = String(archivo).toLowerCase();
+      mimeType = mimeType || (ruta.endsWith('.ogg') ? 'audio/ogg; codecs=opus' : ruta.endsWith('.m4a') || ruta.endsWith('.mp4') ? 'audio/mp4' : 'audio/mpeg');
+
+      enviado = await sock.sendMessage(jidRespuesta, {
+        audio: bufferArchivo,
+        mimetype: mimeType,
+        ptt: false,
+      });
+    }
+
+    const tipoConversacion = tipo === 'foto' ? 'image' : tipo;
+    const mensajeMultimedia = caption || (tipo === 'foto' ? '[Imagen]' : tipo === 'video' ? '[Video]' : '[Audio]');
+
+    await mkdir(MEDIA_DIR, { recursive: true });
+    const mediaId = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionMedia(mimeType || '')}`;
+    await writeFile(`${MEDIA_DIR}/${mediaId}`, bufferArchivo);
+
+    await pool.query(
+      `INSERT INTO conversaciones (
+        cliente_id,
+        telefono,
+        whatsapp_message_id,
+        mensaje,
+        remitente,
+        tipo,
+        empresa_id,
+        whatsapp_qr_id,
+        canal,
+        media_id,
+        mime_type,
+        estado_whatsapp,
+        enviado_at
+      )
+      VALUES ($1, $2, $3, $4, 'bot', $5, $6, $7, 'qr', $8, $9, 'enviado', NOW())
+      ON CONFLICT (whatsapp_message_id)
+      WHERE whatsapp_message_id IS NOT NULL
+      DO NOTHING`,
+      [
+        clienteId,
+        telefono,
+        enviado?.key?.id || null,
+        mensajeMultimedia,
+        tipoConversacion,
+        empresaQrId,
+        whatsappQrId,
+        mediaId,
+        mimeType,
+      ]
+    );
+
+    console.log('MULTIMEDIA BOT ENVIADO:', {
+      clienteId,
+      producto: respuestaBot.producto,
+      tipo,
+      archivo,
+      mediaId,
+    });
+  };
+
+  if (
+    multimediaSolicitada === "presentacion" &&
+    respuestaBot?.producto
+  ) {
+    const fotos = await obtenerMultimediaProducto(
+      respuestaBot.producto,
+      "foto",
+      empresaQrId
+    );
+    const videos = await obtenerMultimediaProducto(
+      respuestaBot.producto,
+      "video",
+      empresaQrId
+    );
+
+    const secuencia = [];
+
+    // Patron universal de presentacion comercial:
+    // primera foto = portada; siguientes fotos = galeria/material adicional.
+    for (const foto of fotos) {
+      secuencia.push({ tipo: "foto", archivo: foto });
+    }
+
+    // Si existe demostracion en video, se envia despues de la galeria.
+    if (videos[0]) {
+      secuencia.push({ tipo: "video", archivo: videos[0] });
+    }
+
+    const apertura = String(respuestaBot?.apertura || "").trim();
+    let aperturaUsada = false;
+    let enviadosPresentacion = 0;
+
+    for (let i = 0; i < secuencia.length; i += 1) {
+      const item = secuencia[i];
+
+      try {
+        const caption =
+          !aperturaUsada && apertura && item.tipo !== "audio"
+            ? apertura
+            : undefined;
+
+        await enviarMultimediaBot({
+          archivo: item.archivo,
+          tipo: item.tipo,
+          caption,
+        });
+
+        if (caption) aperturaUsada = true;
+        enviadosPresentacion += 1;
+
+        if (i < secuencia.length - 1) {
+          await pausaMultimedia();
+        }
+      } catch (error) {
+        console.error(
+          "ERROR ENVIANDO PRESENTACION BOT:",
+          item.archivo,
+          error?.message || error
+        );
+      }
+    }
+
+    if (enviadosPresentacion > 0) {
+      await pool.query(
+        `
+        UPDATE clientes_whatsapp_qr
+        SET bot_contexto = jsonb_set(
+              jsonb_set(
+                COALESCE(bot_contexto, '{}'::jsonb),
+                '{presentacion_enviada}',
+                'true'::jsonb,
+                true
+              ),
+              '{presentacion_enviada_at}',
+              to_jsonb(NOW()::text),
+              true
+            ),
+            updated_at = NOW()
+        WHERE cliente_id = $1
+          AND whatsapp_qr_id = $2
+        `,
+        [clienteId, whatsappQrId]
+      );
+
+      console.log(
+        "PRESENTACION COMERCIAL BOT ENVIADA:",
+        clienteId,
+        respuestaBot.producto,
+        "ARCHIVOS:",
+        enviadosPresentacion
+      );
+
+      await pausaMultimedia();
+    }
+  } else {
+    const archivosMultimedia =
+      multimediaSolicitada !== "ninguno" && respuestaBot?.producto
+        ? await obtenerMultimediaProducto(
+            respuestaBot.producto,
+            multimediaSolicitada,
+            empresaQrId
+          )
+        : [];
+
+    if (archivosMultimedia.length > 0) {
+      const limite = multimediaSolicitada === "foto" ? 2 : 1;
+
+      for (const archivo of archivosMultimedia.slice(0, limite)) {
+        try {
+          await enviarMultimediaBot({
+            archivo,
+            tipo: multimediaSolicitada,
+          });
+        } catch (error) {
+          console.error(
+            "ERROR ENVIANDO MULTIMEDIA BOT:",
+            archivo,
+            error?.message || error
+          );
+        }
+      }
+    }
+  }
+
+  const enviadoBot = await sock.sendMessage(jidRespuesta, {
+    text: respuestaBot.mensaje,
+  });
+
+  await pool.query(
+    `
+    INSERT INTO conversaciones (
+            cliente_id,
+            telefono,
+            whatsapp_message_id,
+            mensaje,
+            remitente,
+            tipo,
+            empresa_id,
+            whatsapp_qr_id,
+            estado_whatsapp,
+            enviado_at,
+            canal
+          )
+          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'enviado', NOW(), 'qr')
+    ON CONFLICT (whatsapp_message_id)
+    WHERE whatsapp_message_id IS NOT NULL
+    DO UPDATE SET
+      mensaje = EXCLUDED.mensaje,
+            remitente = 'bot',
+            estado_whatsapp = COALESCE(conversaciones.estado_whatsapp, EXCLUDED.estado_whatsapp),
+            enviado_at = COALESCE(conversaciones.enviado_at, EXCLUDED.enviado_at)
+    `,
+    [
+      clienteId,
+      telefono,
+      enviadoBot?.key?.id || null,
+      respuestaBot.mensaje,
+      empresaQrId,
+      whatsappQrId,
+    ]
+  );
+
+  await programarSeguimientoSilencio({
+  clienteId,
+  whatsappQrId,
+  analisisCRM,
+  requiereCloserIA,
+  textoCliente: textoAccion || textoBot,
+});
+
+  console.log("BOT RESPONDIO:", {
+    tipo: respuestaBot?.tipo,
+    producto: respuestaBot?.producto,
+    intencion: respuestaBot?.intencion,
+    objecion: respuestaBot?.objecion,
+    nivelInteres: respuestaBot?.nivelInteres,
+    accion: respuestaBot?.accion,
+    handoff: respuestaBot?.handoff,
+    mensajesAgrupados: lote.length,
+  });
+}
+
+const bufferMensajesBot = crearBufferMensajes({
+  silencioMs: 3000,
+  maxEsperaMs: 10000,
+  procesarLote: procesarLoteBot,
+});
+
+async function limpiarSesionWhatsApp() {
+  const AUTH_DIR = './auth';
+  const items = await readdir(AUTH_DIR, { withFileTypes: true }).catch(() => []);
+
+  for (const item of items) {
+    if (item.name === 'media') continue;
+    await rm(`${AUTH_DIR}/${item.name}`, { recursive: true, force: true });
+  }
+
+  console.log('Sesion WhatsApp limpiada');
+}
+
+async function iniciarWhatsApp() {
+  await mkdir(MEDIA_DIR, { recursive: true });
+
+  const { state, saveCreds } = await useMultiFileAuthState("./auth");
+
+  const { version } = await fetchLatestWaWebVersion();
+  console.log("Version WhatsApp Web:", version);
+
+  sock = makeWASocket({
+    auth: state,
+    version,
+    syncFullHistory: true,
+    shouldSyncHistoryMessage: () => true,
+  });
+
+  sock.ev.on("creds.update", saveCreds);
+
+sock.ev.on("messaging-history.set", async ({ chats = [], contacts = [], messages = [], lidPnMappings = [] }) => {
+  console.log("Sincronizacion WhatsApp:", { contacts: contacts.length, chats: chats.length, messages: messages.length });
+
+const canalHistorialListo = await esperarCanalWhatsApp();
+
+if (!canalHistorialListo) {
+  console.log("HISTORIAL OMITIDO: canal WhatsApp no pudo resolverse");
+  return;
+}
+
+  for (const m of lidPnMappings) {
+    if (m?.lid && m?.pn) telefonoPorLidHistorial.set(m.lid, m.pn);
+  }
+  const telefonoPorLid = telefonoPorLidHistorial;
+
+  for (const contact of contacts) {
+    try {
+      const jidContacto = contact.phoneNumber || contact.id || "";
+      if (!jidContacto || jidContacto.endsWith("@g.us") || jidContacto === "status@broadcast") continue;
+
+      let telefonoContacto = "";
+      if (jidContacto.endsWith("@s.whatsapp.net")) telefonoContacto = jidContacto.replace("@s.whatsapp.net", "");
+      else if (jidContacto.endsWith("@c.us")) telefonoContacto = jidContacto.replace("@c.us", "");
+      else if (/^\d+$/.test(jidContacto)) telefonoContacto = jidContacto;
+      else if (jidContacto.endsWith("@lid")) {
+        const pnMapeado = telefonoPorLid.get(jidContacto);
+        if (pnMapeado?.endsWith("@s.whatsapp.net")) telefonoContacto = pnMapeado.replace("@s.whatsapp.net", "");
+        else if (pnMapeado?.endsWith("@c.us")) telefonoContacto = pnMapeado.replace("@c.us", "");
+        else if (/^\d+$/.test(pnMapeado || "")) telefonoContacto = pnMapeado;
+        else continue;
+      }
+      else continue;
+
+      const nombreContacto = contact.name || contact.notify || contact.verifiedName || telefonoContacto;
+
+      const clienteContacto = await pool.query(
+        `INSERT INTO clientes (nombre, telefono, etapa, empresa_id, canal)
+         VALUES ($1, $2, 'Nuevo', $3, 'qr')
+         ON CONFLICT (empresa_id, telefono) DO UPDATE
+         SET nombre = CASE WHEN EXCLUDED.nombre <> clientes.telefono THEN EXCLUDED.nombre ELSE clientes.nombre END,
+             canal = 'qr'
+         RETURNING id`,
+        [nombreContacto, telefonoContacto, empresaQrId]
+      );
+
+      await pool.query(
+        `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+         VALUES ($1, $2, $3, 'contacto', NOW())
+         ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+        [empresaQrId, clienteContacto.rows[0].id, whatsappQrId]
+      );
+
+    } catch (err) {
+      console.error("Error importando contacto WhatsApp:", err);
+    }
+  }
+
+  for (const chat of chats) {
+    try {
+      const jidChat = chat.pnJid || chat.id || "";
+      if (!jidChat || jidChat.endsWith("@g.us") || jidChat === "status@broadcast") continue;
+
+      let telefonoChat = "";
+      if (jidChat.endsWith("@s.whatsapp.net")) telefonoChat = jidChat.replace("@s.whatsapp.net", "");
+      else if (jidChat.endsWith("@c.us")) telefonoChat = jidChat.replace("@c.us", "");
+      else if (/^\d+$/.test(jidChat)) telefonoChat = jidChat;
+      else if (jidChat.endsWith("@lid")) {
+        const pnMapeado = telefonoPorLid.get(jidChat);
+        if (pnMapeado?.endsWith("@s.whatsapp.net")) telefonoChat = pnMapeado.replace("@s.whatsapp.net", "");
+        else if (pnMapeado?.endsWith("@c.us")) telefonoChat = pnMapeado.replace("@c.us", "");
+        else if (/^\d+$/.test(pnMapeado || "")) telefonoChat = pnMapeado;
+        else continue;
+      }
+      else continue;
+
+      const nombreChat = chat.name || chat.displayName || chat.username || telefonoChat;
+
+      const clienteChat = await pool.query(
+        `INSERT INTO clientes (nombre, telefono, etapa, empresa_id, canal)
+         VALUES ($1, $2, 'Nuevo', $3, 'qr')
+         ON CONFLICT (empresa_id, telefono) DO UPDATE
+         SET nombre = CASE WHEN EXCLUDED.nombre <> clientes.telefono THEN EXCLUDED.nombre ELSE clientes.nombre END,
+             canal = 'qr'
+         RETURNING id`,
+        [nombreChat, telefonoChat, empresaQrId]
+      );
+
+      await pool.query(
+        `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+         VALUES ($1, $2, $3, 'chat', NOW())
+         ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+        [empresaQrId, clienteChat.rows[0].id, whatsappQrId]
+      );
+    } catch (err) {
+      console.error("Error importando chat WhatsApp:", err);
+    }
+  }
+
+  for (const msg of messages) {
+    try {
+      if (!msg.message) continue;
+
+      const jid = msg.key.remoteJid;
+      const jidAlt = msg.key.remoteJidAlt;
+
+      if (!jid || jid === "status@broadcast") continue;
+      if (jid.endsWith("@g.us")) continue;
+
+      let telefono = "";
+
+      if (jidAlt && jidAlt.endsWith("@s.whatsapp.net")) {
+        telefono = jidAlt.replace("@s.whatsapp.net", "");
+      } else if (jid.endsWith("@s.whatsapp.net")) {
+        telefono = jid.replace("@s.whatsapp.net", "");
+      } else if (jid.endsWith("@c.us")) {
+        telefono = jid.replace("@c.us", "");
+      } else if (
+        msg.key.participant &&
+        msg.key.participant.endsWith("@s.whatsapp.net")
+      ) {
+        telefono = msg.key.participant.replace("@s.whatsapp.net", "");
+      } else if (jid.endsWith("@lid")) {
+        const pnMapeado = telefonoPorLid.get(jid);
+        if (pnMapeado?.endsWith("@s.whatsapp.net")) telefono = pnMapeado.replace("@s.whatsapp.net", "");
+        else if (pnMapeado?.endsWith("@c.us")) telefono = pnMapeado.replace("@c.us", "");
+        else if (/^\d+$/.test(pnMapeado || "")) telefono = pnMapeado;
+        else continue;
+      } else {
+        continue;
+      }
+
+      const contenido =
+        msg.message.ephemeralMessage?.message ||
+        msg.message.viewOnceMessage?.message ||
+        msg.message.documentWithCaptionMessage?.message ||
+        msg.message;
+
+      const texto =
+        contenido.conversation ||
+        contenido.extendedTextMessage?.text ||
+        contenido.imageMessage?.caption ||
+        contenido.videoMessage?.caption ||
+        contenido.documentMessage?.caption ||
+        contenido.buttonsResponseMessage?.selectedDisplayText ||
+        contenido.listResponseMessage?.title ||
+        contenido.templateButtonReplyMessage?.selectedDisplayText ||
+        "";
+
+const contextInfoMeta =
+  contenido.extendedTextMessage?.contextInfo ||
+  contenido.imageMessage?.contextInfo ||
+  contenido.videoMessage?.contextInfo ||
+  contenido.documentMessage?.contextInfo ||
+  null;
+
+const externalAdReply =
+  contextInfoMeta?.externalAdReply || null;
+
+if (msg.key.fromMe !== true && contextInfoMeta) {
+  console.log("META ADS ENTRADA:", {
+    telefono,
+    ctwaClid:
+      contextInfoMeta?.ctwaClid || null,
+    conversionSource:
+      contextInfoMeta?.conversionSource || null,
+    entryPointConversionSource:
+      contextInfoMeta?.entryPointConversionSource || null,
+    sourceType:
+      contextInfoMeta?.sourceType || null,
+    sourceId:
+      externalAdReply?.sourceId || null,
+    sourceUrl:
+      externalAdReply?.sourceUrl || null,
+    title:
+      externalAdReply?.title || null,
+    body:
+      externalAdReply?.body || null,
+    mediaType:
+      externalAdReply?.mediaType ?? null,
+  });
+}
+
+      let tipoMensaje = 'text';
+      let textoGuardado = texto;
+
+      if (!textoGuardado) {
+        if (contenido.audioMessage) { tipoMensaje = 'audio'; textoGuardado = '[Audio]'; }
+        else if (contenido.imageMessage) { tipoMensaje = 'image'; textoGuardado = '[Imagen]'; }
+        else if (contenido.videoMessage) { tipoMensaje = 'video'; textoGuardado = '[Video]'; }
+        else if (contenido.documentMessage) { tipoMensaje = 'document'; textoGuardado = '[Documento]'; }
+        else if (contenido.stickerMessage) { tipoMensaje = 'sticker'; textoGuardado = '[Sticker]'; }
+        else if (contenido.locationMessage) { tipoMensaje = 'location'; textoGuardado = '[Ubicacion]'; }
+        else if (contenido.contactMessage || contenido.contactsArrayMessage) { tipoMensaje = 'contact'; textoGuardado = '[Contacto]'; }
+        else continue;
+      }
+
+      const esMio = msg.key.fromMe === true;
+
+      let nombreCliente = telefono;
+
+      if (!esMio && msg.pushName) {
+        nombreCliente = msg.pushName;
+      }
+
+      const remitente = esMio ? "asesor" : "cliente";
+
+      const fechaMensaje = msg.messageTimestamp
+        ? new Date(Number(msg.messageTimestamp) * 1000)
+        : new Date();
+
+      const cliente = await pool.query(
+        `
+        INSERT INTO clientes (
+          nombre,
+          telefono,
+          etapa,
+          empresa_id,
+          canal
+        )
+        VALUES ($1, $2, 'Nuevo', $4, 'qr')
+        ON CONFLICT (empresa_id, telefono) DO UPDATE
+        SET
+          nombre = CASE
+            WHEN $3 = false AND EXCLUDED.nombre <> clientes.telefono
+            THEN EXCLUDED.nombre
+            ELSE clientes.nombre
+          END,
+          canal = 'qr'
+        RETURNING id
+        `,
+        [nombreCliente, telefono, esMio, empresaQrId]
+      );
+
+      const clienteId = cliente.rows[0].id;
+
+      await pool.query(
+        `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+         VALUES ($1, $2, $3, 'historial', NOW())
+         ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+        [empresaQrId, clienteId, whatsappQrId]
+      );
+
+      await pool.query(
+        `
+        INSERT INTO conversaciones (
+          cliente_id,
+          telefono,
+          whatsapp_message_id,
+          mensaje,
+          remitente,
+          tipo,
+          empresa_id,
+          whatsapp_qr_id,
+          canal,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'qr', $9)
+        ON CONFLICT (whatsapp_message_id)
+        WHERE whatsapp_message_id IS NOT NULL
+        DO NOTHING
+        `,
+        [clienteId, telefono, msg.key.id || null, textoGuardado, remitente, tipoMensaje, empresaQrId, whatsappQrId, fechaMensaje]
+      );
+
+      console.log("Historial guardado:", telefono, textoGuardado);
+    } catch (err) {
+      console.error("Error guardando historial:", err);
+    }
+  }
+});
+
+  sock.ev.on("connection.update", async (update) => {
+    const { connection, qr, lastDisconnect } = update;
+
+    if (qr) {
+      qrActual = await qrcode.toDataURL(qr);
+      estado = "qr_pendiente";
+      console.log("QR generado");
+    }
+
+    if (connection === "open") {
+  const jidActual = String(sock?.user?.id || "");
+
+  numeroWhatsappActual =
+    jidActual
+      .split("@")[0]
+      .split(":")[0] || null;
+
+  console.log("WHATSAPP NUMERO ACTUAL:", numeroWhatsappActual);
+
+  resolviendoCanalPromise = resolverIntegracionPorNumero(numeroWhatsappActual);
+
+try {
+  await resolviendoCanalPromise;
+} finally {
+  resolviendoCanalPromise = null;
+}
+
+  estado = "conectado";
+  qrActual = null;
+
+  console.log("WhatsApp conectado:", {
+    numeroWhatsappActual,
+    whatsappQrId,
+    empresaQrId,
+    productoQrSlug,
+  });
+}
+
+    if (connection === "close") {
+      estado = "desconectado";
+
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+      console.log("Conexion cerrada. Reintentando:", shouldReconnect);
+
+      if (shouldReconnect) {
+        iniciarWhatsApp();
+      }
+    }
+  });
+
+  const inicioBotUnix = Math.floor(Date.now() / 1000);
+
+sock.ev.on("messages.update", async (updates = []) => {
+  try {
+    for (const item of updates || []) {
+      const whatsappMessageId = item?.key?.id;
+      const estadoWhatsApp = estadoDesdeWAMessageStatus(item?.update?.status);
+
+      if (!whatsappMessageId || !estadoWhatsApp) continue;
+
+      await actualizarEstadoMensajeWhatsApp(
+        whatsappMessageId,
+        estadoWhatsApp,
+        new Date()
+      );
+    }
+  } catch (error) {
+    console.error(
+      "ERROR ESTADO WHATSAPP messages.update:",
+      error?.message || error
+    );
+  }
+});
+
+sock.ev.on("message-receipt.update", async (updates = []) => {
+  try {
+    for (const item of updates || []) {
+      const whatsappMessageId = item?.key?.id;
+      const receipt = item?.receipt || {};
+
+      if (!whatsappMessageId) continue;
+
+      const fechaPlayed = fechaDesdeTimestampWhatsApp(receipt?.playedTimestamp);
+      const fechaRead = fechaDesdeTimestampWhatsApp(receipt?.readTimestamp);
+
+      if (fechaPlayed) {
+        await actualizarEstadoMensajeWhatsApp(
+          whatsappMessageId,
+          "reproducido",
+          fechaPlayed
+        );
+        continue;
+      }
+
+      if (fechaRead) {
+        await actualizarEstadoMensajeWhatsApp(
+          whatsappMessageId,
+          "leido",
+          fechaRead
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      "ERROR ESTADO WHATSAPP message-receipt.update:",
+      error?.message || error
+    );
+  }
+});
+
+sock.ev.on("messages.upsert", async ({ messages, type }) => {
+  if (type !== "notify") {
+    console.log("HISTORIAL IGNORADO:", type);
+    return;
+  }
+  const canalListo = await esperarCanalWhatsApp();
+
+  if (!canalListo) {
+    console.log("MENSAJE OMITIDO: canal WhatsApp no resuelto");
+    return;
+  }
+    for (const msg of messages) {
+
+const timestampMensaje = Number(msg.messageTimestamp || 0);
+
+if (timestampMensaje < inicioBotUnix) {
+  console.log("MENSAJE ANTIGUO IGNORADO:", timestampMensaje);
+  continue;
+}
+
+if (!msg.message) continue;
+
+    const jid = msg.key.remoteJid;
+const jidAlt = msg.key.remoteJidAlt;
+
+if (!jid || jid === "status@broadcast") continue;
+
+// Ignorar grupos
+if (jid.endsWith("@g.us")) continue;
+
+let telefono = "";
+
+if (jidAlt && jidAlt.endsWith("@s.whatsapp.net")) {
+  telefono = jidAlt.replace("@s.whatsapp.net", "");
+} else if (jid.endsWith("@s.whatsapp.net")) {
+  telefono = jid.replace("@s.whatsapp.net", "");
+} else if (jid.endsWith("@c.us")) {
+  telefono = jid.replace("@c.us", "");
+} else if (
+  msg.key.participant &&
+  msg.key.participant.endsWith("@s.whatsapp.net")
+) {
+  telefono = msg.key.participant.replace("@s.whatsapp.net", "");
+} else if (jid.endsWith("@lid")) {
+  const pnMapeado = telefonoPorLidHistorial.get(jid);
+  if (pnMapeado?.endsWith("@s.whatsapp.net")) telefono = pnMapeado.replace("@s.whatsapp.net", "");
+  else if (pnMapeado?.endsWith("@c.us")) telefono = pnMapeado.replace("@c.us", "");
+  else { console.log("LID sin telefono mapeado:", jid); continue; }
+} else {
+  console.log("No se pudo identificar el numero:", jid);
+  continue;
+}
+
+console.log("JID RECIBIDO:", jid);
+console.log("JID ALT:", jidAlt);
+console.log("TELEFONO DETECTADO:", telefono);
+
+    const contenido =
+  msg.message.ephemeralMessage?.message ||
+  msg.message.viewOnceMessage?.message ||
+  msg.message.documentWithCaptionMessage?.message ||
+  msg.message;
+
+const texto =
+  contenido.conversation ||
+  contenido.extendedTextMessage?.text ||
+  contenido.imageMessage?.caption ||
+  contenido.videoMessage?.caption ||
+  contenido.documentMessage?.caption ||
+  contenido.buttonsResponseMessage?.selectedDisplayText ||
+  contenido.listResponseMessage?.title ||
+  contenido.templateButtonReplyMessage?.selectedDisplayText ||
+  "";
+
+const contextInfoDistribucion =
+  contenido.extendedTextMessage?.contextInfo ||
+  contenido.imageMessage?.contextInfo ||
+  contenido.videoMessage?.contextInfo ||
+  contenido.documentMessage?.contextInfo ||
+  null;
+
+const externalAdDistribucion =
+  contextInfoDistribucion?.externalAdReply || null;
+
+const postIdDistribucion = String(
+  externalAdDistribucion?.sourceId || ""
+).trim();
+
+let distribucionLead = null;
+
+if (
+  msg.key.fromMe !== true &&
+  empresaQrId &&
+  postIdDistribucion
+) {
+  try {
+    distribucionLead =
+      await resolverDistribucionPorPostId(pool, {
+        empresaId: empresaQrId,
+        postId: postIdDistribucion,
+      });
+
+    console.log("DISTRIBUCION LEAD:", {
+      postId: postIdDistribucion,
+      encontrada: Boolean(distribucionLead),
+      grupo: distribucionLead?.grupoNombre || null,
+      producto: distribucionLead?.productoSlug || null,
+      closer: distribucionLead?.closerNombre || null,
+    });
+  } catch (errorDistribucion) {
+    console.error(
+      "ERROR RESOLVIENDO DISTRIBUCION:",
+      errorDistribucion?.message || errorDistribucion
+    );
+  }
+}
+
+let estadoFlujoPrevio = null;
+
+if (
+  msg.key.fromMe !== true &&
+  empresaQrId &&
+  whatsappQrId &&
+  telefono
+) {
+  try {
+    const estadoFlujoPrevioResult =
+      await pool.query(
+        `
+        SELECT
+          cwq.distribucion_flujo_id,
+          cwq.flujo_estado
+        FROM clientes c
+        JOIN clientes_whatsapp_qr cwq
+          ON cwq.cliente_id = c.id
+         AND cwq.empresa_id = c.empresa_id
+        WHERE c.empresa_id = $1
+          AND c.telefono = $2
+          AND cwq.whatsapp_qr_id = $3
+        LIMIT 1
+        `,
+        [
+          empresaQrId,
+          telefono,
+          whatsappQrId,
+        ]
+      );
+
+    estadoFlujoPrevio =
+      estadoFlujoPrevioResult.rows[0] ||
+      null;
+  } catch (errorEstadoFlujo) {
+    console.error(
+      "ERROR LEYENDO ESTADO PREVIO DEL FLUJO:",
+      errorEstadoFlujo?.message ||
+        errorEstadoFlujo
+    );
+  }
+}
+
+const flujoFijoAntesIA =
+  msg.key.fromMe !== true &&
+  (
+    Boolean(
+      distribucionLead?.flujoId
+    ) ||
+    (
+      Boolean(
+        estadoFlujoPrevio
+          ?.distribucion_flujo_id
+      ) &&
+      estadoFlujoPrevio
+        ?.flujo_estado !==
+        "completado"
+    )
+  );
+
+let tipoMensaje = "text";
+let textoGuardado = texto;
+
+if (contenido.audioMessage) tipoMensaje = "audio";
+else if (contenido.imageMessage) tipoMensaje = "image";
+else if (contenido.videoMessage) tipoMensaje = "video";
+else if (contenido.documentMessage) tipoMensaje = "document";
+else if (contenido.stickerMessage) tipoMensaje = "sticker";
+else if (contenido.locationMessage) tipoMensaje = "location";
+else if (contenido.contactMessage || contenido.contactsArrayMessage) tipoMensaje = "contact";
+
+if (!textoGuardado) {
+  const etiquetas = { audio: "[Audio]", image: "[Imagen]", video: "[Video]", document: "[Documento]", sticker: "[Sticker]", location: "[Ubicacion]", contact: "[Contacto]" };
+  textoGuardado = etiquetas[tipoMensaje] || "";
+  if (!textoGuardado) { console.log("Mensaje sin contenido reconocido"); continue; }
+}
+
+const mediaContenido = contenido.imageMessage || contenido.videoMessage || contenido.audioMessage || contenido.documentMessage || contenido.stickerMessage || null;
+let mediaId = null;
+const mimeType = mediaContenido?.mimetype || null;
+let filename = mediaContenido?.fileName || null;
+let mediaAnalisis = null;
+
+    console.log(JSON.stringify(msg, null, 2));
+
+    try {
+  const esMio = msg.key.fromMe === true;
+
+  if (mediaContenido) {
+    try {
+      const extension = extensionMedia(mimeType || "");
+      const baseId = String(msg.key.id || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "_");
+      mediaId = `${baseId}.${extension}`;
+      const bufferMedia = await downloadMediaMessage(msg, "buffer", {});
+      await writeFile(`${MEDIA_DIR}/${mediaId}`, bufferMedia);
+      if (!filename) filename = mediaId;
+
+      if (
+        tipoMensaje === "audio" &&
+        !esMio &&
+        !flujoFijoAntesIA
+      ) {
+        try {
+          mediaAnalisis = await transcribirAudio(`${MEDIA_DIR}/${mediaId}`);
+          console.log("AUDIO TRANSCRITO:", mediaAnalisis);
+        } catch (errorIA) {
+          console.error("ERROR TRANSCRIBIENDO AUDIO:", errorIA?.message || errorIA);
+          mediaAnalisis = null;
+        }
+      }
+
+      if (
+        tipoMensaje === "image" &&
+        !esMio &&
+        !flujoFijoAntesIA
+      ) {
+        try {
+          mediaAnalisis = await analizarImagen(`${MEDIA_DIR}/${mediaId}`, mimeType || "image/jpeg");
+          console.log("IMAGEN ANALIZADA:", mediaAnalisis);
+        } catch (errorIA) {
+          console.error("ERROR ANALIZANDO IMAGEN:", errorIA?.message || errorIA);
+          mediaAnalisis = null;
+        }
+      }
+      if (
+        tipoMensaje === "video" &&
+        !esMio &&
+        !flujoFijoAntesIA
+      ) {
+        try {
+          mediaAnalisis = await analizarVideo(MEDIA_DIR + "/" + mediaId);
+          console.log("VIDEO ANALIZADO:", mediaAnalisis);
+        } catch (errorIA) {
+          console.error("ERROR ANALIZANDO VIDEO:", errorIA?.message || errorIA);
+          mediaAnalisis = null;
+        }
+      }
+
+      if (
+        tipoMensaje === "document" &&
+        mimeType === "application/pdf" &&
+        !esMio &&
+        !flujoFijoAntesIA
+      ) {
+        try {
+          mediaAnalisis = await analizarDocumento(`${MEDIA_DIR}/${mediaId}`, filename || "documento.pdf");
+          console.log("PDF ANALIZADO");
+        } catch (errorIA) {
+          console.error("ERROR ANALIZANDO PDF:", errorIA?.message || errorIA);
+          mediaAnalisis = null;
+        }
+      }
+      console.log("MEDIA GUARDADO:", mediaId, mimeType);
+    } catch (errorMedia) {
+      console.error("ERROR DESCARGANDO MEDIA:", errorMedia?.message || errorMedia);
+      mediaId = null;
+    }
+  }
+
+const nombreCliente = !esMio && msg.pushName
+  ? msg.pushName
+  : telefono;
+
+const remitente = esMio ? "asesor" : "cliente";
+  const cliente = await pool.query(
+    `
+    INSERT INTO clientes (
+  nombre,
+  telefono,
+  etapa,
+  empresa_id,
+  canal
+)
+VALUES ($1, $2, 'Nuevo', $4, 'qr')
+ON CONFLICT (empresa_id, telefono) DO UPDATE
+SET
+  nombre = CASE
+    WHEN $3 = false AND EXCLUDED.nombre <> clientes.telefono
+    THEN EXCLUDED.nombre
+    ELSE clientes.nombre
+  END,
+  ultima_gestion = NOW(),
+  canal = 'qr'
+RETURNING id
+    `,
+    [nombreCliente, telefono, esMio, empresaQrId]
+  );
+
+  const clienteId = cliente.rows[0].id;
+
+  await pool.query(
+    `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+     VALUES ($1, $2, $3, 'mensaje', NOW())
+     ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+    [empresaQrId, clienteId, whatsappQrId]
+  );
+
+if (!esMio && distribucionLead) {
+  await pool.query(
+    `
+    UPDATE clientes_whatsapp_qr
+    SET
+      bot_producto = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN COALESCE($3, bot_producto)
+        ELSE bot_producto
+      END,
+
+      asesor = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN $4
+        ELSE asesor
+      END,
+
+      distribucion_post_id = COALESCE(
+        distribucion_post_id,
+        $5
+      ),
+
+      distribucion_closer_id = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN $7
+        ELSE distribucion_closer_id
+      END,
+
+      distribucion_usando_reemplazo = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN $8
+        ELSE distribucion_usando_reemplazo
+      END,
+
+      distribucion_flujo_id = CASE
+        WHEN distribucion_grupo_id IS NULL
+        THEN $9
+        ELSE distribucion_flujo_id
+      END,
+
+      distribucion_grupo_id = COALESCE(
+        distribucion_grupo_id,
+        $6
+      ),
+
+      updated_at = NOW()
+
+    WHERE cliente_id = $1
+      AND whatsapp_qr_id = $2
+    `,
+    [
+      clienteId,
+      whatsappQrId,
+      distribucionLead.productoSlug || null,
+      distribucionLead.closerNombre || null,
+      postIdDistribucion || null,
+      distribucionLead.grupoId || null,
+      distribucionLead.closerId || null,
+      distribucionLead.usandoReemplazo === true,
+      distribucionLead.flujoId || null,
+    ]
+  );
+
+  console.log("DISTRIBUCION GUARDADA EN CLIENTE:", {
+    clienteId,
+    postId: postIdDistribucion,
+    grupoId: distribucionLead.grupoId,
+    grupo: distribucionLead.grupoNombre,
+    producto: distribucionLead.productoSlug,
+    closerId: distribucionLead.closerId,
+    closer: distribucionLead.closerNombre,
+    flujoId:
+      distribucionLead.flujoId || null,
+    flujo:
+      distribucionLead.flujoNombre || null,
+    usandoReemplazo:
+      distribucionLead.usandoReemplazo === true,
+  });
+}
+
+  if (!esMio) {
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+    console.log(
+      "SEGUIMIENTO SILENCIO CANCELADO POR RESPUESTA CLIENTE:",
+      clienteId
+    );
+  }
+
+  const mensajeGuardado = await pool.query(
+  `
+  INSERT INTO conversaciones (
+    cliente_id,
+    telefono,
+    whatsapp_message_id,
+    mensaje,
+    remitente,
+    tipo,
+    empresa_id,
+    whatsapp_qr_id,
+    canal,
+    media_id,
+    mime_type,
+    filename,
+    media_analisis
+  )
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'qr', $9, $10, $11, $12)
+  ON CONFLICT (whatsapp_message_id)
+  WHERE whatsapp_message_id IS NOT NULL
+  DO NOTHING
+  RETURNING id
+  `,
+  [
+    clienteId,
+    telefono,
+    msg.key.id || null,
+    textoGuardado,
+    remitente,
+    tipoMensaje,
+    empresaQrId,
+    whatsappQrId,
+    mediaId,
+    mimeType,
+    filename,
+    mediaAnalisis,
+  ]
+);
+
+if (mensajeGuardado.rowCount === 0) {
+  console.log(
+    "MENSAJE DUPLICADO IGNORADO:",
+    msg.key.id
+  );
+  continue;
+}
+
+console.log("Mensaje guardado en PostgreSQL");
+
+let resultadoFlujo = null;
+
+if (!esMio) {
+  try {
+    const jidFlujo =
+      msg.key.remoteJidAlt ||
+      `${telefono}@s.whatsapp.net`;
+
+    resultadoFlujo =
+      await procesarFlujoCliente({
+        pool,
+        sock,
+        empresaId: empresaQrId,
+        whatsappQrId,
+        clienteId,
+        telefono,
+        jidRespuesta: jidFlujo,
+        mediaDir: MEDIA_DIR,
+      });
+
+    console.log(
+      "FLUJO PRIMER CONTACTO:",
+      {
+        clienteId,
+        ...resultadoFlujo,
+      }
+    );
+  } catch (errorFlujo) {
+    console.error(
+      "ERROR EJECUTANDO FLUJO:",
+      errorFlujo?.message ||
+        errorFlujo
+    );
+
+    resultadoFlujo = null;
+  }
+}
+
+if (
+  !esMio &&
+  resultadoFlujo?.botActivado === true &&
+  mediaContenido &&
+  !mediaAnalisis
+) {
+  try {
+    if (
+      tipoMensaje === "audio" &&
+      mediaId
+    ) {
+      mediaAnalisis =
+        await transcribirAudio(
+          `${MEDIA_DIR}/${mediaId}`
+        );
+    } else if (
+      tipoMensaje === "image" &&
+      mediaId
+    ) {
+      mediaAnalisis =
+        await analizarImagen(
+          `${MEDIA_DIR}/${mediaId}`,
+          mimeType ||
+            "image/jpeg"
+        );
+    } else if (
+      tipoMensaje === "video" &&
+      mediaId
+    ) {
+      mediaAnalisis =
+        await analizarVideo(
+          `${MEDIA_DIR}/${mediaId}`
+        );
+    } else if (
+      tipoMensaje === "document" &&
+      mimeType ===
+        "application/pdf" &&
+      mediaId
+    ) {
+      mediaAnalisis =
+        await analizarDocumento(
+          `${MEDIA_DIR}/${mediaId}`,
+          filename ||
+            "documento.pdf"
+        );
+    }
+
+    if (mediaAnalisis) {
+      await pool.query(
+        `
+        UPDATE conversaciones
+        SET media_analisis = $2
+        WHERE id = $1
+        `,
+        [
+          mensajeGuardado.rows[0].id,
+          mediaAnalisis,
+        ]
+      );
+    }
+  } catch (
+    errorAnalisisPostFlujo
+  ) {
+    console.error(
+      "ERROR ANALIZANDO MEDIA TRAS ACTIVAR BOT:",
+      errorAnalisisPostFlujo
+        ?.message ||
+        errorAnalisisPostFlujo
+    );
+  }
+}
+
+if (
+  resultadoFlujo?.consumido ===
+  true
+) {
+  console.log(
+    "MENSAJE CONSUMIDO POR FLUJO FIJO:",
+    {
+      clienteId,
+      motivo:
+        resultadoFlujo.motivo,
+    }
+  );
+
+  continue;
+}
+
+      const textoBot = [texto, mediaAnalisis ? `[ANALISIS INTERNO DEL ARCHIVO - NO ES TEXTO DEL CLIENTE]: ${mediaAnalisis}` : ""]
+        .filter(Boolean)
+        .join("\n\n");
+
+      if (!esMio && textoBot) {
+  const textoAccion =
+    tipoMensaje === "audio"
+      ? (mediaAnalisis || texto)
+      : texto;
+
+  const jidRespuesta =
+    msg.key.remoteJidAlt || `${telefono}@s.whatsapp.net`;
+
+  const textoPrimerContacto = String(textoAccion || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[¡!¿?.,;:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const esMensajeGenericoPrimerContacto = [
+    "hola quiero mas informacion",
+    "quiero mas informacion",
+    "hola quiero informacion",
+    "quiero informacion",
+  ].includes(textoPrimerContacto);
+
+  let esPrimerContacto = false;
+
+  if (esMensajeGenericoPrimerContacto) {
+    const previo = await pool.query(
+      `
+      SELECT 1
+      FROM conversaciones
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
+        AND id < $3
+      LIMIT 1
+      `,
+      [
+        clienteId,
+        whatsappQrId,
+        mensajeGuardado.rows[0].id,
+      ]
+    );
+
+    esPrimerContacto = previo.rowCount === 0;
+  }
+
+  bufferMensajesBot.agregar(`${empresaQrId}:${clienteId}`, {
+    idConversacion: mensajeGuardado.rows[0].id,
+    clienteId,
+    telefono,
+    jidRespuesta,
+    textoBot,
+    textoAccion,
+    esPrimerContacto,
+  });
+
+  console.log("BUFFER BOT AGREGADO:", {
+    clienteId,
+    idConversacion: mensajeGuardado.rows[0].id,
+    tipoMensaje,
+    esPrimerContacto,
+  });
+}
+
+    } catch (error) {
+      console.error("Error guardando mensaje:", error);
+    }
+    }
+  });
+}
+
+app.get("/media/:id", (req, res) => {
+  const id = String(req.params.id || "");
+  if (!/^[a-zA-Z0-9._-]+$/.test(id)) return res.status(400).json({ error: "Media invalido" });
+  res.sendFile(id, { root: process.cwd() + "/auth/media" }, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: "Media no encontrado" });
+  });
+});
+
+app.get("/qr", (req, res) => {
+  res.json({
+    estado,
+    qr: qrActual,
+    whatsapp_qr_id: whatsappQrId,
+    empresa_id: empresaQrId,
+    numero_whatsapp: numeroWhatsappActual,
+    producto_slug: productoQrSlug,
+  });
+});
+
+
+app.patch("/producto-principal", async (req, res) => {
+  try {
+    if (!whatsappQrId || !empresaQrId) {
+      return res.status(409).json({ success: false, error: "No hay un canal WhatsApp activo" });
+    }
+
+    const slug = String(req.body?.producto_slug || "").trim();
+
+    if (!slug) {
+      return res.status(400).json({ success: false, error: "Producto no valido" });
+    }
+
+    const productoResult = await pool.query(
+      `SELECT slug
+       FROM productos
+       WHERE empresa_id = $1
+         AND slug = $2
+         AND activo = true
+         AND ia_activo = true
+       LIMIT 1`,
+      [empresaQrId, slug]
+    );
+
+    if (productoResult.rowCount === 0) {
+      return res.status(404).json({ success: false, error: "Producto no encontrado o no disponible para IA" });
+    }
+
+    const actualizado = await pool.query(
+      `UPDATE integraciones_whatsapp_qr
+       SET producto_slug = $3,
+           updated_at = NOW()
+       WHERE id = $1
+         AND empresa_id = $2
+       RETURNING producto_slug`,
+      [whatsappQrId, empresaQrId, slug]
+    );
+
+    if (actualizado.rowCount === 0) {
+      return res.status(404).json({ success: false, error: "Canal WhatsApp no encontrado" });
+    }
+
+    productoQrSlug = actualizado.rows[0].producto_slug;
+
+    console.log("PRODUCTO PRINCIPAL WHATSAPP ACTUALIZADO:", {
+      whatsappQrId,
+      empresaQrId,
+      productoQrSlug,
+    });
+
+    return res.json({
+      success: true,
+      whatsapp_qr_id: whatsappQrId,
+      producto_slug: productoQrSlug,
+    });
+  } catch (error) {
+    console.error("ERROR ACTUALIZANDO PRODUCTO PRINCIPAL WHATSAPP:", error);
+    return res.status(500).json({ success: false, error: "No se pudo actualizar el producto principal" });
+  }
+});
+
+app.post("/desconectar", async (req, res) => {
+  try {
+    estado = "desconectando";
+    qrActual = null;
+
+    if (sock) {
+      try {
+        await sock.logout();
+      } catch (error) {
+        console.error("Error cerrando sesion WhatsApp:", error);
+      }
+    }
+
+    await limpiarSesionWhatsApp();
+
+if (whatsappQrId) {
+  await pool.query(
+    `
+    UPDATE integraciones_whatsapp_qr
+    SET estado = 'desconectado',
+        updated_at = NOW()
+    WHERE id = $1
+    `,
+    [whatsappQrId]
+  );
+}
+
+await pool.query(
+  `
+  UPDATE whatsapp_qr_sesiones
+  SET whatsapp_qr_id_activo = NULL,
+      estado = 'desconectado',
+      updated_at = NOW()
+  WHERE session_key = $1
+  `,
+  [process.env.WHATSAPP_SESSION_KEY]
+);
+
+sock = null;
+whatsappQrId = null;
+productoQrSlug = null;
+numeroWhatsappActual = null;
+estado = "desconectado";
+
+    setTimeout(() => {
+      iniciarWhatsApp().catch((error) => {
+        console.error("Error reiniciando WhatsApp:", error);
+      });
+    }, 1000);
+
+    res.json({
+      success: true,
+      mensaje: "WhatsApp desconectado. Generando nuevo QR.",
+    });
+  } catch (error) {
+    console.error("Error desconectando WhatsApp:", error);
+
+    res.status(500).json({
+      success: false,
+      error: "No se pudo desconectar WhatsApp",
+    });
+  }
+});
+
+app.post("/sync-contacts", async (req, res) => {
+  try {
+    if (!sock) {
+      return res.status(400).json({
+        success: false,
+        error: "WhatsApp no iniciado",
+      });
+    }
+
+    if (estado !== "conectado") {
+      return res.status(400).json({
+        success: false,
+        error: "WhatsApp no conectado",
+      });
+    }
+
+    const resultado = await pool.query(`
+      SELECT DISTINCT
+        telefono,
+        COALESCE(NULLIF(telefono, ''), telefono) AS nombre
+      FROM conversaciones
+      WHERE telefono IS NOT NULL
+        AND telefono <> ''
+        AND canal = 'qr'
+    `);
+
+    let contactosSincronizados = 0;
+
+    for (const row of resultado.rows) {
+      const telefono = String(row.telefono).replace(/\D/g, "");
+
+      if (!telefono) continue;
+
+      await pool.query(
+        `
+        INSERT INTO clientes (
+          nombre,
+          telefono,
+          etapa,
+          empresa_id,
+          canal
+        )
+        VALUES ($1, $2, 'Nuevo', $3, 'qr')
+        ON CONFLICT (empresa_id, telefono) DO UPDATE
+        SET canal = 'qr'
+        `,
+        [row.nombre || telefono, telefono, empresaQrId]
+      );
+
+      contactosSincronizados++;
+    }
+
+    return res.json({
+      success: true,
+      contactos_sincronizados: contactosSincronizados,
+    });
+  } catch (error) {
+    console.error("Error sincronizando contactos:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Error sincronizando contactos",
+    });
+  }
+});
+app.post('/send-media', express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
+  try {
+    const telefono = String(req.headers['x-telefono'] || '').replace(/\D/g, '');
+    const clienteId = Number(req.headers['x-cliente-id']);
+    const esperadoQrId = Number(req.headers['x-whatsapp-qr-id']);
+    const mimeType = String(req.headers['x-mime-type'] || req.headers['content-type'] || 'application/octet-stream');
+    let filename = 'archivo';
+
+    try {
+      filename = decodeURIComponent(String(req.headers['x-filename'] || 'archivo'));
+    } catch {}
+
+    if (!sock || estado !== 'conectado' || !empresaQrId || !whatsappQrId) {
+      return res.status(400).json({ success: false, error: 'WhatsApp no iniciado' });
+    }
+
+    if (!telefono || !clienteId || !esperadoQrId) {
+      return res.status(400).json({ success: false, error: 'Faltan datos del envio' });
+    }
+
+    if (Number(whatsappQrId) !== esperadoQrId) {
+      return res.status(409).json({ success: false, error: 'El canal de WhatsApp activo cambio' });
+    }
+
+    const bufferArchivo = Buffer.isBuffer(req.body)
+      ? req.body
+      : Buffer.from(req.body || []);
+
+    if (!bufferArchivo.length) {
+      return res.status(400).json({ success: false, error: 'Archivo vacio' });
+    }
+
+    const cliente = await pool.query(
+      `SELECT id, telefono
+       FROM clientes
+       WHERE id = $1
+         AND empresa_id = $2
+       LIMIT 1`,
+      [clienteId, empresaQrId]
+    );
+
+    if (!cliente.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
+    }
+
+    await pool.query(
+      `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+       VALUES ($1, $2, $3, 'mensaje', NOW())
+       ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+      [empresaQrId, clienteId, whatsappQrId]
+    );
+
+    let tipo = 'document';
+    let contenido;
+
+    if (mimeType.startsWith('image/')) {
+      tipo = 'image';
+      contenido = { image: bufferArchivo, mimetype: mimeType };
+    } else if (mimeType.startsWith('audio/')) {
+      tipo = 'audio';
+      contenido = { audio: bufferArchivo, mimetype: mimeType, ptt: false };
+    } else {
+      contenido = {
+        document: bufferArchivo,
+        mimetype: mimeType,
+        fileName: filename,
+      };
+    }
+
+    const jid = `${telefono}@s.whatsapp.net`;
+    const enviado = await sock.sendMessage(jid, contenido);
+
+    await mkdir(MEDIA_DIR, { recursive: true });
+    const mediaId = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionMedia(mimeType)}`;
+    await writeFile(`${MEDIA_DIR}/${mediaId}`, bufferArchivo);
+
+    await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
+
+    const mensaje =
+      tipo === 'image'
+        ? '[Imagen]'
+        : tipo === 'audio'
+          ? '[Audio]'
+          : '[Documento]';
+
+    await pool.query(
+      `INSERT INTO conversaciones (
+        cliente_id,
+        telefono,
+        whatsapp_message_id,
+        mensaje,
+        remitente,
+        tipo,
+        empresa_id,
+        whatsapp_qr_id,
+        canal,
+        media_id,
+        mime_type,
+        filename,
+        estado_whatsapp,
+        enviado_at
+      )
+      VALUES ($1, $2, $3, $4, 'asesor', $5, $6, $7, 'qr', $8, $9, $10, 'enviado', NOW())
+      ON CONFLICT (whatsapp_message_id)
+      WHERE whatsapp_message_id IS NOT NULL
+      DO NOTHING`,
+      [
+        clienteId,
+        telefono,
+        enviado?.key?.id || null,
+        mensaje,
+        tipo,
+        empresaQrId,
+        whatsappQrId,
+        mediaId,
+        mimeType,
+        filename,
+      ]
+    );
+
+    return res.json({
+      success: true,
+      messageId: enviado?.key?.id || null,
+      mediaId,
+      tipo,
+    });
+  } catch (error) {
+    console.error('ERROR ENVIANDO MEDIA QR:', error);
+    return res.status(500).json({ success: false, error: 'Error enviando archivo' });
+  }
+});
+
+app.post("/send", async (req, res) => {
+  try {
+    const { telefono, mensaje, whatsapp_qr_id } = req.body;
+    const esperadoQrId = Number(whatsapp_qr_id);
+
+    if (!sock) {
+      return res.status(400).json({ error: "WhatsApp no iniciado" });
+    }
+
+    if (!esperadoQrId) {
+      return res.status(400).json({ error: "Falta whatsapp_qr_id" });
+    }
+
+    if (!empresaQrId || !whatsappQrId || Number(whatsappQrId) !== esperadoQrId) {
+      return res.status(409).json({ error: "El canal de WhatsApp activo cambio" });
+    }
+
+    const enviadoAsesor = await sock.sendMessage(`${telefono}@s.whatsapp.net`, {
+  text: mensaje,
+});
+
+const cliente = await pool.query(
+  `
+  SELECT id FROM clientes
+  WHERE telefono = $1
+    AND empresa_id = $2
+  LIMIT 1
+  `,
+  [telefono, empresaQrId]
+);
+
+if (cliente.rows.length > 0) {
+  await pool.query(
+    `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
+     VALUES ($1, $2, $3, 'mensaje', NOW())
+     ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+    [empresaQrId, cliente.rows[0].id, whatsappQrId]
+  );
+
+  await cancelarSeguimientoSilencio(cliente.rows[0].id, whatsappQrId);
+  console.log(
+    "SEGUIMIENTO SILENCIO CANCELADO POR MENSAJE MANUAL:",
+    cliente.rows[0].id
+  );
+
+  await pool.query(
+    `
+    INSERT INTO conversaciones (
+      cliente_id,
+      telefono,
+      whatsapp_message_id,
+      mensaje,
+      remitente,
+      tipo,
+      empresa_id,
+      whatsapp_qr_id,
+      estado_whatsapp,
+      enviado_at,
+      canal
+    )
+    VALUES ($1, $2, $3, $4, 'asesor', 'text', $5, $6, 'enviado', NOW(), 'qr')
+    `,
+    [
+      cliente.rows[0].id,
+      telefono,
+      enviadoAsesor?.key?.id || null,
+      mensaje,
+      empresaQrId,
+      whatsappQrId,
+    ]
+  );
+}
+
+res.json({ success: true });
+  } catch (error) {
+    console.error("Error enviando mensaje:", error);
+    res.status(500).json({ error: "Error enviando mensaje" });
+  }
+});
+
+const PORT = process.env.PORT || 4001;
+
+app.listen(PORT, async () => {
+  console.log(`Servidor WhatsApp QR en puerto ${PORT}`);
+  await prepararColumnasBot();
+  await cargarIntegracionQr();
+  await iniciarWhatsApp();
+
+  setInterval(() => {
+    procesarSeguimientosExplicitos().catch((error) => {
+      console.error(
+        "ERROR INTERVALO SEGUIMIENTO EXPLICITO:",
+        error?.message || error
+      );
+    });
+
+    procesarSeguimientosSilencio().catch((error) => {
+      console.error(
+        "ERROR INTERVALO SEGUIMIENTO SILENCIO:",
+        error?.message || error
+      );
+    });
+  }, 60 * 1000);
+
+  console.log("MOTOR SEGUIMIENTO SILENCIO ACTIVO");
+});

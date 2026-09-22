@@ -154,7 +154,12 @@ function rutaMultimedia(url) {
   const valor = String(url || "").trim();
   if (!valor) return null;
   if (path.isAbsolute(valor)) return valor;
-  return path.join(STORAGE_DIR, valor);
+
+  return path.join(
+    /* turbopackIgnore: true */
+    STORAGE_DIR,
+    valor
+  );
 }
 
 function rutaMultimediaDB(media, empresaId) {

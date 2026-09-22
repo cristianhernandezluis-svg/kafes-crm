@@ -1,0 +1,2206 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  Handle,
+  NodeToolbar,
+  Position,
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  type Connection,
+  type Edge,
+  type EdgeChange,
+  type Node,
+  type NodeChange,
+  type NodeProps,
+} from "@xyflow/react";
+
+import "@xyflow/react/dist/style.css";
+
+import Sidebar from "../components/Sidebar";
+import { useTemaCRM } from "@/components/TemaProvider";
+
+type Flujo = {
+  id: number;
+  nombre: string;
+  slug?: string | null;
+  producto_slug?: string | null;
+  activo: boolean;
+  total_nodos?: number;
+};
+
+type TipoContenido =
+  | "texto"
+  | "imagen"
+  | "video"
+  | "escribiendo"
+  | "boton"
+  | "respuesta_rapida";
+
+type ContenidoNodo = {
+  id: string;
+  tipo: TipoContenido;
+  texto?: string;
+  url?: string;
+  segundos?: number;
+};
+
+type DatosNodo = {
+  titulo?: string;
+  contenidos?: ContenidoNodo[];
+  subtitulo?: string;
+  tipoMensaje?: "omnichannel" | "webchat";
+};
+
+type CloudinarySignatureResponse = {
+  timestamp: number;
+  signature: string;
+  folder: string;
+  apiKey: string;
+  cloudName: string;
+};
+
+type CloudinaryUploadResponse = {
+  secure_url?: string;
+  error?: {
+    message?: string;
+  };
+};
+
+function idNuevo(prefijo: string) {
+  return `${prefijo}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 7)}`;
+}
+
+type AccionNodo =
+  | "preview"
+  | "inicial"
+  | "id"
+  | "renombrar"
+  | "duplicar"
+  | "eliminar";
+
+function dispararAccionNodo(
+  nodeId: string,
+  accion: AccionNodo
+) {
+  window.dispatchEvent(
+    new CustomEvent("flujo:accion-nodo", {
+      detail: {
+        nodeId,
+        accion,
+      },
+    })
+  );
+}
+
+function BarraAccionesNodo({
+  nodeId,
+  selected,
+}: {
+  nodeId: string;
+  selected: boolean;
+}) {
+  if (!selected) return null;
+
+  const acciones: Array<{
+    accion: AccionNodo;
+    icono: string;
+    titulo: string;
+  }> = [
+    {
+      accion: "preview",
+      icono: "👁",
+      titulo: "Vista previa",
+    },
+    {
+      accion: "inicial",
+      icono: "▶",
+      titulo: "Asignar como paso inicial",
+    },
+    {
+      accion: "id",
+      icono: "ID",
+      titulo: "Obtener ID de Paso",
+    },
+    {
+      accion: "renombrar",
+      icono: "T",
+      titulo: "Renombrar",
+    },
+    {
+      accion: "duplicar",
+      icono: "⧉",
+      titulo: "Duplicar",
+    },
+    {
+      accion: "eliminar",
+      icono: "🗑",
+      titulo: "Eliminar",
+    },
+  ];
+
+  return (
+    <NodeToolbar
+      isVisible={selected}
+      position={Position.Top}
+    >
+      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+        {acciones.map((item) => (
+          <button
+            key={item.accion}
+            type="button"
+            title={item.titulo}
+            onClick={(e) => {
+              e.stopPropagation();
+              dispararAccionNodo(
+                nodeId,
+                item.accion
+              );
+            }}
+            className="flex h-7 min-w-7 items-center justify-center rounded px-1 text-[10px] font-black text-slate-700 hover:bg-orange-50 hover:text-orange-600"
+          >
+            {item.icono}
+          </button>
+        ))}
+      </div>
+    </NodeToolbar>
+  );
+}
+
+function NodoInicio({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const d = data as DatosNodo;
+
+  return (
+    <div
+      className={`min-w-[190px] rounded-xl bg-white text-slate-900 shadow-lg ${
+        selected
+          ? "border-2 border-orange-500"
+          : "border border-slate-300"
+      }`}
+    >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
+      <div className="absolute -top-6 left-1 text-[10px] font-bold text-orange-500">
+        ▶ Paso inicial
+      </div>
+
+      <div className="px-4 py-4">
+        <p className="text-xs font-bold">
+          💬 {d.titulo || "Enviar mensaje"}
+        </p>
+      </div>
+
+      <div className="flex items-center justify-end border-t border-slate-200 px-3 py-2">
+        <span className="mr-2 text-[10px] text-slate-500">
+          Continuar
+        </span>
+
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!relative !right-auto !top-auto !h-3 !w-3 !translate-x-0 !translate-y-0 !border !border-slate-400 !bg-white"
+        />
+      </div>
+    </div>
+  );
+}
+
+function PreviewContenido({
+  contenido,
+}: {
+  contenido: ContenidoNodo;
+}) {
+  if (contenido.tipo === "texto") {
+    return (
+      <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-700">
+        {contenido.texto || "Texto vacío"}
+      </div>
+    );
+  }
+
+  if (contenido.tipo === "imagen") {
+    return contenido.url ? (
+      <img
+        src={contenido.url}
+        alt=""
+        className="max-h-[180px] w-full rounded-lg object-cover"
+      />
+    ) : (
+      <div className="flex h-24 items-center justify-center rounded-lg bg-slate-100 text-3xl">
+        🖼️
+      </div>
+    );
+  }
+
+  if (contenido.tipo === "video") {
+    return contenido.url ? (
+      <video
+        src={contenido.url}
+        className="max-h-[180px] w-full rounded-lg bg-black object-contain"
+        controls
+        muted
+      />
+    ) : (
+      <div className="flex h-20 items-center justify-center rounded-lg bg-slate-900 text-3xl text-white">
+        VIDEO
+      </div>
+    );
+  }
+
+  if (contenido.tipo === "escribiendo") {
+    return (
+      <div className="rounded-lg bg-slate-100 px-3 py-2 text-[11px] text-slate-500">
+        ⌨️ Escribiendo...{" "}
+        {contenido.segundos || 1.5}s
+      </div>
+    );
+  }
+
+  if (contenido.tipo === "boton") {
+    return (
+      <div className="rounded-lg bg-slate-100 px-3 py-2 text-center text-xs font-bold text-slate-700">
+        {contenido.texto || "Botón"}
+      </div>
+    );
+  }
+
+  if (contenido.tipo === "respuesta_rapida") {
+    return (
+      <div className="inline-block rounded-full border border-slate-300 px-3 py-1 text-[11px] text-slate-700">
+        {contenido.texto ||
+          "Respuesta rápida"}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function NodoMensaje({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const d = data as DatosNodo;
+
+  const contenidos =
+    Array.isArray(d.contenidos)
+      ? d.contenidos
+      : [];
+
+  return (
+    <div
+      className={`w-[250px] rounded-xl bg-white text-slate-900 shadow-xl ${
+        selected
+          ? "border-2 border-orange-500"
+          : "border border-slate-300"
+      }`}
+    >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!h-3 !w-3 !border !border-slate-400 !bg-white"
+      />
+
+      <div className="border-b border-slate-200 px-3 py-2">
+        <p className="text-xs font-bold">
+          ⬡ {d.titulo || "Enviar mensaje"}
+        </p>
+      </div>
+
+      <div className="max-h-[340px] space-y-2 overflow-hidden p-3">
+        {contenidos.length === 0 ? (
+          <div className="rounded-lg bg-slate-100 px-3 py-5 text-center text-xs text-slate-400">
+            Añade contenido
+          </div>
+        ) : (
+          contenidos.map((contenido) => (
+            <PreviewContenido
+              key={contenido.id}
+              contenido={contenido}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="flex items-center justify-end border-t border-slate-200 px-3 py-2">
+        <span className="mr-2 text-[10px] text-slate-500">
+          Continuar
+        </span>
+
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!relative !right-auto !top-auto !h-3 !w-3 !translate-x-0 !translate-y-0 !border !border-slate-400 !bg-white"
+        />
+      </div>
+    </div>
+  );
+}
+
+function NodoEsperar({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const d = data as DatosNodo;
+
+  return (
+    <div
+      className={`min-w-[220px] rounded-xl bg-white text-slate-900 shadow-lg ${
+        selected
+          ? "border-2 border-orange-500"
+          : "border border-slate-300"
+      }`}
+    >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!h-3 !w-3 !bg-white"
+      />
+
+      <div className="px-4 py-3">
+        <p className="text-xs font-black">
+          ⏸ {d.titulo || "Esperar respuesta"}
+        </p>
+
+        <p className="mt-1 text-[11px] text-slate-500">
+          {d.subtitulo ||
+            "Esperar mensaje del cliente"}
+        </p>
+      </div>
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!h-3 !w-3 !bg-white"
+      />
+    </div>
+  );
+}
+
+function NodoBot({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const d = data as DatosNodo;
+
+  return (
+    <div
+      className={`min-w-[220px] rounded-xl bg-white text-slate-900 shadow-lg ${
+        selected
+          ? "border-2 border-orange-500"
+          : "border border-green-500"
+      }`}
+    >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!h-3 !w-3 !bg-white"
+      />
+
+      <div className="rounded-t-xl bg-green-500 px-4 py-2 text-xs font-black text-white">
+        🤖 {d.titulo || "Activar bot"}
+      </div>
+
+      <div className="px-4 py-3 text-[11px] text-slate-500">
+        {d.subtitulo ||
+          "A partir de aquí responde OpenAI"}
+      </div>
+    </div>
+  );
+}
+
+const nodeTypes = {
+  inicio: NodoInicio,
+  mensaje: NodoMensaje,
+  esperar_respuesta: NodoEsperar,
+  activar_bot: NodoBot,
+};
+
+export default function FlujosPage() {
+  const { temaClaro, cambiarTema } =
+    useTemaCRM();
+
+  const [empresaId, setEmpresaId] =
+    useState<number | null>(null);
+
+  const [flujos, setFlujos] = useState<
+    Flujo[]
+  >([]);
+
+  const [flujoActivo, setFlujoActivo] =
+    useState<Flujo | null>(null);
+
+  const [nodes, setNodes] = useState<
+    Node[]
+  >([]);
+
+  const [edges, setEdges] = useState<
+    Edge[]
+  >([]);
+
+  const [
+    nodoSeleccionadoId,
+    setNodoSeleccionadoId,
+  ] = useState<string | null>(null);
+
+  const [nuevoNombre, setNuevoNombre] =
+    useState("");
+
+  const [
+    nuevoProducto,
+    setNuevoProducto,
+  ] = useState("");
+
+  const [guardando, setGuardando] =
+    useState(false);
+
+  const [
+    nodoPreviewId,
+    setNodoPreviewId,
+  ] = useState<string | null>(null);
+
+  const [creando, setCreando] =
+    useState(false);
+
+  const [
+    subiendoContenidoId,
+    setSubiendoContenidoId,
+  ] = useState<string | null>(null);
+
+  useEffect(() => {
+    const usuarioGuardado =
+      localStorage.getItem("usuario");
+
+    if (!usuarioGuardado) return;
+
+    try {
+      const usuario =
+        JSON.parse(usuarioGuardado);
+
+      if (usuario?.empresa_id) {
+        setEmpresaId(
+          Number(usuario.empresa_id)
+        );
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  const cargarFlujos =
+    useCallback(async () => {
+      if (!empresaId) return;
+
+      const res = await fetch(
+        `/api/flujos?empresa_id=${empresaId}`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        setFlujos(data.flujos || []);
+      }
+    }, [empresaId]);
+
+  useEffect(() => {
+    cargarFlujos();
+  }, [cargarFlujos]);
+
+  const abrirFlujo = async (
+    flujo: Flujo
+  ) => {
+    if (!empresaId) return;
+
+    const res = await fetch(
+      `/api/flujos?empresa_id=${empresaId}&id=${flujo.id}`,
+      {
+        cache: "no-store",
+      }
+    );
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(
+        data.error ||
+          "No se pudo abrir el flujo"
+      );
+
+      return;
+    }
+
+    setFlujoActivo(data.flujo);
+
+    const nodosCargados: Node[] = (
+      data.nodos || []
+    ).map(
+      (nodo: {
+        nodo_uid: string;
+        tipo: string;
+        posicion_x: number;
+        posicion_y: number;
+        config: DatosNodo;
+      }) => {
+        let tipo = nodo.tipo;
+        let config = nodo.config || {};
+
+        /*
+        Compatibilidad con nodos de la
+        primera versión del editor.
+        */
+
+        if (
+          tipo === "imagen" ||
+          tipo === "video" ||
+          tipo === "escribiendo"
+        ) {
+          const contenido: ContenidoNodo =
+            {
+              id: idNuevo("contenido"),
+              tipo:
+                tipo as TipoContenido,
+            };
+
+          if (tipo === "imagen") {
+            contenido.url =
+              (
+                config as {
+                  url?: string;
+                }
+              ).url || "";
+          }
+
+          if (tipo === "video") {
+            contenido.url =
+              (
+                config as {
+                  url?: string;
+                }
+              ).url || "";
+          }
+
+          if (tipo === "escribiendo") {
+            contenido.segundos = 1.5;
+          }
+
+          tipo = "mensaje";
+
+          config = {
+            titulo: "Enviar mensaje",
+            contenidos: [contenido],
+          };
+        }
+
+        if (
+          tipo === "mensaje" &&
+          !(config as DatosNodo).tipoMensaje
+        ) {
+          config = {
+            ...config,
+            tipoMensaje: "omnichannel",
+          };
+        }
+
+        return {
+          id: nodo.nodo_uid,
+          type: tipo,
+          position: {
+            x: Number(
+              nodo.posicion_x || 0
+            ),
+            y: Number(
+              nodo.posicion_y || 0
+            ),
+          },
+          data: config,
+        };
+      }
+    );
+
+    setNodes(nodosCargados);
+
+    setEdges(
+      (data.conexiones || []).map(
+        (conexion: {
+          conexion_uid: string;
+          source_uid: string;
+          target_uid: string;
+          source_handle?: string | null;
+          target_handle?: string | null;
+          config?: Record<
+            string,
+            unknown
+          >;
+        }) => ({
+          id: conexion.conexion_uid,
+          source: conexion.source_uid,
+          target: conexion.target_uid,
+          sourceHandle:
+            conexion.source_handle ||
+            undefined,
+          targetHandle:
+            conexion.target_handle ||
+            undefined,
+          data: conexion.config || {},
+          animated: false,
+        })
+      )
+    );
+
+    setNodoSeleccionadoId(null);
+  };
+
+  const crearFlujo = async () => {
+    if (
+      !empresaId ||
+      !nuevoNombre.trim()
+    ) {
+      return;
+    }
+
+    try {
+      setCreando(true);
+
+      const res = await fetch(
+        "/api/flujos",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            empresa_id: empresaId,
+            nombre:
+              nuevoNombre.trim(),
+            producto_slug:
+              nuevoProducto.trim() ||
+              null,
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        alert(
+          data.error ||
+            "No se pudo crear el flujo"
+        );
+
+        return;
+      }
+
+      setNuevoNombre("");
+      setNuevoProducto("");
+
+      await cargarFlujos();
+      await abrirFlujo(data.flujo);
+    } finally {
+      setCreando(false);
+    }
+  };
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      setNodes((actuales) =>
+        applyNodeChanges(
+          changes,
+          actuales
+        )
+      );
+    },
+    []
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      setEdges((actuales) =>
+        applyEdgeChanges(
+          changes,
+          actuales
+        )
+      );
+    },
+    []
+  );
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      setEdges((actuales) =>
+        addEdge(
+          {
+            ...connection,
+            id: idNuevo("conexion"),
+            type: "smoothstep",
+          },
+          actuales
+        )
+      );
+    },
+    []
+  );
+
+  const nodoSeleccionado = useMemo(
+    () =>
+      nodes.find(
+        (nodo) =>
+          nodo.id ===
+          nodoSeleccionadoId
+      ) || null,
+    [nodes, nodoSeleccionadoId]
+  );
+
+  const nodoPreview = useMemo(
+    () =>
+      nodes.find(
+        (nodo) =>
+          nodo.id === nodoPreviewId
+      ) || null,
+    [nodes, nodoPreviewId]
+  );
+
+  useEffect(() => {
+    const manejarAccion = (
+      event: Event
+    ) => {
+      const detalle = (
+        event as CustomEvent<{
+          nodeId?: string;
+          accion?: AccionNodo;
+        }>
+      ).detail;
+
+      const nodeId = String(
+        detalle?.nodeId || ""
+      );
+
+      const accion =
+        detalle?.accion;
+
+      if (!nodeId || !accion) return;
+
+      const nodo = nodes.find(
+        (item) => item.id === nodeId
+      );
+
+      if (!nodo) return;
+
+      if (accion === "preview") {
+        setNodoPreviewId(nodeId);
+        return;
+      }
+
+      if (accion === "inicial") {
+        if (nodo.type === "inicio") {
+          alert(
+            "Este nodo ya es el paso inicial."
+          );
+          return;
+        }
+
+        const inicio = nodes.find(
+          (item) =>
+            item.type === "inicio"
+        );
+
+        if (!inicio) {
+          alert(
+            "No se encontro el nodo Paso inicial."
+          );
+          return;
+        }
+
+        setEdges((actuales) => [
+          ...actuales.filter(
+            (edge) =>
+              edge.source !== inicio.id
+          ),
+          {
+            id: idNuevo("conexion"),
+            source: inicio.id,
+            target: nodeId,
+            type: "smoothstep",
+          },
+        ]);
+
+        alert(
+          "Paso inicial actualizado."
+        );
+        return;
+      }
+
+      if (accion === "id") {
+        navigator.clipboard
+          .writeText(nodeId)
+          .then(() =>
+            alert(
+              `ID copiado: ${nodeId}`
+            )
+          )
+          .catch(() =>
+            alert(
+              `ID del paso: ${nodeId}`
+            )
+          );
+
+        return;
+      }
+
+      if (accion === "renombrar") {
+        const data =
+          nodo.data as DatosNodo;
+
+        const nombreActual =
+          data.titulo ||
+          (nodo.type ===
+          "esperar_respuesta"
+            ? "Esperar respuesta"
+            : nodo.type ===
+              "activar_bot"
+            ? "Activar bot"
+            : nodo.type === "inicio"
+            ? "Paso inicial"
+            : "Enviar mensaje");
+
+        const nuevoNombre =
+          window.prompt(
+            "Nuevo nombre del paso:",
+            nombreActual
+          );
+
+        if (
+          !nuevoNombre ||
+          !nuevoNombre.trim()
+        ) {
+          return;
+        }
+
+        setNodes((actuales) =>
+          actuales.map((item) =>
+            item.id === nodeId
+              ? {
+                  ...item,
+                  data: {
+                    ...item.data,
+                    titulo:
+                      nuevoNombre.trim(),
+                  },
+                }
+              : item
+          )
+        );
+
+        return;
+      }
+
+      if (accion === "duplicar") {
+        if (nodo.type === "inicio") {
+          alert(
+            "Paso inicial no se puede duplicar."
+          );
+          return;
+        }
+
+        const nuevoId = idNuevo(
+          String(
+            nodo.type || "nodo"
+          )
+        );
+
+        const dataClonada =
+          JSON.parse(
+            JSON.stringify(
+              nodo.data || {}
+            )
+          );
+
+        if (
+          dataClonada?.titulo
+        ) {
+          dataClonada.titulo =
+            `${dataClonada.titulo} copia`;
+        }
+
+        setNodes((actuales) => [
+          ...actuales,
+          {
+            ...nodo,
+            id: nuevoId,
+            selected: false,
+            position: {
+              x:
+                Number(
+                  nodo.position.x || 0
+                ) + 50,
+              y:
+                Number(
+                  nodo.position.y || 0
+                ) + 50,
+            },
+            data: dataClonada,
+          },
+        ]);
+
+        setNodoSeleccionadoId(
+          nuevoId
+        );
+
+        return;
+      }
+
+      if (accion === "eliminar") {
+        if (nodo.type === "inicio") {
+          alert(
+            "Paso inicial no se puede eliminar."
+          );
+          return;
+        }
+
+        const confirmar =
+          window.confirm(
+            "¿Eliminar este paso y sus conexiones?"
+          );
+
+        if (!confirmar) return;
+
+        setNodes((actuales) =>
+          actuales.filter(
+            (item) =>
+              item.id !== nodeId
+          )
+        );
+
+        setEdges((actuales) =>
+          actuales.filter(
+            (edge) =>
+              edge.source !== nodeId &&
+              edge.target !== nodeId
+          )
+        );
+
+        if (
+          nodoSeleccionadoId ===
+          nodeId
+        ) {
+          setNodoSeleccionadoId(
+            null
+          );
+        }
+
+        if (
+          nodoPreviewId === nodeId
+        ) {
+          setNodoPreviewId(null);
+        }
+      }
+    };
+
+    window.addEventListener(
+      "flujo:accion-nodo",
+      manejarAccion
+    );
+
+    return () => {
+      window.removeEventListener(
+        "flujo:accion-nodo",
+        manejarAccion
+      );
+    };
+  }, [
+    nodes,
+    nodoSeleccionadoId,
+    nodoPreviewId,
+  ]);
+
+  const actualizarDataNodo = (
+    nuevoData: Partial<DatosNodo>
+  ) => {
+    if (!nodoSeleccionadoId) return;
+
+    setNodes((actuales) =>
+      actuales.map((nodo) =>
+        nodo.id ===
+        nodoSeleccionadoId
+          ? {
+              ...nodo,
+              data: {
+                ...nodo.data,
+                ...nuevoData,
+              },
+            }
+          : nodo
+      )
+    );
+  };
+
+  const obtenerPosicionNuevoPaso = () => {
+    if (nodes.length === 0) {
+      return {
+        x: 450,
+        y: 260,
+      };
+    }
+
+    const ultimoNodo = [...nodes].sort(
+      (a, b) =>
+        Number(b.position.x || 0) -
+        Number(a.position.x || 0)
+    )[0];
+
+    return {
+      x:
+        Number(
+          ultimoNodo?.position.x || 0
+        ) + 300,
+      y:
+        Number(
+          ultimoNodo?.position.y || 0
+        ),
+    };
+  };
+
+  const agregarPasoMensaje = () => {
+    if (!flujoActivo) return;
+
+    const mensajesExistentes =
+      nodes.filter(
+        (nodo) =>
+          nodo.type === "mensaje"
+      ).length;
+
+    const titulo =
+      mensajesExistentes === 0
+        ? "Enviar mensaje"
+        : `Enviar mensaje #${mensajesExistentes}`;
+
+    const id = idNuevo("mensaje");
+    const position =
+      obtenerPosicionNuevoPaso();
+
+    setNodes((actuales) => [
+      ...actuales,
+      {
+        id,
+        type: "mensaje",
+        position,
+        data: {
+          titulo,
+          tipoMensaje: "omnichannel",
+          contenidos: [],
+        },
+      },
+    ]);
+
+    setNodoSeleccionadoId(id);
+  };
+
+  const agregarPasoEsperar = () => {
+    if (!flujoActivo) return;
+
+    const id = idNuevo("esperar");
+    const position =
+      obtenerPosicionNuevoPaso();
+
+    setNodes((actuales) => [
+      ...actuales,
+      {
+        id,
+        type: "esperar_respuesta",
+        position,
+        data: {
+          subtitulo:
+            "Esperar mensaje del cliente",
+        },
+      },
+    ]);
+
+    setNodoSeleccionadoId(id);
+  };
+
+  const agregarPasoBot = () => {
+    if (!flujoActivo) return;
+
+    const id = idNuevo("bot");
+    const position =
+      obtenerPosicionNuevoPaso();
+
+    setNodes((actuales) => [
+      ...actuales,
+      {
+        id,
+        type: "activar_bot",
+        position,
+        data: {
+          subtitulo:
+            "Continuar con OpenAI",
+        },
+      },
+    ]);
+
+    setNodoSeleccionadoId(id);
+  };
+
+  const agregarContenido = (
+    tipo: TipoContenido
+  ) => {
+    if (
+      !nodoSeleccionado ||
+      nodoSeleccionado.type !==
+        "mensaje"
+    ) {
+      return;
+    }
+
+    const data =
+      nodoSeleccionado.data as DatosNodo;
+
+    const actuales =
+      Array.isArray(data.contenidos)
+        ? data.contenidos
+        : [];
+
+    const nuevo: ContenidoNodo = {
+      id: idNuevo("contenido"),
+      tipo,
+    };
+
+    if (tipo === "texto") {
+      nuevo.texto =
+        "Escribe tu mensaje...";
+    }
+
+    if (tipo === "imagen") {
+      nuevo.url = "";
+    }
+
+    if (tipo === "video") {
+      nuevo.url = "";
+    }
+
+    if (tipo === "escribiendo") {
+      nuevo.segundos = 1.5;
+    }
+
+    if (tipo === "boton") {
+      nuevo.texto = "Botón";
+    }
+
+    if (
+      tipo === "respuesta_rapida"
+    ) {
+      nuevo.texto =
+        "Respuesta rápida";
+    }
+
+    actualizarDataNodo({
+      contenidos: [
+        ...actuales,
+        nuevo,
+      ],
+    });
+  };
+
+  const actualizarContenido = (
+    contenidoId: string,
+    cambios: Partial<ContenidoNodo>
+  ) => {
+    if (
+      !nodoSeleccionado ||
+      nodoSeleccionado.type !==
+        "mensaje"
+    ) {
+      return;
+    }
+
+    const data =
+      nodoSeleccionado.data as DatosNodo;
+
+    const contenidos =
+      Array.isArray(data.contenidos)
+        ? data.contenidos
+        : [];
+
+    actualizarDataNodo({
+      contenidos: contenidos.map(
+        (contenido) =>
+          contenido.id === contenidoId
+            ? {
+                ...contenido,
+                ...cambios,
+              }
+            : contenido
+      ),
+    });
+  };
+
+  const subirArchivoContenido = async (
+    contenidoId: string,
+    archivo: File,
+    tipo: "imagen" | "video"
+  ) => {
+    if (!flujoActivo) {
+      alert("Primero selecciona un flujo.");
+      return;
+    }
+
+    if (
+      tipo === "imagen" &&
+      !archivo.type.startsWith("image/")
+    ) {
+      alert("Selecciona un archivo de imagen.");
+      return;
+    }
+
+    if (
+      tipo === "video" &&
+      !archivo.type.startsWith("video/")
+    ) {
+      alert("Selecciona un archivo de video.");
+      return;
+    }
+
+    try {
+      setSubiendoContenidoId(contenidoId);
+
+      const firmaResponse = await fetch(
+        "/api/cloudinary/signature",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            tipo: "flujo",
+            flujoId: flujoActivo.id,
+          }),
+        }
+      );
+
+      const firma =
+        (await firmaResponse.json()) as
+          | CloudinarySignatureResponse
+          | { error?: string };
+
+      if (
+        !firmaResponse.ok ||
+        !("signature" in firma) ||
+        !firma.signature ||
+        !firma.cloudName ||
+        !firma.apiKey
+      ) {
+        throw new Error(
+          "error" in firma && firma.error
+            ? firma.error
+            : "No se pudo preparar la carga."
+        );
+      }
+
+      const formData = new FormData();
+
+      formData.append("file", archivo);
+      formData.append("api_key", firma.apiKey);
+      formData.append(
+        "timestamp",
+        String(firma.timestamp)
+      );
+      formData.append(
+        "signature",
+        firma.signature
+      );
+      formData.append("folder", firma.folder);
+
+      const resourceType =
+        tipo === "video" ? "video" : "image";
+
+      const uploadResponse = await fetch(
+        `https://api.cloudinary.com/v1_1/${firma.cloudName}/${resourceType}/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const upload =
+        (await uploadResponse.json()) as
+          CloudinaryUploadResponse;
+
+      if (
+        !uploadResponse.ok ||
+        !upload.secure_url
+      ) {
+        throw new Error(
+          upload.error?.message ||
+            "Cloudinary no pudo subir el archivo."
+        );
+      }
+
+      actualizarContenido(contenidoId, {
+        url: upload.secure_url,
+      });
+    } catch (error) {
+      console.error(
+        "Error subiendo archivo:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "No se pudo subir el archivo."
+      );
+    } finally {
+      setSubiendoContenidoId(null);
+    }
+  };
+
+  const eliminarContenido = (
+    contenidoId: string
+  ) => {
+    if (
+      !nodoSeleccionado ||
+      nodoSeleccionado.type !==
+        "mensaje"
+    ) {
+      return;
+    }
+
+    const data =
+      nodoSeleccionado.data as DatosNodo;
+
+    const contenidos =
+      Array.isArray(data.contenidos)
+        ? data.contenidos
+        : [];
+
+    actualizarDataNodo({
+      contenidos: contenidos.filter(
+        (contenido) =>
+          contenido.id !==
+          contenidoId
+      ),
+    });
+  };
+
+  const guardarFlujo = async () => {
+    if (
+      !empresaId ||
+      !flujoActivo
+    ) {
+      return;
+    }
+
+    try {
+      setGuardando(true);
+
+      const res = await fetch(
+        "/api/flujos",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            empresa_id: empresaId,
+            flujo_id:
+              flujoActivo.id,
+            nodos: nodes,
+            conexiones: edges,
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        alert(
+          data.error ||
+            "No se pudo guardar"
+        );
+
+        return;
+      }
+
+      await cargarFlujos();
+
+      alert("Flujo guardado");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const contenidosSeleccionados =
+    nodoSeleccionado?.type ===
+    "mensaje"
+      ? (
+          nodoSeleccionado.data as DatosNodo
+        ).contenidos || []
+      : [];
+
+  return (
+    <div
+      className={`flex min-h-screen ${
+        temaClaro
+          ? "bg-slate-100 text-slate-900"
+          : "bg-[#0b1220] text-white"
+      }`}
+    >
+      <Sidebar
+        temaClaro={temaClaro}
+        onCambiarTema={
+          cambiarTema
+        }
+      />
+
+      <main className="ml-60 flex h-screen flex-1 overflow-hidden">
+        <aside
+          className={`w-[355px] shrink-0 overflow-y-auto border-r ${
+            temaClaro
+              ? "border-slate-200 bg-white"
+              : "border-slate-800 bg-[#0f172a]"
+          }`}
+        >
+          <div className="border-b border-slate-200/20 p-4">
+            <h1 className="text-xl font-black">
+              Flujos
+            </h1>
+
+            <p className="text-xs text-slate-500">
+              Primer contacto sin OpenAI
+            </p>
+
+            <div className="mt-4 space-y-2">
+              <input
+                value={nuevoNombre}
+                onChange={(e) =>
+                  setNuevoNombre(
+                    e.target.value
+                  )
+                }
+                placeholder="Nombre del flujo"
+                className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none"
+              />
+
+              <input
+                value={
+                  nuevoProducto
+                }
+                onChange={(e) =>
+                  setNuevoProducto(
+                    e.target.value
+                  )
+                }
+                placeholder="broca-escalonada"
+                className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none"
+              />
+
+              <button
+                onClick={crearFlujo}
+                disabled={creando}
+                className="w-full rounded-lg bg-orange-500 px-3 py-2 text-xs font-black text-white"
+              >
+                + Crear flujo
+              </button>
+            </div>
+
+            <div className="mt-3 flex gap-2 overflow-x-auto">
+              {flujos.map(
+                (flujo) => (
+                  <button
+                    key={flujo.id}
+                    onClick={() =>
+                      abrirFlujo(
+                        flujo
+                      )
+                    }
+                    className={`shrink-0 rounded-lg border px-3 py-2 text-xs ${
+                      flujoActivo?.id ===
+                      flujo.id
+                        ? "border-orange-500 text-orange-500"
+                        : "border-slate-300"
+                    }`}
+                  >
+                    {flujo.nombre}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+
+          {flujoActivo &&
+            !nodoSeleccionado && (
+              <div className="p-4">
+                <p className="text-xs font-black">
+                  AÑADIR PASO
+                </p>
+
+                <button
+                  onClick={
+                    agregarPasoMensaje
+                  }
+                  className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-3 text-left text-sm"
+                >
+                  💬 Enviar mensaje
+                </button>
+
+                <button
+                  onClick={
+                    agregarPasoEsperar
+                  }
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-left text-sm"
+                >
+                  ⏸ Esperar respuesta
+                </button>
+
+                <button
+                  onClick={
+                    agregarPasoBot
+                  }
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-left text-sm"
+                >
+                  🤖 Activar bot
+                </button>
+              </div>
+            )}
+
+          {nodoSeleccionado?.type ===
+            "mensaje" && (
+            <div className="p-4">
+              <button
+                onClick={() =>
+                  setNodoSeleccionadoId(
+                    null
+                  )
+                }
+                className="mb-4 text-xs text-orange-500"
+              >
+                ← Volver
+              </button>
+
+              <input
+                value={
+                  (
+                    nodoSeleccionado.data as DatosNodo
+                  ).titulo || ""
+                }
+                onChange={(e) =>
+                  actualizarDataNodo({
+                    titulo:
+                      e.target.value,
+                  })
+                }
+                className="w-full border-b border-slate-300 bg-transparent pb-2 text-sm font-bold outline-none"
+              />
+
+              <div className="mt-4">
+                <label className="mb-1 block text-[11px] font-bold text-slate-500">
+                  Tipo de mensaje
+                </label>
+
+                <select
+                  value={
+                    (
+                      nodoSeleccionado.data as DatosNodo
+                    ).tipoMensaje ||
+                    "omnichannel"
+                  }
+                  onChange={(e) =>
+                    actualizarDataNodo({
+                      tipoMensaje:
+                        e.target.value as
+                          | "omnichannel"
+                          | "webchat",
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                >
+                  <option value="omnichannel">
+                    Omnichannel
+                  </option>
+                  <option value="webchat">
+                    Webchat
+                  </option>
+                </select>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {contenidosSeleccionados.map(
+                  (contenido) => (
+                    <div
+                      key={
+                        contenido.id
+                      }
+                      className="rounded-xl bg-slate-100 p-3 text-slate-900"
+                    >
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase">
+                          {
+                            contenido.tipo
+                          }
+                        </span>
+
+                        <button
+                          onClick={() =>
+                            eliminarContenido(
+                              contenido.id
+                            )
+                          }
+                          className="text-xs text-red-500"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+
+                      {contenido.tipo ===
+                        "texto" && (
+                        <textarea
+                          value={
+                            contenido.texto ||
+                            ""
+                          }
+                          onChange={(
+                            e
+                          ) =>
+                            actualizarContenido(
+                              contenido.id,
+                              {
+                                texto:
+                                  e
+                                    .target
+                                    .value,
+                              }
+                            )
+                          }
+                          rows={4}
+                          className="w-full resize-none rounded-lg border border-slate-300 bg-white p-2 text-sm outline-none"
+                        />
+                      )}
+
+                      {contenido.tipo ===
+                        "imagen" && (
+                        <>
+                          <label className="flex min-h-[170px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-5 text-center hover:border-orange-400">
+                            {contenido.url ? (
+                              <img
+                                src={contenido.url}
+                                alt=""
+                                className="mb-3 max-h-[220px] w-full rounded-lg object-contain"
+                              />
+                            ) : (
+                              <div className="mb-3 text-4xl">
+                                IMAGEN
+                              </div>
+                            )}
+
+                            <span className="text-sm font-bold text-orange-500">
+                              {subiendoContenidoId ===
+                              contenido.id
+                                ? "Subiendo..."
+                                : "Subir imagen"}
+                            </span>
+
+                            <span className="mt-1 text-[11px] text-slate-400">
+                              desde tu computadora
+                            </span>
+
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={
+                                subiendoContenidoId ===
+                                contenido.id
+                              }
+                              className="hidden"
+                              onChange={async (e) => {
+                                const archivo =
+                                  e.target.files?.[0];
+
+                                if (archivo) {
+                                  await subirArchivoContenido(
+                                    contenido.id,
+                                    archivo,
+                                    "imagen"
+                                  );
+                                }
+
+                                e.currentTarget.value = "";
+                              }}
+                            />
+                          </label>
+
+                          <div className="my-3 flex items-center gap-2">
+                            <div className="h-px flex-1 bg-slate-300" />
+                            <span className="text-[10px] font-bold text-slate-400">
+                              O INSERTAR URL
+                            </span>
+                            <div className="h-px flex-1 bg-slate-300" />
+                          </div>
+
+                          <input
+                            value={contenido.url || ""}
+                            onChange={(e) =>
+                              actualizarContenido(
+                                contenido.id,
+                                {
+                                  url: e.target.value,
+                                }
+                              )
+                            }
+                            placeholder="https://..."
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs"
+                          />
+                        </>
+                      )}
+
+                      {contenido.tipo ===
+                        "video" && (
+                        <>
+                          <label className="flex min-h-[150px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-5 text-center hover:border-orange-400">
+                            {contenido.url ? (
+                              <video
+                                src={contenido.url}
+                                controls
+                                className="mb-3 max-h-[220px] w-full rounded-lg bg-black"
+                              />
+                            ) : (
+                              <div className="mb-3 text-4xl">
+                                VIDEO
+                              </div>
+                            )}
+
+                            <span className="text-sm font-bold text-orange-500">
+                              {subiendoContenidoId ===
+                              contenido.id
+                                ? "Subiendo..."
+                                : "Subir video"}
+                            </span>
+
+                            <span className="mt-1 text-[11px] text-slate-400">
+                              desde tu computadora
+                            </span>
+
+                            <input
+                              type="file"
+                              accept="video/*"
+                              disabled={
+                                subiendoContenidoId ===
+                                contenido.id
+                              }
+                              className="hidden"
+                              onChange={async (e) => {
+                                const archivo =
+                                  e.target.files?.[0];
+
+                                if (archivo) {
+                                  await subirArchivoContenido(
+                                    contenido.id,
+                                    archivo,
+                                    "video"
+                                  );
+                                }
+
+                                e.currentTarget.value = "";
+                              }}
+                            />
+                          </label>
+
+                          <div className="my-3 flex items-center gap-2">
+                            <div className="h-px flex-1 bg-slate-300" />
+                            <span className="text-[10px] font-bold text-slate-400">
+                              O INSERTAR URL
+                            </span>
+                            <div className="h-px flex-1 bg-slate-300" />
+                          </div>
+
+                          <input
+                            value={contenido.url || ""}
+                            onChange={(e) =>
+                              actualizarContenido(
+                                contenido.id,
+                                {
+                                  url: e.target.value,
+                                }
+                              )
+                            }
+                            placeholder="https://..."
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs"
+                          />
+                        </>
+                      )}
+
+                      {contenido.tipo ===
+                        "escribiendo" && (
+                        <input
+                          type="number"
+                          min="0.5"
+                          step="0.5"
+                          value={
+                            contenido.segundos ||
+                            1.5
+                          }
+                          onChange={(
+                            e
+                          ) =>
+                            actualizarContenido(
+                              contenido.id,
+                              {
+                                segundos:
+                                  Number(
+                                    e
+                                      .target
+                                      .value
+                                  ),
+                              }
+                            )
+                          }
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs"
+                        />
+                      )}
+
+                      {(contenido.tipo ===
+                        "boton" ||
+                        contenido.tipo ===
+                          "respuesta_rapida") && (
+                        <input
+                          value={
+                            contenido.texto ||
+                            ""
+                          }
+                          onChange={(
+                            e
+                          ) =>
+                            actualizarContenido(
+                              contenido.id,
+                              {
+                                texto:
+                                  e
+                                    .target
+                                    .value,
+                              }
+                            )
+                          }
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs"
+                        />
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+
+              <div className="mt-5 border-t border-slate-300 pt-4">
+                <p className="mb-3 text-xs font-black">
+                  + AÑADIR CONTENIDO
+                </p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() =>
+                      agregarContenido(
+                        "texto"
+                      )
+                    }
+                    className="rounded-lg border p-2 text-xs"
+                  >
+                    ☰ Texto
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      agregarContenido(
+                        "imagen"
+                      )
+                    }
+                    className="rounded-lg border p-2 text-xs"
+                  >
+                    🖼 Imagen
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      agregarContenido(
+                        "video"
+                      )
+                    }
+                    className="rounded-lg border p-2 text-xs"
+                  >
+                    🎥 Video
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      agregarContenido(
+                        "escribiendo"
+                      )
+                    }
+                    className="rounded-lg border p-2 text-xs"
+                  >
+                    ⌨️ Escribiendo
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      agregarContenido(
+                        "boton"
+                      )
+                    }
+                    className="rounded-lg border p-2 text-xs"
+                  >
+                    + Botón
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      agregarContenido(
+                        "respuesta_rapida"
+                      )
+                    }
+                    className="rounded-lg border p-2 text-xs"
+                  >
+                    ⚡ Respuesta rápida
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {nodoSeleccionado &&
+            nodoSeleccionado.type !==
+              "mensaje" && (
+              <div className="p-4">
+                <button
+                  onClick={() =>
+                    setNodoSeleccionadoId(
+                      null
+                    )
+                  }
+                  className="mb-3 text-xs text-orange-500"
+                >
+                  ← Volver
+                </button>
+
+                <p className="font-bold">
+                  {nodoSeleccionado.type}
+                </p>
+              </div>
+            )}
+        </aside>
+
+        <section className="relative flex-1 bg-[#eef0f3]">
+          {!flujoActivo ? (
+            <div className="flex h-full items-center justify-center text-slate-500">
+              Selecciona o crea un
+              flujo
+            </div>
+          ) : (
+            <>
+              <div className="absolute left-4 right-4 top-4 z-20 flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow">
+                <div>
+                  <p className="font-black text-slate-900">
+                    {
+                      flujoActivo.nombre
+                    }
+                  </p>
+
+                  <p className="text-xs text-slate-500">
+                    {flujoActivo.producto_slug ||
+                      "Sin producto"}
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      setNodoSeleccionadoId(
+                        null
+                      )
+                    }
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700"
+                  >
+                    + Añadir paso
+                  </button>
+
+                  <button
+                    onClick={
+                      guardarFlujo
+                    }
+                    disabled={
+                      guardando
+                    }
+                    className="rounded-lg bg-orange-500 px-5 py-2 text-xs font-black text-white"
+                  >
+                    {guardando
+                      ? "GUARDANDO..."
+                      : "GUARDAR"}
+                  </button>
+                </div>
+              </div>
+
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                nodeTypes={nodeTypes}
+                onNodesChange={
+                  onNodesChange
+                }
+                onEdgesChange={
+                  onEdgesChange
+                }
+                onConnect={onConnect}
+                onNodeClick={(
+                  _,
+                  nodo
+                ) =>
+                  setNodoSeleccionadoId(
+                    nodo.id
+                  )
+                }
+                onPaneClick={() =>
+                  setNodoSeleccionadoId(
+                    null
+                  )
+                }
+                fitView
+                deleteKeyCode={[
+                  "Backspace",
+                  "Delete",
+                ]}
+                defaultEdgeOptions={{
+                  type: "smoothstep",
+                }}
+              >
+                <Background
+                  gap={20}
+                  size={1}
+                />
+
+                <Controls />
+
+                <MiniMap
+                  pannable
+                  zoomable
+                />
+              </ReactFlow>
+            </>
+          )}
+        </section>
+      </main>
+
+      {nodoPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 text-slate-900 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-wider text-orange-500">
+                  Vista previa
+                </p>
+
+                <h2 className="text-lg font-black">
+                  {(
+                    nodoPreview.data as DatosNodo
+                  ).titulo ||
+                    (nodoPreview.type ===
+                    "esperar_respuesta"
+                      ? "Esperar respuesta"
+                      : nodoPreview.type ===
+                        "activar_bot"
+                      ? "Activar bot"
+                      : nodoPreview.type ===
+                        "inicio"
+                      ? "Paso inicial"
+                      : "Enviar mensaje")}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setNodoPreviewId(null)
+                }
+                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-black"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            {nodoPreview.type ===
+            "mensaje" ? (
+              <div className="space-y-3">
+                {(
+                  (
+                    nodoPreview.data as DatosNodo
+                  ).contenidos || []
+                ).length === 0 ? (
+                  <div className="rounded-xl bg-slate-100 p-5 text-center text-sm text-slate-500">
+                    Este paso no tiene contenido.
+                  </div>
+                ) : (
+                  (
+                    (
+                      nodoPreview.data as DatosNodo
+                    ).contenidos || []
+                  ).map((contenido) => (
+                    <PreviewContenido
+                      key={contenido.id}
+                      contenido={contenido}
+                    />
+                  ))
+                )}
+              </div>
+            ) : nodoPreview.type ===
+              "esperar_respuesta" ? (
+              <div className="rounded-xl bg-slate-100 p-5 text-sm">
+                El flujo se detiene aquí hasta que el cliente responda.
+              </div>
+            ) : nodoPreview.type ===
+              "activar_bot" ? (
+              <div className="rounded-xl bg-green-50 p-5 text-sm text-green-800">
+                Desde este punto se activa el bot con OpenAI.
+              </div>
+            ) : (
+              <div className="rounded-xl bg-slate-100 p-5 text-sm">
+                Paso inicial del flujo.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
