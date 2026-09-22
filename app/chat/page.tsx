@@ -91,15 +91,11 @@ type Plantilla = {
 export default function ChatsPage() {
 const { temaClaro, cambiarTema } = useTemaCRM();
   const [clientes, setClientes] = useState<Cliente[]>([]);
-const [totalChats, setTotalChats] = useState(0);
-const [limiteChats, setLimiteChats] = useState(100);
   const [whatsappQrId, setWhatsappQrId] = useState<number | null>(null);
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [mensajeNuevo, setMensajeNuevo] = useState("");
 const [busqueda, setBusqueda] = useState("");
-const [busquedaServidor, setBusquedaServidor] = useState("");
-const [totalGeneralChats, setTotalGeneralChats] = useState(0);
 const [filtroChat, setFiltroChat] = useState("todas");
 const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
@@ -156,9 +152,7 @@ if (whatsappQrId !== null && whatsappQrId !== nuevoQrId) {
 }
 
 setWhatsappQrId(nuevoQrId);
-  const res = await fetch(
-  `/api/chats?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${qrId}&limit=${limiteChats}&offset=0&buscar=${encodeURIComponent(busquedaServidor)}`,
-  {
+  const res = await fetch(`/api/chats?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${qrId}`, {
     cache: "no-store",
   });
 
@@ -166,15 +160,6 @@ setWhatsappQrId(nuevoQrId);
 
  if (data.success) {
   setClientes(data.chats);
-const totalActual = Number(
-  data.total ?? data.chats.length
-);
-
-setTotalChats(totalActual);
-
-if (!busquedaServidor) {
-  setTotalGeneralChats(totalActual);
-}
   setClosers(Array.isArray(data.closers) ? data.closers : []);
 
   setClienteActivo((actual) => {
@@ -456,12 +441,7 @@ useEffect(() => {
     window.removeEventListener("pagehide", manejarPageHide);
     liberarAlSalir();
   };
-}, [
-  clienteActivo?.id,
-  whatsappQrId,
-  limiteChats,
-  busquedaServidor,
-]);
+}, [clienteActivo?.id, whatsappQrId]);
 
 const devolverAlBot = async () => {
   if (!clienteActivo || !whatsappQrId) return;
@@ -738,17 +718,7 @@ const detenerGrabacion = () => {
   }
 };
 
-// Espera 300 ms antes de buscar en el servidor
-useEffect(() => {
-  const timer = setTimeout(() => {
-    setLimiteChats(100);
-    setBusquedaServidor(busqueda.trim());
-  }, 300);
-
-  return () => clearTimeout(timer);
-}, [busqueda]);
-
-useEffect(() => {
+  useEffect(() => {
   cargarClientes();
   cargarPlantillas();
 
@@ -809,7 +779,7 @@ useEffect(() => {
       : "bg-[#0b1220] text-white"
   }`}
 >
-      <Sidebar temaClaro={temaClaro} onCambiarTema={cambiarTema} conversacionesCount={totalGeneralChats || totalChats} />
+      <Sidebar temaClaro={temaClaro} onCambiarTema={cambiarTema} conversacionesCount={clientes.length} />
 
       <main className="flex-1 min-w-0 h-screen overflow-hidden flex">
 <div
@@ -1030,30 +1000,6 @@ useEffect(() => {
 
 </button>
   ))}
-
-{clientes.length < totalChats && (
-  <div className="p-4">
-    <button
-      type="button"
-      onClick={() =>
-        setLimiteChats((actual) =>
-          Math.min(actual + 100, totalChats)
-        )
-      }
-      className={`w-full rounded-xl border px-4 py-3 text-sm font-bold transition ${
-        temaClaro
-          ? "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
-          : "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-      }`}
-    >
-      Cargar más conversaciones
-      <span className="ml-2 text-xs opacity-60">
-        {clientes.length} de {totalChats}
-      </span>
-    </button>
-  </div>
-)}
-
 </div>
 </section>
 

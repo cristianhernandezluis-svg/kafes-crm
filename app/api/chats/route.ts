@@ -12,20 +12,6 @@ export async function GET(request: Request) {
     const empresaId = searchParams.get("empresa_id");
     const whatsappQrId = searchParams.get("whatsapp_qr_id");
 
-const buscar = (
-  searchParams.get("buscar") || ""
-).trim();
-
-const limit = Math.min(
-  Math.max(Number(searchParams.get("limit") || 100), 1),
-  200
-);
-
-const offset = Math.max(
-  Number(searchParams.get("offset") || 0),
-  0
-);
-
     if (!empresaId || !whatsappQrId) {
       return NextResponse.json({
         success: true,
@@ -92,9 +78,7 @@ const offset = Math.max(
 
         c.created_at,
 
-COUNT(*) OVER() AS total_chats,
-
-ult.mensaje AS ultimo_mensaje,
+        ult.mensaje AS ultimo_mensaje,
         ult.tipo AS ultimo_tipo,
         ult.created_at AS ultimo_mensaje_fecha,
 
@@ -127,20 +111,7 @@ ult.mensaje AS ultimo_mensaje,
 
       WHERE c.empresa_id = $1
 
-  AND EXISTS (
-    SELECT 1
-    FROM conversaciones conv
-    WHERE conv.cliente_id = c.id
-      AND conv.empresa_id = $1
-      AND conv.whatsapp_qr_id = $2
-  )
-
-  AND (
-    $5 = ''
-    OR COALESCE(c.nombre, '') ILIKE '%' || $5 || '%'
-    OR COALESCE(c.telefono, '') ILIKE '%' || $5 || '%'
-    OR COALESCE(ult.mensaje, '') ILIKE '%' || $5 || '%'
-  )
+        AND EXISTS (
           SELECT 1
           FROM conversaciones conv
           WHERE conv.cliente_id = c.id
@@ -149,25 +120,11 @@ ult.mensaje AS ultimo_mensaje,
         )
 
       ORDER BY
-  ult.created_at DESC NULLS LAST,
-  c.created_at DESC
-
-LIMIT $3
-OFFSET $4
+        ult.created_at DESC NULLS LAST,
+        c.created_at DESC
       `,
-      [
-  empresaId,
-  whatsappQrId,
-  limit,
-  offset,
-  buscar,
-]
+      [empresaId, whatsappQrId]
     );
-
-const totalChats =
-  result.rows.length > 0
-    ? Number(result.rows[0].total_chats || 0)
-    : 0;
 
     const closersResult = await pool.query(
       `
@@ -195,14 +152,11 @@ const totalChats =
       [empresaId]
     );
 
-return NextResponse.json({
-  success: true,
-  chats: result.rows,
-  closers: closersResult.rows,
-  total: totalChats,
-  limit,
-  offset,
-});
+    return NextResponse.json({
+      success: true,
+      chats: result.rows,
+      closers: closersResult.rows,
+    });
   } catch (error) {
     console.error("ERROR API CHATS:", error);
 
