@@ -1398,6 +1398,80 @@ export default function FlujosPage() {
     }
   };
 
+const renombrarFlujo = async (
+  flujo: Flujo
+) => {
+  if (!empresaId) return;
+
+  const nuevoNombreFlujo =
+    window.prompt(
+      "Nuevo nombre del flujo:",
+      flujo.nombre
+    )?.trim();
+
+  if (
+    !nuevoNombreFlujo ||
+    nuevoNombreFlujo === flujo.nombre
+  ) {
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      "/api/flujos",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          empresa_id: empresaId,
+          flujo_id: flujo.id,
+          nombre: nuevoNombreFlujo,
+        }),
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      alert(
+        data.error ||
+          "No se pudo renombrar el flujo"
+      );
+
+      return;
+    }
+
+    if (
+      flujoActivo?.id === flujo.id
+    ) {
+      setFlujoActivo(
+        (actual) =>
+          actual
+            ? {
+                ...actual,
+                nombre:
+                  data.flujo.nombre,
+              }
+            : actual
+      );
+    }
+
+    await cargarFlujos();
+  } catch (error) {
+    console.error(
+      "ERROR RENOMBRANDO FLUJO:",
+      error
+    );
+
+    alert(
+      "No se pudo renombrar el flujo"
+    );
+  }
+};
+
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       setNodes((actuales) =>
@@ -2274,6 +2348,13 @@ export default function FlujosPage() {
     }
   };
 
+  const volverAFlujos = () => {
+    setFlujoActivo(null);
+    setNodoSeleccionadoId(null);
+    setNodes([]);
+    setEdges([]);
+  };
+
   const contenidosSeleccionados =
     nodoSeleccionado?.type ===
     "mensaje"
@@ -2306,71 +2387,137 @@ export default function FlujosPage() {
           }`}
         >
           <div className="border-b border-slate-200/20 p-4">
-            <h1 className="text-xl font-black">
-              Flujos
-            </h1>
+  {!flujoActivo ? (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-black">
+            Flujos
+          </h1>
 
-            <p className="text-xs text-slate-500">
-              Primer contacto sin OpenAI
-            </p>
+          <p className="text-xs text-slate-500">
+            Administra tus flujos de atención
+          </p>
+        </div>
+      </div>
 
-            <div className="mt-4 space-y-2">
-              <input
-                value={nuevoNombre}
-                onChange={(e) =>
-                  setNuevoNombre(
-                    e.target.value
-                  )
-                }
-                placeholder="Nombre del flujo"
-                className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none"
-              />
+      <div className="mt-4 space-y-2">
+        <input
+          value={nuevoNombre}
+          onChange={(e) =>
+            setNuevoNombre(
+              e.target.value
+            )
+          }
+          placeholder="Nombre del flujo"
+          className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none"
+        />
 
-              <input
-                value={
-                  nuevoProducto
-                }
-                onChange={(e) =>
-                  setNuevoProducto(
-                    e.target.value
-                  )
-                }
-                placeholder="broca-escalonada"
-                className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none"
-              />
+        <input
+          value={nuevoProducto}
+          onChange={(e) =>
+            setNuevoProducto(
+              e.target.value
+            )
+          }
+          placeholder="Producto / slug"
+          className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none"
+        />
 
-              <button
-                onClick={crearFlujo}
-                disabled={creando}
-                className="w-full rounded-lg bg-orange-500 px-3 py-2 text-xs font-black text-white"
-              >
-                + Crear flujo
-              </button>
-            </div>
+        <button
+          onClick={crearFlujo}
+          disabled={creando}
+          className="w-full rounded-lg bg-orange-500 px-3 py-2 text-xs font-black text-white"
+        >
+          {creando
+            ? "CREANDO..."
+            : "+ Crear flujo"}
+        </button>
+      </div>
 
-            <div className="mt-3 flex gap-2 overflow-x-auto">
-              {flujos.map(
-                (flujo) => (
-                  <button
-                    key={flujo.id}
-                    onClick={() =>
-                      abrirFlujo(
-                        flujo
-                      )
-                    }
-                    className={`shrink-0 rounded-lg border px-3 py-2 text-xs ${
-                      flujoActivo?.id ===
-                      flujo.id
-                        ? "border-orange-500 text-orange-500"
-                        : "border-slate-300"
-                    }`}
-                  >
-                    {flujo.nombre}
-                  </button>
-                )
-              )}
-            </div>
+      <div className="mt-5 space-y-2">
+        {flujos.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-xs text-slate-400">
+            Todavía no tienes flujos creados.
           </div>
+        )}
+
+        {flujos.map((flujo) => (
+          <div
+            key={flujo.id}
+            className="flex items-center gap-2 rounded-xl border border-slate-300 p-2 transition"
+          >
+            <button
+              type="button"
+              onClick={() =>
+                abrirFlujo(flujo)
+              }
+              className="min-w-0 flex-1 px-2 py-1 text-left"
+            >
+              <div className="truncate text-sm font-black">
+                {flujo.nombre}
+              </div>
+
+              <div className="mt-1 truncate text-[11px] text-slate-400">
+                {flujo.producto_slug
+                  ? `Producto: ${flujo.producto_slug}`
+                  : "Sin producto asignado"}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              title="Renombrar flujo"
+              onClick={() =>
+                renombrarFlujo(flujo)
+              }
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:border-orange-500 hover:text-orange-500"
+            >
+              ✏️
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  ) : (
+    <>
+      <button
+        type="button"
+        onClick={volverAFlujos}
+        className="mb-4 text-xs font-bold text-orange-500 hover:underline"
+      >
+        ← Volver a flujos
+      </button>
+
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-black">
+            {flujoActivo.nombre}
+          </h1>
+
+          <p className="mt-1 truncate text-xs text-slate-500">
+            {flujoActivo.producto_slug
+              ? `Producto: ${flujoActivo.producto_slug}`
+              : "Sin producto asignado"}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          title="Renombrar flujo"
+          onClick={() =>
+            renombrarFlujo(
+              flujoActivo
+            )
+          }
+          className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm hover:border-orange-500 hover:text-orange-500"
+        >
+          ✏️
+        </button>
+      </div>
+    </>
+  )}
+</div>
 
           {flujoActivo &&
             !nodoSeleccionado && (

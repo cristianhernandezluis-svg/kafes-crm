@@ -297,6 +297,71 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+
+    const empresaId = Number(body.empresa_id);
+    const flujoId = Number(body.flujo_id);
+    const nombre = String(body.nombre || "").trim();
+
+    if (!empresaId || !flujoId || !nombre) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Falta empresa_id, flujo_id o nombre",
+        },
+        { status: 400 }
+      );
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE flujos_bot
+      SET
+        nombre = $3,
+        updated_at = NOW()
+      WHERE id = $1
+        AND empresa_id = $2
+      RETURNING *
+      `,
+      [
+        flujoId,
+        empresaId,
+        nombre,
+      ]
+    );
+
+    if (result.rowCount === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Flujo no encontrado",
+        },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      flujo: result.rows[0],
+    });
+  } catch (error) {
+    console.error(
+      "ERROR RENOMBRANDO FLUJO:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "No se pudo renombrar el flujo",
+      },
+      { status: 500 }
+    );
+  }
+}
+
 /*
 =========================================================
 PUT
