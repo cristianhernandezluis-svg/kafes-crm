@@ -277,18 +277,26 @@ const abrirConversacion = async (cliente: Cliente) => {
       }
 
       await fetch("/api/chats", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          cliente_id: cliente.id,
-          whatsapp_qr_id: whatsappQrId,
-          accion: "tomar",
-        }),
-      });
+  method: "PATCH",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    cliente_id: cliente.id,
+    whatsapp_qr_id: whatsappQrId,
+    accion: "tomar",
+  }),
+});
 
-      cargarClientes();
+// Marcamos localmente como leído.
+// No descargamos nuevamente los 4,875 chats.
+setClientes((actuales) =>
+  actuales.map((c) =>
+    c.id === cliente.id
+      ? { ...c, no_leidos: 0 }
+      : c
+  )
+);
     } catch (error) {
       console.error(
         "Error actualizando asignacion del chat:",
