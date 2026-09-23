@@ -1,4 +1,4 @@
-import { consultarIA } from "./ia.mjs";
+﻿import { consultarIA } from "./ia.mjs";
 import {
   buscarProducto,
   buscarProductoPorSlug,
@@ -150,6 +150,108 @@ function detectarCantidadPedido(texto) {
   return null;
 }
 
+function detectarCantidadExplicita(texto) {
+  const t = normalizar(texto)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const cantidades = new Map([
+    ["uno", 1],
+    ["una", 1],
+    ["un", 1],
+    ["dos", 2],
+    ["tres", 3],
+    ["cuatro", 4],
+    ["cinco", 5],
+  ]);
+
+  if (/^([1-9]|[1-9]\d)$/.test(t)) {
+    return Number(t);
+  }
+
+  if (cantidades.has(t)) {
+    return cantidades.get(t);
+  }
+
+  const conUnidad = t.match(
+    /\b([1-9]|[1-9]\d)\s*(?:unidad|unidades|und|uds)\b/
+  );
+
+  if (conUnidad) {
+    return Number(conUnidad[1]);
+  }
+
+  const compraNumero = t.match(
+    /\b(?:quiero|deseo|necesito|quisiera|llevo|me llevo)\s+(?:comprar\s+|llevar\s+)?([1-9]|[1-9]\d)\b/
+  );
+
+  if (compraNumero) {
+    return Number(compraNumero[1]);
+  }
+
+  const compraPalabra = t.match(
+    /\b(?:quiero|deseo|necesito|quisiera|llevo|me llevo)\s+(?:comprar\s+|llevar\s+)?(uno|una|un|dos|tres|cuatro|cinco)\b/
+  );
+
+  if (compraPalabra) {
+    return cantidades.get(compraPalabra[1]) || null;
+  }
+
+  return null;
+}
+
+function detectarSedePedidoEnMensaje(
+  texto,
+  agencia
+) {
+  if (!agencia) return null;
+
+  const lineas = String(texto || "")
+    .split(/\r?\n/)
+    .map((linea) => linea.trim())
+    .filter(Boolean);
+
+  if (lineas.length < 2) {
+    return null;
+  }
+
+  const indiceAgencia =
+    lineas.findIndex(
+      (linea) =>
+        detectarAgenciaPedido(linea) ===
+        agencia
+    );
+
+  if (indiceAgencia < 0) {
+    return null;
+  }
+
+  for (
+    let i = indiceAgencia + 1;
+    i < lineas.length;
+    i += 1
+  ) {
+    const candidato = lineas[i];
+
+    if (detectarAgenciaPedido(candidato)) continue;
+    if (dniValido(candidato)) continue;
+    if (detectarCantidadExplicita(candidato)) continue;
+
+    if (
+      /^(?:si|ok|okay|listo|dale|correcto)$/i.test(
+        normalizar(candidato)
+      )
+    ) {
+      continue;
+    }
+
+    return candidato;
+  }
+
+  return null;
+}
+
 function dniValido(dni) {
   const limpio = String(dni || "")
     .replace(/\D/g, "");
@@ -177,7 +279,7 @@ function esConfirmacionResumen(texto) {
     .replace(/\s+/g, " ")
     .trim();
 
-  return /^(si|correcto|esta bien|todo bien|todo correcto|ok|okay|confirmo|confirmado|ya esta|si esta bien|si todo bien)$/.test(
+  return /^(?:si|correcto|esta bien|todo bien|todo correcto|todo ok|ok|okay|confirmo|confirmado|ya esta|si esta bien|si todo bien|si todo ok|si correcto|si todo correcto|dale|listo|de acuerdo)$/.test(
     t
   );
 }
@@ -186,7 +288,7 @@ function quitarPreguntaFinal(texto) {
   const valor = String(texto || "").trim();
 
   const indicePregunta =
-    valor.lastIndexOf("¿");
+    valor.lastIndexOf("Â¿");
 
   if (
     indicePregunta >= 0 &&
@@ -233,41 +335,91 @@ function obtenerDatoPagoPrincipal() {
   return null;
 }
 
-function obtenerPromocionProducto(
-  producto
+function obtenerPromocionAplicable(
+  producto,
+  cantidadPedido
 ) {
-  if (
-    !Array.isArray(
-      producto?.promociones
-    )
-  ) {
+  if (!Array.isArray(producto?.promociones)) {
+    return null;
+  }
+
+  const cantidad = Number(cantidadPedido);
+
+  if (!Number.isFinite(cantidad) || cantidad <= 0) {
     return null;
   }
 
   for (const promocion of producto.promociones) {
-    if (
-      typeof promocion ===
-        "string" &&
-      promocion.trim()
-    ) {
-      return promocion.trim();
-    }
+    if (!promocion || typeof promocion !== "object") continue;
+
+    const cantidadPromo = Number(promocion.cantidad);
+    const precioPromo = Number(promocion.precio);
 
     if (
-      promocion &&
-      typeof promocion === "object"
+      Number.isFinite(cantidadPromo) &&
+      cantidadPromo === cantidad &&
+      Number.isFinite(precioPromo) &&
+      precioPromo > 0
     ) {
-      const texto =
-        promocion.texto ||
-        promocion.nombre ||
-        promocion.descripcion ||
-        promocion.titulo ||
-        null;
-
-      if (texto) {
-        return String(texto).trim();
-      }
+      return {
+        cantidad: cantidadPromo,
+        precio: precioPromo,
+      };
     }
+  }
+
+  return null;
+}
+
+function obtenerPromocionProducto(
+  producto,
+  cantidadPedido
+) {
+  const promocionAplicable =
+    obtenerPromocionAplicable(
+      producto,
+      cantidadPedido
+    );
+
+  if (promocionAplicable) {
+    return `PROMO: ${promocionAplicable.cantidad} por S/${promocionAplicable.precio.toFixed(2)}`;
+  }
+
+  return null;
+}
+
+function calcularTotalPedido({
+  contexto,
+  producto,
+  cantidad,
+}) {
+  const promocionAplicable =
+    obtenerPromocionAplicable(
+      producto,
+      cantidad
+    );
+
+  if (promocionAplicable) {
+    return promocionAplicable.precio;
+  }
+
+  const precioUnitario = Number(producto?.precio);
+
+  if (
+    Number.isFinite(precioUnitario) &&
+    precioUnitario > 0
+  ) {
+    return precioUnitario * cantidad;
+  }
+
+  const precioAcordado =
+    Number(contexto?.precio_acordado);
+
+  if (
+    Number.isFinite(precioAcordado) &&
+    precioAcordado > 0
+  ) {
+    return precioAcordado;
   }
 
   return null;
@@ -278,63 +430,48 @@ function construirResumenPedido({
   producto,
   requiereAdelanto,
 }) {
-  const cantidad =
-    Number(contexto?.cantidad || 1);
+  const cantidad = Number(contexto?.cantidad || 1);
 
   const total =
-    Number(
-      contexto?.precio_acordado
-    );
+    calcularTotalPedido({
+      contexto,
+      producto,
+      cantidad,
+    });
 
   const promocion =
     obtenerPromocionProducto(
-      producto
+      producto,
+      cantidad
     );
 
   const lineas = [];
 
-  lineas.push(
-    `NOMBRE: ${contexto.nombre}`
-  );
-
-  lineas.push(
-    `D.N.I.: ${contexto.dni}`
-  );
+  lineas.push(`NOMBRE: ${contexto.nombre}`);
+  lineas.push(`D.N.I.: ${contexto.dni}`);
 
   if (contexto.telefono) {
-    lineas.push(
-      `CEL: ${contexto.telefono}`
-    );
+    lineas.push(`CEL: ${contexto.telefono}`);
   }
 
-  lineas.push(
-    `CIUDAD: ${contexto.ciudad}`
-  );
+  lineas.push(`CIUDAD: ${contexto.ciudad}`);
 
   if (contexto.agencia) {
     lineas.push("");
-    lineas.push(
-      "EMPRESA DE ENVIO:"
-    );
+    lineas.push("EMPRESA DE ENVIO:");
 
     const destino =
       contexto.sede_envio
         ? ` - ${contexto.sede_envio}`
         : "";
 
-    lineas.push(
-      `${contexto.agencia}${destino}`
-    );
+    lineas.push(`${contexto.agencia}${destino}`);
   }
 
   lineas.push("");
   lineas.push("PEDIDO:");
-
   lineas.push(
-    `${String(cantidad).padStart(
-      2,
-      "0"
-    )} ${producto?.nombre || "PRODUCTO"}`
+    `${String(cantidad).padStart(2, "0")} ${producto?.nombre || "PRODUCTO"}`
   );
 
   if (promocion) {
@@ -346,20 +483,16 @@ function construirResumenPedido({
     total > 0
   ) {
     lineas.push("");
-    lineas.push(
-      `TOTAL: S/${total.toFixed(2)}`
-    );
+    lineas.push(`TOTAL: S/${total.toFixed(2)}`);
   }
 
   if (requiereAdelanto) {
-    lineas.push(
-      "ADELANTO PARA CONFIRMAR: S/30.00"
-    );
+    lineas.push("ADELANTO PARA CONFIRMAR: S/30.00");
   }
 
   lineas.push("");
   lineas.push(
-    "Por favor, corrobora que todos tus datos esten correctos. ¿Todo está bien?"
+    "Por favor, corrobora que todos tus datos esten correctos. Â¿Todo esta bien?"
   );
 
   return lineas.join("\n");
@@ -393,7 +526,7 @@ async function respuestaRespaldo(texto, memoria = {}, empresaId = null) {
       return {
         tipo: "respaldo_precio",
         producto: producto.slug,
-        mensaje: `${producto.nombre} está a S/${producto.precio}. Si quieres, te muestro cómo viene y qué incluye.`,
+        mensaje: `${producto.nombre} estÃ¡ a S/${producto.precio}. Si quieres, te muestro cÃ³mo viene y quÃ© incluye.`,
         memoria: {
           producto: producto.slug,
           paso: memoria.paso || "conversacion",
@@ -405,7 +538,7 @@ async function respuestaRespaldo(texto, memoria = {}, empresaId = null) {
     return {
       tipo: "respaldo_producto",
       producto: producto.slug,
-      mensaje: `Claro 👋 Te cuento sobre ${producto.nombre}. Está a S/${producto.precio}.`,
+      mensaje: `Claro ðŸ‘‹ Te cuento sobre ${producto.nombre}. EstÃ¡ a S/${producto.precio}.`,
       memoria: {
         producto: producto.slug,
         paso: memoria.paso || "conversacion",
@@ -417,7 +550,7 @@ async function respuestaRespaldo(texto, memoria = {}, empresaId = null) {
   return {
     tipo: "respaldo_general",
     mensaje:
-      "Claro 👋 Dime qué producto viste y te paso la información.",
+      "Claro ðŸ‘‹ Dime quÃ© producto viste y te paso la informaciÃ³n.",
     memoria: {
       producto: memoria.producto || null,
       paso: memoria.paso || "conversacion",
@@ -598,6 +731,70 @@ let pasoFinal =
 
 let mensajeControlado = null;
 
+const agenciaDetectadaGlobal =
+  detectarAgenciaPedido(texto);
+
+if (agenciaDetectadaGlobal) {
+  contexto.agencia =
+    agenciaDetectadaGlobal;
+}
+
+const cantidadExplicitaGlobal =
+  detectarCantidadExplicita(texto);
+
+if (
+  cantidadExplicitaGlobal &&
+  cantidadExplicitaGlobal > 0
+) {
+  contexto.cantidad =
+    cantidadExplicitaGlobal;
+}
+
+const sedeDetectadaGlobal =
+  detectarSedePedidoEnMensaje(
+    texto,
+    contexto.agencia
+  );
+
+if (
+  sedeDetectadaGlobal &&
+  !contexto.sede_envio
+) {
+  contexto.sede_envio =
+    sedeDetectadaGlobal;
+}
+
+const intencionCompraExplicita =
+  senalCompraFuerte ||
+  /\b(?:quiero|deseo|necesito|quisiera)\s+(?:comprar\s+|pedir\s+|llevar\s+)?(?:uno|una|un|dos|tres|cuatro|cinco|[1-9]\d?)\b/.test(
+    textoNormalizado
+  ) ||
+  /\b(?:quiero comprar|quiero pedir|quiero llevar|me lo llevo|me la llevo|quiero hacer el pedido|hago el pedido|como compro)\b/.test(
+    textoNormalizado
+  );
+
+if (
+  pasoFinal === "esperando_ciudad" &&
+  contexto.ciudad
+) {
+  pasoFinal = "conversacion";
+}
+
+if (
+  pasoFinal !== "postventa" &&
+  producto &&
+  !contexto.ciudad &&
+  (
+    pasoFinal === "esperando_ciudad" ||
+    intencionCompraExplicita
+  )
+) {
+  pasoFinal = "esperando_ciudad";
+  mensajeControlado =
+    "Perfecto. Â¿Desde que ciudad o distrito del Peru nos escribes?";
+}
+
+
 /*
  * =========================================================
  * CIERRE DETERMINISTICO PARA ENVIOS POR AGENCIA
@@ -608,15 +805,113 @@ let mensajeControlado = null;
  */
 
 if (
+  !mensajeControlado &&
   pasoFinal !== "postventa" &&
   envioPorAgencia &&
   producto
 ) {
+  if (
+    pasoFinal === "esperando_sede_envio" &&
+    !contexto.sede_envio
+  ) {
+    const sedeDirecta =
+      String(texto || "").trim();
+
+    const parecePreguntaSede =
+      /[?Â¿]/.test(sedeDirecta);
+
+    if (
+      sedeDirecta &&
+      !parecePreguntaSede &&
+      sedeDirecta.length <= 120 &&
+      !detectarAgenciaPedido(sedeDirecta)
+    ) {
+      contexto.sede_envio =
+        sedeDirecta;
+    }
+  }
+
+  const puedeAvanzarPorDatos =
+    contexto.agencia &&
+    pasoFinal !==
+      "esperando_confirmacion_resumen" &&
+    pasoFinal !== "esperando_pago" &&
+    (
+      pasoFinal !== "conversacion" ||
+      agenciaDetectadaGlobal ||
+      intencionCompraExplicita
+    );
+
+  if (puedeAvanzarPorDatos) {
+    const parecePregunta =
+      /[?Â¿]/.test(String(texto || ""));
+
+    const respuestaDuda =
+      parecePregunta
+        ? quitarPreguntaFinal(
+            analisis.respuesta
+          )
+        : "";
+
+    const conRespuestaDuda =
+      (pregunta) =>
+        respuestaDuda
+          ? `${respuestaDuda}\n\n${pregunta}`.trim()
+          : pregunta;
+
+    if (
+      !nombreCompletoValido(
+        contexto.nombre
+      )
+    ) {
+      pasoFinal = "esperando_nombre";
+      mensajeControlado =
+        conRespuestaDuda(
+          "Perfecto, envia tus nombres y apellidos completos para registrar el pedido."
+        );
+    } else if (
+      !dniValido(contexto.dni)
+    ) {
+      pasoFinal = "esperando_dni";
+      mensajeControlado =
+        conRespuestaDuda(
+          `Perfecto ${contexto.nombre}. Ahora enviame solamente tu DNI de 8 digitos.`
+        );
+    } else if (
+      !contexto.cantidad ||
+      Number(contexto.cantidad) <= 0
+    ) {
+      pasoFinal = "esperando_cantidad";
+      mensajeControlado =
+        conRespuestaDuda(
+          "Â¿Cuantas unidades deseas?"
+        );
+    } else if (
+      !contexto.sede_envio
+    ) {
+      pasoFinal = "esperando_sede_envio";
+      mensajeControlado =
+        conRespuestaDuda(
+          `Perfecto. Â¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`
+        );
+    } else {
+      contexto.resumen_confirmado = false;
+      pasoFinal = "esperando_confirmacion_resumen";
+      mensajeControlado =
+        construirResumenPedido({
+          contexto,
+          producto: productoDetalle,
+          requiereAdelanto:
+            envioPedido?.requiereAdelanto === true,
+        });
+    }
+  }
+
   /*
    * Si ya estabamos esperando agencia,
    * intentar detectar Shalom u Olva.
    */
-  if (
+  else if (
     pasoFinal === "esperando_agencia"
   ) {
     const agencia =
@@ -670,7 +965,7 @@ if (
           "esperando_cantidad";
 
         mensajeControlado =
-          "¿Cuantas unidades deseas?";
+          "Â¿Cuantas unidades deseas?";
       }
     } else {
       /*
@@ -686,7 +981,7 @@ if (
         "esperando_agencia";
 
       mensajeControlado =
-        `${respuestaDuda}\n\n¿Prefieres Shalom u Olva Courier?`.trim();
+        `${respuestaDuda}\n\nÂ¿Prefieres Shalom u Olva Courier?`.trim();
     }
   }
 
@@ -726,7 +1021,7 @@ if (
           "esperando_cantidad";
 
         mensajeControlado =
-          "¿Cuantas unidades deseas?";
+          "Â¿Cuantas unidades deseas?";
       }
     } else {
       pasoFinal =
@@ -756,7 +1051,7 @@ if (
         "esperando_cantidad";
 
       mensajeControlado =
-        "¿Cuantas unidades deseas?";
+        "Â¿Cuantas unidades deseas?";
     } else {
       pasoFinal =
         "esperando_dni";
@@ -785,13 +1080,13 @@ if (
         "esperando_sede_envio";
 
       mensajeControlado =
-        `Perfecto. ¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`;
+        `Perfecto. Â¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`;
     } else {
       pasoFinal =
         "esperando_cantidad";
 
       mensajeControlado =
-        "¿Cuantas unidades deseas?";
+        "Â¿Cuantas unidades deseas?";
     }
   }
 
@@ -807,7 +1102,7 @@ if (
     ).trim();
 
     const parecePregunta =
-      /[?¿]/.test(sede);
+      /[?Â¿]/.test(sede);
 
     if (
       sede &&
@@ -842,7 +1137,7 @@ if (
         "esperando_sede_envio";
 
       mensajeControlado =
-        `${respuestaDuda}\n\n¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`.trim();
+        `${respuestaDuda}\n\nÂ¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`.trim();
     }
   }
 
@@ -915,7 +1210,7 @@ if (
     } else {
       /*
        * Si detectamos que corrigio algun dato,
-       * volver a enseñar el resumen actualizado.
+       * volver a enseÃ±ar el resumen actualizado.
        */
       const hizoCorreccion =
         Boolean(
@@ -960,12 +1255,34 @@ if (
   else if (
     pasoFinal === "esperando_pago"
   ) {
-    const pidePago =
-      /\b(pago|pagar|numero|yape|plin|cuenta|deposito|depositar|transferencia|adelanto|donde pago|a que numero)\b/i.test(
-        normalizar(texto)
+    const tPago =
+      normalizar(texto)
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const reportaPago =
+      /\b(?:ya pague|ya hice el pago|ya transferi|ya deposite|pago realizado|ya esta pagado)\b/.test(
+        tPago
       );
 
-    if (pidePago) {
+    const confirmacionCorta =
+      /^(?:ok|okay|listo|dale|perfecto|gracias|esta bien|todo bien|de acuerdo)$/.test(
+        tPago
+      );
+
+    const pidePago =
+      /\b(pago|pagar|numero|yape|plin|cuenta|deposito|depositar|transferencia|adelanto|donde pago|a que numero)\b/i.test(
+        tPago
+      );
+
+    if (reportaPago) {
+      mensajeControlado =
+        "Perfecto. Enviame el comprobante por aqui para continuar con la confirmacion.";
+    } else if (confirmacionCorta) {
+      mensajeControlado =
+        "Perfecto ðŸ‘ Quedo atento al comprobante.";
+    } else if (pidePago) {
       const datosSolicitados =
         construirDatosPago(
           textoAccion ?? texto
@@ -1003,7 +1320,7 @@ if (
         : "";
 
     mensajeControlado =
-      `${adelanto}\n\n¿Prefieres Shalom u Olva Courier?`.trim();
+      `${adelanto}\n\nÂ¿Prefieres Shalom u Olva Courier?`.trim();
   }
 }
 
