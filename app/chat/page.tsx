@@ -100,6 +100,7 @@ const limiteChatsRef = useRef(100);
 const busquedaRef = useRef("");
 const busquedaInicializadaRef = useRef(false);
   const [whatsappQrId, setWhatsappQrId] = useState<number | null>(null);
+const whatsappQrIdRef = useRef<number | null>(null);
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [mensajeNuevo, setMensajeNuevo] = useState("");
@@ -133,6 +134,53 @@ const bajarAlFinal = () => {
     });
   }, 300);
 };
+
+const actualizarWhatsappQr = async () => {
+  try {
+    const qrRes = await fetch("/api/whatsapp-qr", {
+      cache: "no-store",
+    });
+
+    const qrData = await qrRes.json();
+    const qrId = qrData.whatsapp_qr_id;
+
+    if (!qrId) {
+      whatsappQrIdRef.current = null;
+      setWhatsappQrId(null);
+      setClientes([]);
+      setClosers([]);
+      setClienteActivo(null);
+      setConversaciones([]);
+      setMostrarConversacion(false);
+      return null;
+    }
+
+    const nuevoQrId = Number(qrId);
+    const qrAnterior = whatsappQrIdRef.current;
+
+    if (
+      qrAnterior !== null &&
+      qrAnterior !== nuevoQrId
+    ) {
+      setClienteActivo(null);
+      setConversaciones([]);
+      setMostrarConversacion(false);
+    }
+
+    whatsappQrIdRef.current = nuevoQrId;
+    setWhatsappQrId(nuevoQrId);
+
+    return nuevoQrId;
+  } catch (error) {
+    console.error(
+      "Error obteniendo WhatsApp QR:",
+      error
+    );
+
+    return null;
+  }
+};
+
 const cargarClientes = async (
   limiteSolicitado?: number,
   buscarSolicitado?: string,
@@ -152,29 +200,9 @@ const filtroActual =
   if (!usuarioGuardado) return;
 
   const usuario = JSON.parse(usuarioGuardado);
-  const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
-  const qrData = await qrRes.json();
-  const qrId = qrData.whatsapp_qr_id;
+const qrId = whatsappQrIdRef.current;
 
-  if (!qrId) {
-  setWhatsappQrId(null);
-  setClientes([]);
-  setClosers([]);
-  setClienteActivo(null);
-  setConversaciones([]);
-  setMostrarConversacion(false);
-  return;
-}
-
-  const nuevoQrId = Number(qrId);
-
-if (whatsappQrId !== null && whatsappQrId !== nuevoQrId) {
-  setClienteActivo(null);
-  setConversaciones([]);
-  setMostrarConversacion(false);
-}
-
-setWhatsappQrId(nuevoQrId);
+if (!qrId) return;
   const parametros = new URLSearchParams({
   empresa_id: String(usuario.empresa_id),
   whatsapp_qr_id: String(qrId),
@@ -782,17 +810,47 @@ const detenerGrabacion = () => {
 };
 
 useEffect(() => {
-  // Carga inicial de la lista y plantillas
-  cargarClientes();
+  let cancelado = false;
+
+  const iniciar = async () => {
+    const qrId = await actualizarWhatsappQr();
+
+    if (cancelado || !qrId) return;
+
+    await cargarClientes();
+  };
+
+  void iniciar();
   cargarPlantillas();
 
-  // La lista completa ya no se descarga cada 5 segundos.
-  // 30 segundos es suficiente para refrescar el sidebar.
+  // Refresca la lista usando el QR que ya conocemos.
   const intervaloClientes = setInterval(() => {
-    cargarClientes();
+    if (whatsappQrIdRef.current) {
+      void cargarClientes();
+    }
   }, 30000);
 
-  return () => clearInterval(intervaloClientes);
+  // Solo verificamos si cambió el QR cada 5 minutos.
+  const intervaloQr = setInterval(async () => {
+    const qrAnterior = whatsappQrIdRef.current;
+
+    const qrNuevo =
+      await actualizarWhatsappQr();
+
+    if (
+      !cancelado &&
+      qrNuevo &&
+      qrNuevo !== qrAnterior
+    ) {
+      void cargarClientes();
+    }
+  }, 300000);
+
+  return () => {
+    cancelado = true;
+    clearInterval(intervaloClientes);
+    clearInterval(intervaloQr);
+  };
 }, []);
 
 useEffect(() => {
