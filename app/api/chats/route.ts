@@ -12,13 +12,37 @@ export async function GET(request: Request) {
     const empresaId = searchParams.get("empresa_id");
     const whatsappQrId = searchParams.get("whatsapp_qr_id");
 
+    const limitRaw = Number(
+      searchParams.get("limit") || 100
+    );
+
+    const offsetRaw = Number(
+      searchParams.get("offset") || 0
+    );
+
+    const limit = Number.isFinite(limitRaw)
+  ? Math.min(Math.max(Math.trunc(limitRaw), 1), 5000)
+  : 100;
+
+    const offset = Number.isFinite(offsetRaw)
+      ? Math.max(Math.trunc(offsetRaw), 0)
+      : 0;
+
+    const buscar = (
+      searchParams.get("buscar") || ""
+    ).trim();
+
     if (!empresaId || !whatsappQrId) {
-      return NextResponse.json({
-        success: true,
-        chats: [],
-        closers: [],
-      });
-    }
+  return NextResponse.json({
+    success: true,
+    chats: [],
+    closers: [],
+    total: 0,
+    total_general: 0,
+    limit,
+    offset,
+  });
+}
 
     const result = await pool.query(
       `
@@ -111,6 +135,77 @@ export async function GET(request: Request) {
 
       WHERE c.empresa_id = $1
 
+  AND EXISTS (
+    SELECT 1
+    FROM conversaciones conv
+    WHERE conv.cliente_id = c.id
+      AND conv.empresa_id = $1
+      AND conv.whatsapp_qr_id = $2
+  )
+
+  AND (
+    $5 = ''
+    OR COALESCE(c.nombre, '') ILIKE '%' || $5 || '%'
+    OR COALESCE(c.telefono, '') ILIKE '%' || $5 || '%'
+    OR COALESCE(ult.mensaje, '') ILIKE '%' || $5 || '%'
+  )
+
+ORDER BY
+  ult.created_at DESC NULLS LAST,
+  c.created_at DESC
+
+LIMIT $3
+OFFSET $4
+      `,
+      [
+  empresaId,
+  whatsappQrId,
+  limit,
+  offset,
+  buscar,
+]
+    );
+
+const totalResult = await pool.query(
+  `
+  SELECT
+    COUNT(DISTINCT cliente_id)::int AS total
+  FROM conversaciones
+  WHERE empresa_id = $1
+    AND whatsapp_qr_id = $2
+  `,
+  [
+    empresaId,
+    whatsappQrId,
+  ]
+);
+
+const totalChats = Number(
+  totalResult.rows[0]?.total || 0
+);
+
+let totalFiltrado = totalChats;
+
+if (buscar) {
+  const totalFiltradoResult = await pool.query(
+    `
+    SELECT COUNT(*)::int AS total
+    FROM (
+      SELECT c.id
+
+      FROM clientes c
+
+      LEFT JOIN LATERAL (
+        SELECT mensaje
+        FROM conversaciones
+        WHERE cliente_id = c.id
+          AND whatsapp_qr_id = $2
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) ult_busqueda ON true
+
+      WHERE c.empresa_id = $1
+
         AND EXISTS (
           SELECT 1
           FROM conversaciones conv
@@ -119,12 +214,24 @@ export async function GET(request: Request) {
             AND conv.whatsapp_qr_id = $2
         )
 
-      ORDER BY
-        ult.created_at DESC NULLS LAST,
-        c.created_at DESC
-      `,
-      [empresaId, whatsappQrId]
-    );
+        AND (
+          COALESCE(c.nombre, '') ILIKE '%' || $3 || '%'
+          OR COALESCE(c.telefono, '') ILIKE '%' || $3 || '%'
+          OR COALESCE(ult_busqueda.mensaje, '') ILIKE '%' || $3 || '%'
+        )
+    ) resultados
+    `,
+    [
+      empresaId,
+      whatsappQrId,
+      buscar,
+    ]
+  );
+
+  totalFiltrado = Number(
+    totalFiltradoResult.rows[0]?.total || 0
+  );
+}
 
     const closersResult = await pool.query(
       `
@@ -152,11 +259,15 @@ export async function GET(request: Request) {
       [empresaId]
     );
 
-    return NextResponse.json({
-      success: true,
-      chats: result.rows,
-      closers: closersResult.rows,
-    });
+return NextResponse.json({
+  success: true,
+  chats: result.rows,
+  closers: closersResult.rows,
+  total: totalFiltrado,
+  total_general: totalChats,
+  limit,
+  offset,
+});
   } catch (error) {
     console.error("ERROR API CHATS:", error);
 

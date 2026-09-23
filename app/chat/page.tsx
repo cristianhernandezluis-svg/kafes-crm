@@ -91,6 +91,14 @@ type Plantilla = {
 export default function ChatsPage() {
 const { temaClaro, cambiarTema } = useTemaCRM();
   const [clientes, setClientes] = useState<Cliente[]>([]);
+const [totalChats, setTotalChats] = useState(0);
+const [totalResultados, setTotalResultados] = useState(0);
+
+const [limiteChats, setLimiteChats] = useState(100);
+const limiteChatsRef = useRef(100);
+
+const busquedaRef = useRef("");
+const busquedaInicializadaRef = useRef(false);
   const [whatsappQrId, setWhatsappQrId] = useState<number | null>(null);
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
@@ -124,7 +132,16 @@ const bajarAlFinal = () => {
     });
   }, 300);
 };
-const cargarClientes = async () => {
+const cargarClientes = async (
+  limiteSolicitado?: number,
+  buscarSolicitado?: string
+) => {
+  const limite =
+    limiteSolicitado ?? limiteChatsRef.current;
+
+  const terminoBusqueda = (
+    buscarSolicitado ?? busquedaRef.current
+  ).trim();
   const usuarioGuardado = localStorage.getItem("usuario");
   if (!usuarioGuardado) return;
 
@@ -152,14 +169,42 @@ if (whatsappQrId !== null && whatsappQrId !== nuevoQrId) {
 }
 
 setWhatsappQrId(nuevoQrId);
-  const res = await fetch(`/api/chats?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${qrId}`, {
+  const parametros = new URLSearchParams({
+  empresa_id: String(usuario.empresa_id),
+  whatsapp_qr_id: String(qrId),
+  limit: String(limite),
+  offset: "0",
+});
+
+if (terminoBusqueda) {
+  parametros.set("buscar", terminoBusqueda);
+}
+
+const res = await fetch(
+  `/api/chats?${parametros.toString()}`,
+  {
     cache: "no-store",
-  });
+  }
+);
 
   const data = await res.json();
 
  if (data.success) {
   setClientes(data.chats);
+
+  // Total REAL del canal: por ejemplo 4875
+  setTotalChats(
+    Number(
+      data.total_general ??
+      data.total ??
+      data.chats.length
+    )
+  );
+
+  // Total de resultados de la búsqueda actual
+  setTotalResultados(
+    Number(data.total ?? data.chats.length)
+  );
   setClosers(Array.isArray(data.closers) ? data.closers : []);
 
   setClienteActivo((actual) => {
@@ -789,6 +834,24 @@ useEffect(() => {
   return () =>
     clearInterval(intervaloConversacion);
 }, [clienteActivo?.id, whatsappQrId]);
+
+useEffect(() => {
+  // Evita duplicar la carga inicial al entrar a Conversaciones
+  if (!busquedaInicializadaRef.current) {
+    busquedaInicializadaRef.current = true;
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    limiteChatsRef.current = 100;
+    setLimiteChats(100);
+
+    void cargarClientes(100, busqueda);
+  }, 400);
+
+  return () => clearTimeout(timer);
+}, [busqueda]);
+
 useEffect(() => {
   if (clientes.length === 0 || clienteActivo) return;
 
@@ -817,7 +880,7 @@ useEffect(() => {
       : "bg-[#0b1220] text-white"
   }`}
 >
-      <Sidebar temaClaro={temaClaro} onCambiarTema={cambiarTema} conversacionesCount={clientes.length} />
+      <Sidebar temaClaro={temaClaro} onCambiarTema={cambiarTema} conversacionesCount={totalChats || clientes.length} />
 
       <main className="flex-1 min-w-0 h-screen overflow-hidden flex">
 <div
@@ -891,7 +954,12 @@ useEffect(() => {
       type="text"
       placeholder="Buscar conversaciones..."
       value={busqueda}
-      onChange={(e) => setBusqueda(e.target.value)}
+      onChange={(e) => {
+  const valor = e.target.value;
+
+  setBusqueda(valor);
+  busquedaRef.current = valor;
+}}
       className={`flex-1 border rounded-lg px-3 py-2 text-sm outline-none ${
   temaClaro
     ? "bg-slate-50 border-slate-300 text-slate-900"
@@ -943,17 +1011,13 @@ useEffect(() => {
           <div className="overflow-y-auto h-[calc(100vh-90px)]">
   {clientes
   .filter((cliente) => {
-    const coincideBusqueda = `${cliente.nombre} ${cliente.telefono} ${cliente.ultimo_mensaje || ""}`
-      .toLowerCase()
-      .includes(busqueda.toLowerCase());
-
     const coincideFiltro =
       filtroChat === "todas" ||
       (filtroChat === "no_leidas" && (cliente.no_leidos || 0) > 0) ||
       (filtroChat === "asignadas" && !!cliente.asesor) ||
       (filtroChat === "sin_asignar" && !cliente.asesor);
 
-    return coincideBusqueda && coincideFiltro;
+    return coincideFiltro;
   })
   .map((cliente) => (
   <button
@@ -1038,6 +1102,38 @@ useEffect(() => {
 
 </button>
   ))}
+
+{clientes.length < totalResultados && (
+  <div className="p-4">
+    <button
+      type="button"
+      onClick={() => {
+const nuevoLimite = Math.min(
+  limiteChatsRef.current + 100,
+  totalResultados
+);
+
+        limiteChatsRef.current = nuevoLimite;
+        setLimiteChats(nuevoLimite);
+        void cargarClientes(
+  nuevoLimite,
+  busquedaRef.current
+);
+      }}
+      className={`w-full rounded-xl border px-4 py-3 text-sm font-bold ${
+        temaClaro
+          ? "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+          : "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+      }`}
+    >
+      Cargar más conversaciones
+      <span className="ml-2 text-xs opacity-60">
+        {clientes.length} de {totalResultados}
+      </span>
+    </button>
+  </div>
+)}
+
 </div>
 </section>
 
