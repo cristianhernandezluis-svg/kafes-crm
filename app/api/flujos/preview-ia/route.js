@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { decidirRespuestaBot } from "../../../whatsapp-qr-server/bot/cerebro.mjs";
+import { obtenerDatosPagoPrivados } from "../../../whatsapp-qr-server/bot/politicas.mjs";
 
 export const runtime = "nodejs";
 
@@ -72,9 +73,24 @@ export async function POST(request) {
         productoPrincipal,
       });
 
+    const datosPago = obtenerDatosPagoPrivados();
+
+    const diagnosticoPago = {
+      titular: Boolean(datosPago?.titular),
+      yape: Boolean(datosPago?.yape),
+      plin: Boolean(datosPago?.plin),
+      bcp: Boolean(datosPago?.bcp),
+      interbank: Boolean(datosPago?.interbank),
+      bbva: Boolean(datosPago?.bbva),
+      bancoNacion: Boolean(datosPago?.bancoNacion),
+    };
+
+    console.log("PREVIEW DATOS PAGO DISPONIBLES:", diagnosticoPago);
+
     return NextResponse.json({
       ok: true,
       resultado,
+      diagnosticoPago,
     });
   } catch (error) {
     console.error(
