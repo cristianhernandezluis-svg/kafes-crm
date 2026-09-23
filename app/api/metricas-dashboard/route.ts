@@ -27,16 +27,18 @@ export async function GET(request: Request) {
         SELECT (NOW() AT TIME ZONE 'America/Lima')::date AS hoy
       ),
       conversaciones_metricas AS (
-        SELECT
-          COUNT(DISTINCT c.cliente_id) FILTER (
-            WHERE
-              c.remitente = 'cliente'
-              AND (
-                c.created_at
-                AT TIME ZONE 'UTC'
-                AT TIME ZONE 'America/Lima'
-              )::date = f.hoy
-          )::int AS conversaciones_hoy,
+  SELECT
+    COUNT(DISTINCT c.cliente_id)::int AS total_conversaciones,
+
+    COUNT(DISTINCT c.cliente_id) FILTER (
+      WHERE
+        c.remitente = 'cliente'
+        AND (
+          c.created_at
+          AT TIME ZONE 'UTC'
+          AT TIME ZONE 'America/Lima'
+        )::date = f.hoy
+    )::int AS conversaciones_hoy,
 
           COUNT(DISTINCT c.cliente_id) FILTER (
             WHERE
@@ -75,10 +77,11 @@ export async function GET(request: Request) {
           AND h.whatsapp_qr_id = $2
       )
       SELECT
-        c.conversaciones_hoy,
-        c.conversaciones_ayer,
-        h.cierres_hoy,
-        h.cierres_ayer
+  c.total_conversaciones,
+  c.conversaciones_hoy,
+  c.conversaciones_ayer,
+  h.cierres_hoy,
+  h.cierres_ayer
       FROM conversaciones_metricas c
       CROSS JOIN cierres_metricas h
       `,
@@ -88,11 +91,12 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       metricas: result.rows[0] ?? {
-        conversaciones_hoy: 0,
-        conversaciones_ayer: 0,
-        cierres_hoy: 0,
-        cierres_ayer: 0,
-      },
+  total_conversaciones: 0,
+  conversaciones_hoy: 0,
+  conversaciones_ayer: 0,
+  cierres_hoy: 0,
+  cierres_ayer: 0,
+},
     });
   } catch (error) {
     console.error("ERROR METRICAS DASHBOARD:", error);
@@ -101,11 +105,12 @@ export async function GET(request: Request) {
       {
         success: false,
         metricas: {
-          conversaciones_hoy: 0,
-          conversaciones_ayer: 0,
-          cierres_hoy: 0,
-          cierres_ayer: 0,
-        },
+  total_conversaciones: 0,
+  conversaciones_hoy: 0,
+  conversaciones_ayer: 0,
+  cierres_hoy: 0,
+  cierres_ayer: 0,
+},
       },
       { status: 500 }
      );

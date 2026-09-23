@@ -63,16 +63,17 @@ export default function Home() {
 const { temaClaro, cambiarTema } = useTemaCRM();
   const [clientes, setClientes] = useState<Cliente[]>([]);
 const whatsappQrIdRef = useRef<number | null>(null);
-  const [metricasDashboard, setMetricasDashboard] = useState({
-    conversaciones_hoy: 0,
-    conversaciones_ayer: 0,
-    cierres_hoy: 0,
-    cierres_ayer: 0,
-    enviados_hoy: 0,
-    enviados_ayer: 0,
-    entregados_hoy: 0,
-    entregados_ayer: 0,
-  });
+const [metricasDashboard, setMetricasDashboard] = useState({
+  total_conversaciones: 0,
+  conversaciones_hoy: 0,
+  conversaciones_ayer: 0,
+  cierres_hoy: 0,
+  cierres_ayer: 0,
+  enviados_hoy: 0,
+  enviados_ayer: 0,
+  entregados_hoy: 0,
+  entregados_ayer: 0,
+});
   const [cargando, setCargando] = useState(true);
 const [filtroFechaVentas, setFiltroFechaVentas] = useState("esta_semana");
 const [filtroFecha, setFiltroFecha] = useState("esta_semana");
@@ -175,15 +176,16 @@ const actualizarWhatsappQr = async () => {
   setClientes([]);
 
   setMetricasDashboard({
-    conversaciones_hoy: 0,
-    conversaciones_ayer: 0,
-    cierres_hoy: 0,
-    cierres_ayer: 0,
-    enviados_hoy: 0,
-    enviados_ayer: 0,
-    entregados_hoy: 0,
-    entregados_ayer: 0,
-  });
+  total_conversaciones: 0,
+  conversaciones_hoy: 0,
+  conversaciones_ayer: 0,
+  cierres_hoy: 0,
+  cierres_ayer: 0,
+  enviados_hoy: 0,
+  enviados_ayer: 0,
+  entregados_hoy: 0,
+  entregados_ayer: 0,
+});
 
   return null;
 }
@@ -213,16 +215,17 @@ const actualizarWhatsappQr = async () => {
       const whatsappQrId = whatsappQrIdRef.current;
 
       if (!whatsappQrId) {
-        setMetricasDashboard({
-          conversaciones_hoy: 0,
-          conversaciones_ayer: 0,
-          cierres_hoy: 0,
-          cierres_ayer: 0,
+  setMetricasDashboard({
+    total_conversaciones: 0,
+    conversaciones_hoy: 0,
+    conversaciones_ayer: 0,
+    cierres_hoy: 0,
+    cierres_ayer: 0,
     enviados_hoy: 0,
     enviados_ayer: 0,
     entregados_hoy: 0,
     entregados_ayer: 0,
-        });
+  });
         return;
       }
 
@@ -634,7 +637,11 @@ const barraTema = temaClaro
       : "bg-[#0b1220] text-white"
   }`}
 >
-      <Sidebar temaClaro={temaClaro} onCambiarTema={cambiarTema} conversacionesCount={clientes.length} />
+      <Sidebar
+  temaClaro={temaClaro}
+  onCambiarTema={cambiarTema}
+  conversacionesCount={metricasDashboard.total_conversaciones}
+/>
 <main
   className={`flex-1 min-w-0 h-screen overflow-hidden transition-colors duration-300 ${
     temaClaro ? "bg-slate-100" : "bg-[#0b1220]"
