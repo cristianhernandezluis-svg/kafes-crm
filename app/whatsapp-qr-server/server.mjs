@@ -1504,6 +1504,7 @@ console.log("ASIGNACION BOT RESUELTA:", {
   historial,
   empresaId: empresaQrId,
   productoPrincipal: productoAsignado,
+  telefono,
 });
 
   const mensajeMasNuevo = await pool.query(
