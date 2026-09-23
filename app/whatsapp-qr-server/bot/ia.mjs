@@ -3,7 +3,10 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { PROMPT_VENDEDOR, PROMPT_POSTVENTA } from "./prompt.mjs";
 import { AnalisisVenta } from "./esquema.mjs";
 import { obtenerCatalogoEmpresa } from "./catalogo.mjs";
-import { obtenerPoliticasComerciales } from "./politicas.mjs";
+import {
+  obtenerPoliticasComerciales,
+  resolverTipoEnvioPorUbicacion,
+} from "./politicas.mjs";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -80,6 +83,181 @@ export async function consultarIA(input) {
       ? input?.productoPrincipal || null
       : null;
 
+const ciudadMemoria =
+  memoria?.contexto?.ciudad || null;
+
+const normalizarTextoUbicacion = (valor = "") =>
+  String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[.,;:/_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const mensajeUbicacionNormalizado =
+  normalizarTextoUbicacion(mensaje);
+
+const envioDesdeMensaje =
+  resolverTipoEnvioPorUbicacion(mensaje);
+
+const envioDesdeMemoria =
+  ciudadMemoria
+    ? resolverTipoEnvioPorUbicacion(ciudadMemoria)
+    : null;
+
+const zonasLimaResueltas = new Set([
+  "lima_motorizado",
+  "lima_agencia",
+  "lima_distrito_pendiente",
+]);
+
+const mensajeResuelveLima =
+  envioDesdeMensaje &&
+  zonasLimaResueltas.has(
+    envioDesdeMensaje.zona
+  );
+
+const coincidenciaUbicacionDeclarada =
+  mensajeUbicacionNormalizado.match(
+    /\b(?:soy de|vivo en|estoy en|me encuentro en|me ubico en|provincia de|departamento de|distrito de|envio a|envios a|envialo a|enviala a|enviamelo a|enviamela a|mandalo a|mandala a|mejor a)\s+(.+)$/i
+  );
+
+const ubicacionDeclarada =
+  coincidenciaUbicacionDeclarada?.[1]?.trim() || "";
+
+const ubicacionesGenericas = new Set([
+  "domicilio",
+  "mi domicilio",
+  "casa",
+  "mi casa",
+  "agencia",
+  "shalom",
+  "olva",
+  "duda",
+  "proceso",
+  "camino",
+  "trabajo",
+  "oficina",
+]);
+
+const mensajeDeclaraNuevaUbicacion =
+  Boolean(ubicacionDeclarada) &&
+  !ubicacionesGenericas.has(
+    ubicacionDeclarada
+  );
+
+const envioDesdeUbicacionDeclarada =
+  mensajeDeclaraNuevaUbicacion
+    ? resolverTipoEnvioPorUbicacion(
+        ubicacionDeclarada
+      )
+    : null;
+
+const ultimoHistorial =
+  historial.length > 0
+    ? historial[historial.length - 1]
+    : null;
+
+const ultimoMensajeBotNormalizado =
+  ultimoHistorial?.rol === "bot"
+    ? normalizarTextoUbicacion(
+        ultimoHistorial.mensaje || ""
+      )
+    : "";
+
+const botAcabaDePreguntarUbicacion =
+  Boolean(ultimoMensajeBotNormalizado) &&
+  /\b(desde que parte del peru|de que parte del peru|desde donde|de donde|de que ciudad|en que ciudad|que ciudad|de que distrito|en que distrito|que distrito|donde te encuentras|donde se encuentra|a que ciudad|a que distrito)\b/.test(
+    ultimoMensajeBotNormalizado
+  );
+
+const respuestasSinUbicacion = new Set([
+  "si",
+  "no",
+  "ya",
+  "ok",
+  "okay",
+  "dale",
+  "listo",
+  "gracias",
+  "bien",
+  "perfecto",
+  "correcto",
+  "no se",
+  "aun no se",
+  "todavia no se",
+  "aca",
+  "aqui",
+  "mi casa",
+  "mi domicilio",
+]);
+
+const pareceConsultaNoUbicacion =
+  /\b(precio|cuanto|costo|envio|envios|delivery|entrega|garantia|sirve|funciona|producto|pago|yape|plin|pedido|comprar|stock|foto|video)\b/.test(
+    mensajeUbicacionNormalizado
+  );
+
+const palabrasRespuestaUbicacion =
+  mensajeUbicacionNormalizado
+    .split(" ")
+    .filter(Boolean);
+
+const respuestaAUbicacion =
+  botAcabaDePreguntarUbicacion &&
+  palabrasRespuestaUbicacion.length >= 1 &&
+  palabrasRespuestaUbicacion.length <= 5 &&
+  !respuestasSinUbicacion.has(
+    mensajeUbicacionNormalizado
+  ) &&
+  !pareceConsultaNoUbicacion;
+
+let envioResuelto = null;
+
+// Si el mensaje actual reconoce claramente una zona
+// de Lima, tiene prioridad absoluta sobre la memoria.
+if (mensajeResuelveLima) {
+  envioResuelto = {
+    fuente: "mensaje_actual",
+    ubicacion_original: mensaje,
+    ...envioDesdeMensaje,
+  };
+}
+
+// Si el bot acaba de preguntar la ubicación,
+// una respuesta corta como Arequipa, Huaral,
+// Barranca o Huancayo se interpreta como ubicación.
+else if (respuestaAUbicacion) {
+  envioResuelto = {
+    fuente: "respuesta_a_pregunta_ubicacion",
+    ubicacion_original: mensaje,
+    ...envioDesdeMensaje,
+  };
+}
+
+// Si el cliente declara explícitamente un cambio
+// de ubicación, no reutilizar la ciudad anterior.
+else if (
+  mensajeDeclaraNuevaUbicacion &&
+  envioDesdeUbicacionDeclarada
+) {
+  envioResuelto = {
+    fuente: "mensaje_actual_declarado",
+    ubicacion_original: ubicacionDeclarada,
+    ...envioDesdeUbicacionDeclarada,
+  };
+}
+
+// En los demás mensajes seguimos usando
+// la ubicación ya conocida.
+else if (envioDesdeMemoria) {
+  envioResuelto = {
+    fuente: "memoria_cliente",
+    ubicacion_original: ciudadMemoria,
+    ...envioDesdeMemoria,
+  };
+}
+
   const catalogoEmpresa = await obtenerCatalogoEmpresa(empresaId);
 
   const venta = memoria?.venta || null;
@@ -117,6 +295,21 @@ REGLA DE PRODUCTO PRINCIPAL:
 
 POLITICAS COMERCIALES REALES:
 ${JSON.stringify(obtenerPoliticasComerciales(), null, 2)}
+
+ENVIO RESUELTO POR EL SISTEMA:
+${envioResuelto
+  ? JSON.stringify(envioResuelto, null, 2)
+  : "sin resolver"}
+
+REGLA OBLIGATORIA SOBRE ENVIO:
+- ENVIO RESUELTO POR EL SISTEMA tiene prioridad sobre una politica generica de envio.
+- Si zona="lima_motorizado", el envio corresponde a motorizado contraentrega. NO digas que requiere adelanto y NO cambies automaticamente a Shalom u Olva.
+- Si zona="lima_agencia", corresponde envio por agencia y puedes aplicar el adelanto confirmado para agencia.
+- Si zona="provincia", respeta exactamente tipoEnvio, requiereAdelanto, adelantoMinimo y agencias devueltos por el sistema. NO lo cambies a motorizado contraentrega.
+- Si zona="lima_distrito_pendiente", NO asumas provincia ni cobres adelanto. Pregunta el distrito de Lima.
+- Si contraEntrega=true, puedes indicar que paga al recibir con motorizado.
+- Si requiereAdelanto=false, NO solicites S/30.
+- Nunca reemplaces una clasificacion concreta del sistema por la politica generica de Shalom u Olva.
 
 MEMORIA DEL CLIENTE:
 ${JSON.stringify(memoria, null, 2)}

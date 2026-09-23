@@ -128,6 +128,7 @@ function normalizarUbicacion(texto = "") {
     .toLowerCase()
     .replace(/[.,;:/_-]+/g, " ")
     .replace(/\s+/g, " ")
+    .replace(/\bsanta nita\b/g, "santa anita")
     .trim();
 }
 
@@ -191,6 +192,147 @@ function contieneLugar(texto, lugar) {
   return new RegExp(`(^|\\s)${escape}(\\s|$)`).test(texto);
 }
 
+const ALIAS_DISTRITOS_LIMA = {
+  sjl: "san juan de lurigancho",
+  smp: "san martin de porres",
+  vmt: "villa maria del triunfo",
+  ves: "villa el salvador",
+  "san juan lurigancho": "san juan de lurigancho",
+  "san martin porres": "san martin de porres",
+  "villa maria triunfo": "villa maria del triunfo",
+  "villa salvador": "villa el salvador",
+  "santa nita": "santa anita",
+};
+
+function distanciaLevenshtein(a = "", b = "") {
+  const filas = a.length + 1;
+  const columnas = b.length + 1;
+
+  const matriz = Array.from(
+    { length: filas },
+    () => Array(columnas).fill(0)
+  );
+
+  for (let i = 0; i < filas; i++) {
+    matriz[i][0] = i;
+  }
+
+  for (let j = 0; j < columnas; j++) {
+    matriz[0][j] = j;
+  }
+
+  for (let i = 1; i < filas; i++) {
+    for (let j = 1; j < columnas; j++) {
+      const costo =
+        a[i - 1] === b[j - 1] ? 0 : 1;
+
+      matriz[i][j] = Math.min(
+        matriz[i - 1][j] + 1,
+        matriz[i][j - 1] + 1,
+        matriz[i - 1][j - 1] + costo
+      );
+    }
+  }
+
+  return matriz[a.length][b.length];
+}
+
+function similitudTexto(a = "", b = "") {
+  if (!a || !b) return 0;
+
+  const maximo = Math.max(a.length, b.length);
+
+  if (!maximo) return 1;
+
+  return (
+    1 -
+    distanciaLevenshtein(a, b) / maximo
+  );
+}
+
+function buscarDistritoLimaAproximado(
+  ubicacionNormalizada
+) {
+  let texto = String(
+    ubicacionNormalizada || ""
+  )
+    .replace(/\bprovincia de lima\b/g, " ")
+    .replace(/\blima metropolitana\b/g, " ")
+    .replace(/\blima\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!texto) return null;
+
+  // Primero probar alias seguros y abreviaciones conocidas.
+  if (ALIAS_DISTRITOS_LIMA[texto]) {
+    return {
+      distrito: ALIAS_DISTRITOS_LIMA[texto],
+      confianza: 1,
+    };
+  }
+
+  /*
+   * No aplicar fuzzy a una sola palabra.
+   *
+   * Esto evita errores peligrosos como:
+   * Barranca -> Barranco
+   *
+   * En cambio permite corregir:
+   * "san juna de lurigancho"
+   * "sa njuna de lurgasncho"
+   * "punta hermoza"
+   */
+  const palabras = texto
+    .split(" ")
+    .filter(Boolean);
+
+  if (
+    palabras.length < 2 ||
+    texto.length < 5
+  ) {
+    return null;
+  }
+
+  const distritos = [
+    ...new Set([
+      ...DISTRITOS_LIMA_MOTORIZADO,
+      ...DISTRITOS_LIMA_AGENCIA,
+    ]),
+  ];
+
+  const resultados = distritos
+    .map((distrito) => ({
+      distrito,
+      confianza: similitudTexto(
+        texto,
+        distrito
+      ),
+    }))
+    .sort(
+      (a, b) =>
+        b.confianza - a.confianza
+    );
+
+  const mejor = resultados[0];
+  const segundo = resultados[1];
+
+  if (!mejor) return null;
+
+  const diferencia =
+    mejor.confianza -
+    (segundo?.confianza || 0);
+
+  if (
+    mejor.confianza >= 0.70 &&
+    diferencia >= 0.08
+  ) {
+    return mejor;
+  }
+
+  return null;
+}
+
 export function resolverTipoEnvioPorUbicacion(ciudad) {
   const ubicacion = normalizarUbicacion(ciudad);
 
@@ -220,36 +362,94 @@ export function resolverTipoEnvioPorUbicacion(ciudad) {
     };
   }
 
-  const agenciaLima = [...DISTRITOS_LIMA_AGENCIA]
-    .sort((a, b) => b.length - a.length)
-    .find((distrito) => contieneLugar(ubicacion, distrito));
+  // Si no hubo coincidencia exacta de motorizado,
+// intentar reconocer errores ortograficos,
+// abreviaciones o nombres aproximados ANTES
+// de buscar distritos de agencia.
+const aproximado =
+  buscarDistritoLimaAproximado(ubicacion);
 
-  if (agenciaLima) {
+if (aproximado) {
+  const distrito = aproximado.distrito;
+
+  if (
+    DISTRITOS_LIMA_MOTORIZADO.includes(
+      distrito
+    )
+  ) {
+    return {
+      zona: "lima_motorizado",
+      distrito,
+      tipoEnvio:
+        "motorizado_contraentrega",
+      contraEntrega: true,
+      requiereAdelanto: false,
+      adelantoMinimo: 0,
+      agencias: [],
+    };
+  }
+
+  if (
+    DISTRITOS_LIMA_AGENCIA.includes(
+      distrito
+    )
+  ) {
     return {
       zona: "lima_agencia",
-      distrito: agenciaLima,
+      distrito,
       tipoEnvio: "agencia",
       contraEntrega: false,
       requiereAdelanto: true,
       adelantoMinimo:
-        POLITICAS_COMERCIALES.envios.courierAgencia.adelantoMinimo,
-      agencias: POLITICAS_COMERCIALES.envios.agencias,
+        POLITICAS_COMERCIALES.envios
+          .courierAgencia.adelantoMinimo,
+      agencias:
+        POLITICAS_COMERCIALES.envios
+          .agencias,
     };
   }
+}
 
-  // Si solamente dice Lima, todavía necesitamos el distrito.
-  if (
-    ubicacion === "lima" ||
-    ubicacion === "lima metropolitana" ||
-    ubicacion === "provincia de lima"
-  ) {
-    return {
-      zona: "lima_distrito_pendiente",
-      tipoEnvio: "preguntar_distrito",
-      contraEntrega: false,
-      requiereAdelanto: false,
-    };
-  }
+// Despues del fuzzy comprobar los distritos
+// exactos que trabajan por agencia.
+const agenciaLima = [...DISTRITOS_LIMA_AGENCIA]
+  .sort((a, b) => b.length - a.length)
+  .find((distrito) =>
+    contieneLugar(ubicacion, distrito)
+  );
+
+if (agenciaLima) {
+  return {
+    zona: "lima_agencia",
+    distrito: agenciaLima,
+    tipoEnvio: "agencia",
+    contraEntrega: false,
+    requiereAdelanto: true,
+    adelantoMinimo:
+      POLITICAS_COMERCIALES.envios
+        .courierAgencia.adelantoMinimo,
+    agencias:
+      POLITICAS_COMERCIALES.envios
+        .agencias,
+  };
+}
+
+// Si menciona Lima pero no logramos reconocer
+// el distrito con suficiente seguridad,
+// NO asumir que es provincia.
+if (
+  ubicacion === "lima" ||
+  ubicacion === "lima metropolitana" ||
+  ubicacion === "provincia de lima" ||
+  contieneLugar(ubicacion, "lima")
+) {
+  return {
+    zona: "lima_distrito_pendiente",
+    tipoEnvio: "preguntar_distrito",
+    contraEntrega: false,
+    requiereAdelanto: false,
+  };
+}
 
   // Cualquier ubicación que no pertenezca a los distritos de Lima
   // configurados arriba se trata como provincia.
