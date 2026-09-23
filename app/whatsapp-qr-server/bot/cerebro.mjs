@@ -102,13 +102,48 @@ function construirDatosPago(texto) {
 }
 
 function detectarAgenciaPedido(texto) {
-  const t = normalizar(texto);
+  const original = String(texto || "");
 
-  if (/\bshalom\b/.test(t)) {
+  const t = normalizar(original)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const tieneShalom =
+    /\bshalom\b/.test(t);
+
+  const tieneOlva =
+    /\bolva(?: courier)?\b/.test(t);
+
+  if (!tieneShalom && !tieneOlva) {
+    return null;
+  }
+
+  /*
+   * Si menciona ambas agencias, esta comparando,
+   * citando o haciendo una pregunta; no es una eleccion.
+   */
+  if (tieneShalom && tieneOlva) {
+    return null;
+  }
+
+  /*
+   * Preguntas o referencias a algo que dijo el bot
+   * tampoco deben convertirse en una seleccion.
+   */
+  const referenciaOAclaracion =
+    /[?¿]/.test(original) ||
+    /\b(?:por que|porque|me dijiste|me dices|dijiste|dices|preguntaste|pregunta|que diferencia|diferencia entre)\b/.test(t);
+
+  if (referenciaOAclaracion) {
+    return null;
+  }
+
+  if (tieneShalom) {
     return "SHALOM";
   }
 
-  if (/\bolva(?: courier)?\b/.test(t)) {
+  if (tieneOlva) {
     return "OLVA COURIER";
   }
 
@@ -731,8 +766,41 @@ let pasoFinal =
 
 let mensajeControlado = null;
 
+const textoRechazo =
+  textoNormalizado
+    .replace(/[.,!?¿¡;:]+/g, " ")
+    .replace(/\\s+/g, " ")
+    .trim();
+
+const rechazoDefinitivo =
+  /^(?:no quiero|no quiero nada|ya no quiero|no me interesa|ya no me interesa|no estoy interesado|no estoy interesada|no me escribas|no me escriban|ya compre en otro lado|ya compre otro|ya lo compre en otro lado|no gracias|dejalo nomas|dejalo no mas)(?: gracias| por favor)?$/.test(
+    textoRechazo
+  );
+
+if (rechazoDefinitivo) {
+  /*
+   * Cancelar solamente el intento de pedido actual.
+   * Conservamos identidad y ciudad del cliente, pero
+   * eliminamos los datos transitorios del cierre.
+   */
+  delete contexto.agencia;
+  delete contexto.cantidad;
+  delete contexto.sede_envio;
+  delete contexto.resumen_confirmado;
+  delete contexto.precio_acordado;
+
+  pasoFinal = "conversacion";
+
+  mensajeControlado =
+    analisis.respuesta ||
+    "Entiendo. Si mas adelante necesitas algo, escribeme por aqui.";
+}
+
+
 const agenciaDetectadaGlobal =
-  detectarAgenciaPedido(texto);
+  rechazoDefinitivo
+    ? null
+    : detectarAgenciaPedido(texto);
 
 if (agenciaDetectadaGlobal) {
   contexto.agencia =
@@ -765,7 +833,6 @@ if (
 }
 
 const intencionCompraExplicita =
-  senalCompraFuerte ||
   /\b(?:quiero|deseo|necesito|quisiera)\s+(?:comprar\s+|pedir\s+|llevar\s+)?(?:uno|una|un|dos|tres|cuatro|cinco|[1-9]\d?)\b/.test(
     textoNormalizado
   ) ||
@@ -781,6 +848,7 @@ if (
 }
 
 if (
+  !mensajeControlado &&
   pasoFinal !== "postventa" &&
   producto &&
   !contexto.ciudad &&
