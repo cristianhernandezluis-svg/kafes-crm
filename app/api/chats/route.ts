@@ -32,6 +32,20 @@ export async function GET(request: Request) {
       searchParams.get("buscar") || ""
     ).trim();
 
+const filtroRaw =
+  searchParams.get("filtro") || "todas";
+
+const filtrosValidos = [
+  "todas",
+  "no_leidas",
+  "asignadas",
+  "sin_asignar",
+];
+
+const filtro = filtrosValidos.includes(filtroRaw)
+  ? filtroRaw
+  : "todas";
+
     if (!empresaId || !whatsappQrId) {
   return NextResponse.json({
     success: true,
@@ -150,6 +164,25 @@ export async function GET(request: Request) {
     OR COALESCE(ult.mensaje, '') ILIKE '%' || $5 || '%'
   )
 
+AND (
+  $6 = 'todas'
+
+  OR (
+    $6 = 'no_leidas'
+    AND COALESCE(no_leidos.total, 0) > 0
+  )
+
+  OR (
+    $6 = 'asignadas'
+    AND rel.asesor IS NOT NULL
+  )
+
+  OR (
+    $6 = 'sin_asignar'
+    AND rel.asesor IS NULL
+  )
+)
+
 ORDER BY
   ult.created_at DESC NULLS LAST,
   c.created_at DESC
@@ -163,6 +196,7 @@ OFFSET $4
   limit,
   offset,
   buscar,
+  filtro,
 ]
     );
 
@@ -186,7 +220,7 @@ const totalChats = Number(
 
 let totalFiltrado = totalChats;
 
-if (buscar) {
+if (buscar || filtro !== "todas") {
   const totalFiltradoResult = await pool.query(
     `
     SELECT COUNT(*)::int AS total
@@ -194,6 +228,11 @@ if (buscar) {
       SELECT c.id
 
       FROM clientes c
+
+      LEFT JOIN clientes_whatsapp_qr rel
+        ON rel.cliente_id = c.id
+       AND rel.empresa_id = c.empresa_id
+       AND rel.whatsapp_qr_id = $2
 
       LEFT JOIN LATERAL (
         SELECT mensaje
@@ -215,9 +254,36 @@ if (buscar) {
         )
 
         AND (
-          COALESCE(c.nombre, '') ILIKE '%' || $3 || '%'
+          $3 = ''
+          OR COALESCE(c.nombre, '') ILIKE '%' || $3 || '%'
           OR COALESCE(c.telefono, '') ILIKE '%' || $3 || '%'
           OR COALESCE(ult_busqueda.mensaje, '') ILIKE '%' || $3 || '%'
+        )
+
+        AND (
+          $4 = 'todas'
+
+          OR (
+            $4 = 'no_leidas'
+            AND EXISTS (
+              SELECT 1
+              FROM conversaciones nl
+              WHERE nl.cliente_id = c.id
+                AND nl.whatsapp_qr_id = $2
+                AND nl.remitente = 'cliente'
+                AND COALESCE(nl.leido, false) = false
+            )
+          )
+
+          OR (
+            $4 = 'asignadas'
+            AND rel.asesor IS NOT NULL
+          )
+
+          OR (
+            $4 = 'sin_asignar'
+            AND rel.asesor IS NULL
+          )
         )
     ) resultados
     `,
@@ -225,6 +291,7 @@ if (buscar) {
       empresaId,
       whatsappQrId,
       buscar,
+      filtro,
     ]
   );
 

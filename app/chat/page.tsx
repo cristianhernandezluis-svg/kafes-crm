@@ -105,6 +105,7 @@ const busquedaInicializadaRef = useRef(false);
   const [mensajeNuevo, setMensajeNuevo] = useState("");
 const [busqueda, setBusqueda] = useState("");
 const [filtroChat, setFiltroChat] = useState("todas");
+const filtroChatRef = useRef("todas");
 const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
 const [mostrarConversacion, setMostrarConversacion] = useState(false);
@@ -134,7 +135,8 @@ const bajarAlFinal = () => {
 };
 const cargarClientes = async (
   limiteSolicitado?: number,
-  buscarSolicitado?: string
+  buscarSolicitado?: string,
+  filtroSolicitado?: string
 ) => {
   const limite =
     limiteSolicitado ?? limiteChatsRef.current;
@@ -142,6 +144,10 @@ const cargarClientes = async (
   const terminoBusqueda = (
     buscarSolicitado ?? busquedaRef.current
   ).trim();
+
+const filtroActual =
+  filtroSolicitado ?? filtroChatRef.current;
+
   const usuarioGuardado = localStorage.getItem("usuario");
   if (!usuarioGuardado) return;
 
@@ -178,6 +184,10 @@ setWhatsappQrId(nuevoQrId);
 
 if (terminoBusqueda) {
   parametros.set("buscar", terminoBusqueda);
+}
+
+if (filtroActual !== "todas") {
+  parametros.set("filtro", filtroActual);
 }
 
 const res = await fetch(
@@ -993,7 +1003,19 @@ useEffect(() => {
     ].map((filtro) => (
       <button
         key={filtro.id}
-        onClick={() => setFiltroChat(filtro.id)}
+        onClick={() => {
+  setFiltroChat(filtro.id);
+  filtroChatRef.current = filtro.id;
+
+  limiteChatsRef.current = 100;
+  setLimiteChats(100);
+
+  void cargarClientes(
+    100,
+    busquedaRef.current,
+    filtro.id
+  );
+}}
         className={
           filtroChat === filtro.id
             ? "text-green-400 font-bold"
@@ -1009,17 +1031,7 @@ useEffect(() => {
 </div>
 
           <div className="overflow-y-auto h-[calc(100vh-90px)]">
-  {clientes
-  .filter((cliente) => {
-    const coincideFiltro =
-      filtroChat === "todas" ||
-      (filtroChat === "no_leidas" && (cliente.no_leidos || 0) > 0) ||
-      (filtroChat === "asignadas" && !!cliente.asesor) ||
-      (filtroChat === "sin_asignar" && !cliente.asesor);
-
-    return coincideFiltro;
-  })
-  .map((cliente) => (
+  {clientes.map((cliente) => (
   <button
     key={cliente.id}
     onClick={() => abrirConversacion(cliente)}
