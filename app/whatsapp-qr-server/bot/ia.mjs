@@ -5,6 +5,7 @@ import { AnalisisVenta } from "./esquema.mjs";
 import { obtenerCatalogoEmpresa } from "./catalogo.mjs";
 import {
   obtenerPoliticasComerciales,
+  obtenerDatosPagoPrivados,
   resolverTipoEnvioPorUbicacion,
 } from "./politicas.mjs";
 
@@ -279,7 +280,11 @@ else if (envioDesdeMemoria) {
 
   const fechaHoraPeru = obtenerFechaHoraPeru();
 
-  const contexto = `
+const datosPagoPrivados =
+  obtenerDatosPagoPrivados();
+
+const contexto = `
+
 FECHA Y HORA ACTUAL EN PERU:
 ${fechaHoraPeru}
 Zona horaria: America/Lima (UTC-05:00)
@@ -298,6 +303,22 @@ REGLA DE PRODUCTO PRINCIPAL:
 
 POLITICAS COMERCIALES REALES:
 ${JSON.stringify(obtenerPoliticasComerciales(), null, 2)}
+
+DATOS PRIVADOS DE PAGO DISPONIBLES:
+${JSON.stringify(datosPagoPrivados, null, 2)}
+
+REGLA OBLIGATORIA SOBRE DATOS DE PAGO:
+- Estos datos son los unicos numeros y cuentas que puedes proporcionar al cliente.
+- Nunca inventes, completes ni modifiques un numero de cuenta, telefono o titular.
+- Si el cliente pregunta "a que numero pago", "pasame el Yape", "donde deposito", "numero para pagar" o equivalente, responde DIRECTAMENTE con los datos reales disponibles.
+- Si existe Yape, puedes dar el numero de Yape.
+- Si existe Plin, puedes dar el numero de Plin.
+- Si pide una cuenta bancaria especifica y existe, entrega solamente esa cuenta.
+- Si el cliente no especifica metodo y existen varias opciones, ofrece brevemente las opciones reales disponibles.
+- No respondas "un asesor te enviara el numero" si DATOS PRIVADOS DE PAGO DISPONIBLES contiene un dato util.
+- No preguntes "¿Quieres que te facilite el dato?" cuando el cliente ya solicito el numero o cuenta. Entregalo inmediatamente.
+- Despues de entregar los datos de pago, pide solamente que envie el comprobante cuando realice el adelanto.
+- Nunca afirmes que un pago fue confirmado solo porque el cliente envio un comprobante.
 
 ENVIO RESUELTO POR EL SISTEMA:
 ${envioResuelto
