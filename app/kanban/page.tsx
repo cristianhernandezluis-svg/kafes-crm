@@ -176,9 +176,9 @@ useEffect(() => {
 
   iniciar();
 
-  const intervaloClientes = setInterval(() => {
-    cargarClientes();
-  }, 5000);
+const intervaloClientes = setInterval(() => {
+  cargarClientes();
+}, 15000);
 
   const intervaloQr = setInterval(async () => {
     const whatsappQrId =
