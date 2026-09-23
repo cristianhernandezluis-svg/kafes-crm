@@ -12,7 +12,8 @@ export async function GET(request: Request) {
     const empresaId = searchParams.get("empresa_id");
     const whatsappQrId = searchParams.get("whatsapp_qr_id");
     const incluirContactos = searchParams.get("incluir_contactos") === "1";
-
+const modoDashboard =
+  searchParams.get("modo") === "dashboard";
     const fechaRecibida = searchParams.get("fecha");
 
     const fecha =
@@ -190,12 +191,29 @@ END AS score,
       ]
     );
 
+const clientesRespuesta = modoDashboard
+  ? result.rows.map((cliente) => ({
+      id: cliente.id,
+      nombre: cliente.nombre,
+      telefono: cliente.telefono,
+      ciudad: cliente.ciudad,
+      etapa: cliente.etapa,
+      asesor: cliente.asesor,
+      observacion: cliente.observacion,
+      proximo_seguimiento: cliente.proximo_seguimiento,
+      ultima_gestion: cliente.ultima_gestion,
+      cantidad_seguimientos: cliente.cantidad_seguimientos,
+      created_at: cliente.created_at,
+      whatsapp_qr_id: cliente.whatsapp_qr_id,
+    }))
+  : result.rows;
+
     return NextResponse.json({
-      success: true,
-      fecha,
-      total: result.rows.length,
-      clientes: result.rows,
-    });
+  success: true,
+  fecha,
+  total: clientesRespuesta.length,
+  clientes: clientesRespuesta,
+});
   } catch (error) {
     console.error("ERROR API CLIENTES:", error);
 

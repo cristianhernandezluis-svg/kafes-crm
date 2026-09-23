@@ -262,7 +262,7 @@ if (!whatsappQrId) {
   return;
 }
 
-const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}`, {
+const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp_qr_id=${whatsappQrId}&modo=dashboard`, {
   cache: "no-store",
 });
       const data = await res.json();
