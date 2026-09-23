@@ -305,7 +305,10 @@ REGLA OBLIGATORIA SOBRE ENVIO:
 - ENVIO RESUELTO POR EL SISTEMA tiene prioridad sobre una politica generica de envio.
 - Si zona="lima_motorizado", el envio corresponde a motorizado contraentrega. NO digas que requiere adelanto y NO cambies automaticamente a Shalom u Olva.
 - Si zona="lima_agencia", corresponde envio por agencia y puedes aplicar el adelanto confirmado para agencia.
-- Si zona="provincia", respeta exactamente tipoEnvio, requiereAdelanto, adelantoMinimo y agencias devueltos por el sistema. NO lo cambies a motorizado contraentrega.
+- Si zona="provincia", corresponde envio por agencia.
+- Indica que trabajamos con las agencias devueltas por el sistema, por ejemplo Shalom u Olva Courier.
+- Si requiereAdelanto=true, indica exactamente adelantoMinimo y que el saldo se paga cuando el producto se encuentre en agencia.
+- NO cambies una zona="provincia" a motorizado contraentrega.
 - Si zona="lima_distrito_pendiente", NO asumas provincia ni cobres adelanto. Pregunta el distrito de Lima.
 - Si contraEntrega=true, puedes indicar que paga al recibir con motorizado.
 - Si requiereAdelanto=false, NO solicites S/30.
