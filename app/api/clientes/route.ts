@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
 
+import { gzip } from "zlib";
+import { promisify } from "util";
+
+const gzipAsync = promisify(gzip);
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
@@ -208,12 +213,38 @@ const clientesRespuesta = modoDashboard
     }))
   : result.rows;
 
-    return NextResponse.json({
+    const respuesta = {
   success: true,
   fecha,
   total: clientesRespuesta.length,
   clientes: clientesRespuesta,
-});
+};
+
+const acceptEncoding =
+  request.headers.get("accept-encoding") || "";
+
+if (
+  modoDashboard &&
+  acceptEncoding.includes("gzip")
+) {
+  const json = JSON.stringify(respuesta);
+
+  const comprimido = await gzipAsync(
+    Buffer.from(json, "utf-8")
+  );
+
+  return new NextResponse(comprimido, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Encoding": "gzip",
+      "Vary": "Accept-Encoding",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+return NextResponse.json(respuesta);
   } catch (error) {
     console.error("ERROR API CLIENTES:", error);
 
