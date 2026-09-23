@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useTemaCRM } from "@/components/TemaProvider";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sidebar from "../components/Sidebar";
 
   import {
@@ -62,6 +62,7 @@ type Conversacion = {
 export default function Home() {
 const { temaClaro, cambiarTema } = useTemaCRM();
   const [clientes, setClientes] = useState<Cliente[]>([]);
+const whatsappQrIdRef = useRef<number | null>(null);
   const [metricasDashboard, setMetricasDashboard] = useState({
     conversaciones_hoy: 0,
     conversaciones_ayer: 0,
@@ -159,6 +160,48 @@ const seguimientosHoy = clientes.filter((c) => {
   );
 });
 
+const actualizarWhatsappQr = async () => {
+  try {
+    const qrRes = await fetch("/api/whatsapp-qr", {
+      cache: "no-store",
+    });
+
+    const qrData = await qrRes.json();
+    const qrId = qrData.whatsapp_qr_id;
+
+    if (!qrId) {
+  whatsappQrIdRef.current = null;
+
+  setClientes([]);
+
+  setMetricasDashboard({
+    conversaciones_hoy: 0,
+    conversaciones_ayer: 0,
+    cierres_hoy: 0,
+    cierres_ayer: 0,
+    enviados_hoy: 0,
+    enviados_ayer: 0,
+    entregados_hoy: 0,
+    entregados_ayer: 0,
+  });
+
+  return null;
+}
+
+    const nuevoQrId = Number(qrId);
+    whatsappQrIdRef.current = nuevoQrId;
+
+    return nuevoQrId;
+  } catch (error) {
+    console.error(
+      "Error obteniendo WhatsApp QR:",
+      error
+    );
+
+    return null;
+  }
+};
+
   const cargarMetricasDashboard = async () => {
     try {
       const usuarioGuardado = localStorage.getItem("usuario");
@@ -167,9 +210,7 @@ const seguimientosHoy = clientes.filter((c) => {
 
       const usuario = JSON.parse(usuarioGuardado);
 
-      const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
-      const qrData = await qrRes.json();
-      const whatsappQrId = qrData.whatsapp_qr_id;
+      const whatsappQrId = whatsappQrIdRef.current;
 
       if (!whatsappQrId) {
         setMetricasDashboard({
@@ -211,9 +252,7 @@ if (!usuarioGuardado) {
 
 const usuario = JSON.parse(usuarioGuardado);
 
-const qrRes = await fetch("/api/whatsapp-qr", { cache: "no-store" });
-const qrData = await qrRes.json();
-const whatsappQrId = qrData.whatsapp_qr_id;
+const whatsappQrId = whatsappQrIdRef.current;
 
 if (!whatsappQrId) {
   setClientes([]);
@@ -235,17 +274,7 @@ const res = await fetch(`/api/clientes?empresa_id=${usuario.empresa_id}&whatsapp
     }
   };
 
-  useEffect(() => {
-    cargarMetricasDashboard();
-
-    const intervalo = window.setInterval(() => {
-      cargarMetricasDashboard();
-    }, 30000);
-
-    return () => window.clearInterval(intervalo);
-  }, []);
-
-  const abrirConversacion = async (cliente: Cliente) => {
+    const abrirConversacion = async (cliente: Cliente) => {
 setEditandoInfo(false);
 setEditCiudad(cliente.ciudad || "");    
 setClienteActivo(cliente);
@@ -275,14 +304,53 @@ setEditObservacion(cliente.observacion || "");
   };
 
   useEffect(() => {
-    cargarClientes();
+  let cancelado = false;
 
-    const intervalo = setInterval(() => {
-      cargarClientes();
-    }, 5000);
+  const iniciarDashboard = async () => {
+    const qrId = await actualizarWhatsappQr();
 
-    return () => clearInterval(intervalo);
-  }, []);
+    if (cancelado || !qrId) {
+      setCargando(false);
+      return;
+    }
+
+    await Promise.all([
+      cargarMetricasDashboard(),
+      cargarClientes(),
+    ]);
+  };
+
+  void iniciarDashboard();
+
+  // Clientes + métricas cada 30 segundos
+  const intervaloDatos = setInterval(() => {
+    if (!whatsappQrIdRef.current) return;
+
+    void cargarMetricasDashboard();
+    void cargarClientes();
+  }, 30000);
+
+  // Comprobar si cambió el QR cada 5 minutos
+  const intervaloQr = setInterval(async () => {
+    const qrAnterior = whatsappQrIdRef.current;
+    const qrNuevo = await actualizarWhatsappQr();
+
+    if (
+      !cancelado &&
+      qrNuevo &&
+      qrNuevo !== qrAnterior
+    ) {
+      void cargarMetricasDashboard();
+      void cargarClientes();
+    }
+  }, 300000);
+
+  return () => {
+    cancelado = true;
+    clearInterval(intervaloDatos);
+    clearInterval(intervaloQr);
+  };
+}, []);
 
   const crearCliente = async () => {
     if (!form.nombre || !form.telefono) {
