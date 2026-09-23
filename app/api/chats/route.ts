@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
 
+import { gzip } from "zlib";
+import { promisify } from "util";
+
+const gzipAsync = promisify(gzip);
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
@@ -326,7 +331,7 @@ if (buscar || filtro !== "todas") {
       [empresaId]
     );
 
-return NextResponse.json({
+const respuesta = {
   success: true,
   chats: result.rows,
   closers: closersResult.rows,
@@ -334,7 +339,30 @@ return NextResponse.json({
   total_general: totalChats,
   limit,
   offset,
-});
+};
+
+const acceptEncoding =
+  request.headers.get("accept-encoding") || "";
+
+if (acceptEncoding.includes("gzip")) {
+  const json = JSON.stringify(respuesta);
+
+  const comprimido = await gzipAsync(
+    Buffer.from(json, "utf-8")
+  );
+
+  return new NextResponse(comprimido, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Encoding": "gzip",
+      "Vary": "Accept-Encoding",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+return NextResponse.json(respuesta);
   } catch (error) {
     console.error("ERROR API CHATS:", error);
 
