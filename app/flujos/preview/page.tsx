@@ -484,6 +484,8 @@ const memoriaBotRef = useRef<
   },
 });
 
+const productoPrincipalRef = useRef<string | null>(null);
+
 const historialBotRef = useRef<
   Array<{
     rol: "cliente" | "bot";
@@ -677,6 +679,8 @@ const consultarBotPreview =
                   memoriaBotRef.current,
                 historial:
                   historialBotRef.current,
+                productoPrincipal:
+                  productoPrincipalRef.current,
               }),
             }
           );
@@ -1493,6 +1497,20 @@ return;
           data.flujo?.nombre ||
             "Vista previa"
         );
+
+        const productoPrincipal =
+          String(
+            data.flujo?.producto_slug || ""
+          ).trim() || null;
+
+        productoPrincipalRef.current =
+          productoPrincipal;
+
+        memoriaBotRef.current = {
+          ...memoriaBotRef.current,
+          producto: productoPrincipal,
+          paso: "conversacion",
+        };
 
         setNodos(
           data.nodos || []
