@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTemaCRM } from "@/components/TemaProvider";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sidebar from "../components/Sidebar";
 
 type Cliente = {
@@ -94,17 +94,32 @@ const [filtroFecha, setFiltroFecha] = useState<
 const [fechaSeleccionada, setFechaSeleccionada] =
   useState(fechaLocalISO());
 
-  const cargarClientes = async () => {
-  const usuario = JSON.parse(
-    localStorage.getItem("usuario") || "{}"
-  );
+const whatsappQrIdRef = useRef<number | null>(null);
 
+const obtenerWhatsappQrId = async () => {
   const qrRes = await fetch("/api/whatsapp-qr", {
     cache: "no-store",
   });
 
   const qrData = await qrRes.json();
-  const whatsappQrId = qrData.whatsapp_qr_id;
+
+  const whatsappQrId =
+    Number(qrData.whatsapp_qr_id || 0) || null;
+
+  whatsappQrIdRef.current = whatsappQrId;
+
+  return whatsappQrId;
+};
+
+  const cargarClientes = async (
+  qrIdForzado?: number | null
+) => {
+  const usuario = JSON.parse(
+    localStorage.getItem("usuario") || "{}"
+  );
+
+  const whatsappQrId =
+    qrIdForzado ?? whatsappQrIdRef.current;
 
   if (!whatsappQrId) {
     setClientes([]);
@@ -144,15 +159,44 @@ const [fechaSeleccionada, setFechaSeleccionada] =
   setCargando(false);
 };
 
- useEffect(() => {
-  setCargando(true);
-  cargarClientes();
+useEffect(() => {
+  let activo = true;
 
-  const intervalo = setInterval(() => {
+  setCargando(true);
+
+  const iniciar = async () => {
+    const whatsappQrId =
+      whatsappQrIdRef.current ??
+      (await obtenerWhatsappQrId());
+
+    if (!activo) return;
+
+    await cargarClientes(whatsappQrId);
+  };
+
+  iniciar();
+
+  const intervaloClientes = setInterval(() => {
     cargarClientes();
   }, 5000);
 
-  return () => clearInterval(intervalo);
+  const intervaloQr = setInterval(async () => {
+    const whatsappQrId =
+      await obtenerWhatsappQrId();
+
+    if (!activo) return;
+
+    if (!whatsappQrId) {
+      setClientes([]);
+      setCargando(false);
+    }
+  }, 5 * 60 * 1000);
+
+  return () => {
+    activo = false;
+    clearInterval(intervaloClientes);
+    clearInterval(intervaloQr);
+  };
 }, [filtroFecha, fechaSeleccionada]);
 
   const moverEtapa = async (cliente: Cliente, nuevaEtapa: string) => {
