@@ -564,11 +564,12 @@ export async function PATCH(req: Request) {
       `
       UPDATE conversaciones
 
-      SET leido = true
+SET leido = true
 
-      WHERE cliente_id = $1
-        AND whatsapp_qr_id = $2
-        AND remitente = 'cliente'
+WHERE cliente_id = $1
+  AND whatsapp_qr_id = $2
+  AND remitente = 'cliente'
+  AND COALESCE(leido, false) = false
       `,
       [
         cliente_id,

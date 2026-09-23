@@ -859,20 +859,8 @@ useEffect(() => {
   const clienteId = clienteActivo.id;
   const qrId = whatsappQrId;
 
-  const actualizarConversacionActiva = async () => {
+  const actualizarMensajes = async () => {
     try {
-      await fetch("/api/chats", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          cliente_id: clienteId,
-          whatsapp_qr_id: qrId,
-          accion: "tomar",
-        }),
-      });
-
       const res = await fetch(
         `/api/conversaciones/${clienteId}?whatsapp_qr_id=${qrId}`,
         {
@@ -893,14 +881,43 @@ useEffect(() => {
     }
   };
 
-  // Solo el chat que estás mirando se refresca cada 5 segundos.
-  const intervaloConversacion = setInterval(
-    actualizarConversacionActiva,
+  const mantenerChatTomado = async () => {
+    try {
+      await fetch("/api/chats", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cliente_id: clienteId,
+          whatsapp_qr_id: qrId,
+          accion: "tomar",
+        }),
+      });
+    } catch (error) {
+      console.error(
+        "Error manteniendo conversación en modo humano:",
+        error
+      );
+    }
+  };
+
+  // Refresca mensajes cada 5 segundos
+  const intervaloMensajes = setInterval(
+    actualizarMensajes,
     5000
   );
 
-  return () =>
-    clearInterval(intervaloConversacion);
+  // Mantiene pausado el bot cada 30 segundos
+  const intervaloHeartbeat = setInterval(
+    mantenerChatTomado,
+    30000
+  );
+
+  return () => {
+    clearInterval(intervaloMensajes);
+    clearInterval(intervaloHeartbeat);
+  };
 }, [clienteActivo?.id, whatsappQrId]);
 
 useEffect(() => {
