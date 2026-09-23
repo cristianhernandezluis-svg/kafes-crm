@@ -2013,43 +2013,162 @@ if (mensajeDuranteEspera.rowCount > 0) {
     }
   }
 
-  const enviadoBot = await sock.sendMessage(jidRespuesta, {
-    text: respuestaBot.mensaje,
-  });
+      const mensajeBotCompleto =
+    String(respuestaBot.mensaje || "")
+      .replace(/\s+/g, " ")
+      .trim();
 
-  await pool.query(
-    `
-    INSERT INTO conversaciones (
-            cliente_id,
-            telefono,
-            whatsapp_message_id,
-            mensaje,
-            remitente,
-            tipo,
-            empresa_id,
-            whatsapp_qr_id,
-            estado_whatsapp,
-            enviado_at,
-            canal
-          )
-          VALUES ($1, $2, $3, $4, 'bot', 'text', $5, $6, 'enviado', NOW(), 'qr')
-    ON CONFLICT (whatsapp_message_id)
-    WHERE whatsapp_message_id IS NOT NULL
-    DO UPDATE SET
-      mensaje = EXCLUDED.mensaje,
-            remitente = 'bot',
-            estado_whatsapp = COALESCE(conversaciones.estado_whatsapp, EXCLUDED.estado_whatsapp),
-            enviado_at = COALESCE(conversaciones.enviado_at, EXCLUDED.enviado_at)
-    `,
-    [
-      clienteId,
-      telefono,
-      enviadoBot?.key?.id || null,
-      respuestaBot.mensaje,
-      empresaQrId,
-      whatsappQrId,
-    ]
-  );
+  const dividirRespuestaHumana = (texto) => {
+    const oraciones = (
+      texto.match(/[^.!?]+(?:[.!?]+|$)/g) || [texto]
+    )
+      .map((parte) => parte.trim())
+      .filter(Boolean);
+
+    const partes = [];
+    let actual = "";
+
+    for (const oracion of oraciones) {
+      const esPregunta =
+        oracion.startsWith("¿");
+
+      const propuesta =
+        actual
+          ? `${actual} ${oracion}`
+          : oracion;
+
+      // La pregunta final queda como burbuja aparte.
+      if (esPregunta && actual) {
+        partes.push(actual.trim());
+        actual = oracion;
+        continue;
+      }
+
+      // Evita burbujas demasiado largas.
+      if (
+        actual &&
+        propuesta.length > 135
+      ) {
+        partes.push(actual.trim());
+        actual = oracion;
+        continue;
+      }
+
+      actual = propuesta;
+    }
+
+    if (actual) {
+      partes.push(actual.trim());
+    }
+
+    // Evitar que el bot mande demasiadas burbujas.
+    if (partes.length <= 3) {
+      return partes;
+    }
+
+    return [
+      partes[0],
+      partes[1],
+      partes.slice(2).join(" "),
+    ];
+  };
+
+  const partesRespuesta =
+    dividirRespuestaHumana(
+      mensajeBotCompleto
+    );
+
+  for (
+    let i = 0;
+    i < partesRespuesta.length;
+    i += 1
+  ) {
+    const textoParte =
+      partesRespuesta[i];
+
+    if (!textoParte) continue;
+
+    const enviadoBot =
+      await sock.sendMessage(
+        jidRespuesta,
+        {
+          text: textoParte,
+        }
+      );
+
+    await pool.query(
+      `
+      INSERT INTO conversaciones (
+        cliente_id,
+        telefono,
+        whatsapp_message_id,
+        mensaje,
+        remitente,
+        tipo,
+        empresa_id,
+        whatsapp_qr_id,
+        estado_whatsapp,
+        enviado_at,
+        canal
+      )
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        'bot',
+        'text',
+        $5,
+        $6,
+        'enviado',
+        NOW(),
+        'qr'
+      )
+      ON CONFLICT (whatsapp_message_id)
+      WHERE whatsapp_message_id IS NOT NULL
+      DO UPDATE SET
+        mensaje = EXCLUDED.mensaje,
+        remitente = 'bot',
+        estado_whatsapp = COALESCE(
+          conversaciones.estado_whatsapp,
+          EXCLUDED.estado_whatsapp
+        ),
+        enviado_at = COALESCE(
+          conversaciones.enviado_at,
+          EXCLUDED.enviado_at
+        )
+      `,
+      [
+        clienteId,
+        telefono,
+        enviadoBot?.key?.id || null,
+        textoParte,
+        empresaQrId,
+        whatsappQrId,
+      ]
+    );
+
+        if (
+      i <
+      partesRespuesta.length - 1
+    ) {
+      try {
+        await sock?.sendPresenceUpdate?.(
+          "composing",
+          jidRespuesta
+        );
+      } catch {}
+
+      await pausaMultimedia();
+
+      try {
+        await sock?.sendPresenceUpdate?.(
+          "paused",
+          jidRespuesta
+        );
+      } catch {}
+    }
+  }
 
   await programarSeguimientoSilencio({
   clienteId,

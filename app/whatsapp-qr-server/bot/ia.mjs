@@ -214,30 +214,12 @@ const respuestaAUbicacion =
 
 let envioResuelto = null;
 
-// Si el mensaje actual reconoce claramente una zona
-// de Lima, tiene prioridad absoluta sobre la memoria.
-if (mensajeResuelveLima) {
-  envioResuelto = {
-    fuente: "mensaje_actual",
-    ubicacion_original: mensaje,
-    ...envioDesdeMensaje,
-  };
-}
-
-// Si el bot acaba de preguntar la ubicación,
-// una respuesta corta como Arequipa, Huaral,
-// Barranca o Huancayo se interpreta como ubicación.
-else if (respuestaAUbicacion) {
-  envioResuelto = {
-    fuente: "respuesta_a_pregunta_ubicacion",
-    ubicacion_original: mensaje,
-    ...envioDesdeMensaje,
-  };
-}
-
-// Si el cliente declara explícitamente un cambio
-// de ubicación, no reutilizar la ciudad anterior.
-else if (
+// Si el cliente declara explicitamente una ubicacion,
+// analizar primero SOLO la ubicacion extraida.
+// Esto evita que frases como:
+// "soy de san juna de lurigancho"
+// se confundan con el distrito "lurigancho".
+if (
   mensajeDeclaraNuevaUbicacion &&
   envioDesdeUbicacionDeclarada
 ) {
@@ -245,6 +227,27 @@ else if (
     fuente: "mensaje_actual_declarado",
     ubicacion_original: ubicacionDeclarada,
     ...envioDesdeUbicacionDeclarada,
+  };
+}
+
+// Si no hubo una declaracion explicita,
+// aceptar una zona de Lima reconocida directamente.
+else if (mensajeResuelveLima) {
+  envioResuelto = {
+    fuente: "mensaje_actual",
+    ubicacion_original: mensaje,
+    ...envioDesdeMensaje,
+  };
+}
+
+// Si el bot acaba de preguntar la ubicacion,
+// una respuesta corta como Arequipa, Huaral,
+// Barranca o Huancayo se interpreta como ubicacion.
+else if (respuestaAUbicacion) {
+  envioResuelto = {
+    fuente: "respuesta_a_pregunta_ubicacion",
+    ubicacion_original: mensaje,
+    ...envioDesdeMensaje,
   };
 }
 
