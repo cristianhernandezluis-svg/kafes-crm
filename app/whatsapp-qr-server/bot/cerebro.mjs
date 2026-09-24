@@ -464,6 +464,8 @@ function construirResumenPedido({
   contexto,
   producto,
   requiereAdelanto,
+  tipoEnvio = null,
+  contraEntrega = false,
 }) {
   const cantidad = Number(contexto?.cantidad || 1);
 
@@ -483,13 +485,32 @@ function construirResumenPedido({
   const lineas = [];
 
   lineas.push(`NOMBRE: ${contexto.nombre}`);
-  lineas.push(`D.N.I.: ${contexto.dni}`);
+
+  if (
+    contexto.dni &&
+    tipoEnvio !== "motorizado"
+  ) {
+    lineas.push(`D.N.I.: ${contexto.dni}`);
+  }
 
   if (contexto.telefono) {
     lineas.push(`CEL: ${contexto.telefono}`);
   }
 
   lineas.push(`CIUDAD: ${contexto.ciudad}`);
+
+  if (contexto.direccion) {
+    lineas.push(`DIRECCION: ${contexto.direccion}`);
+  }
+
+  if (tipoEnvio === "motorizado") {
+    lineas.push("");
+    lineas.push(
+      contraEntrega
+        ? "ENTREGA: MOTORIZADO CONTRAENTREGA"
+        : "ENTREGA: MOTORIZADO"
+    );
+  }
 
   if (contexto.agencia) {
     lineas.push("");
@@ -759,6 +780,13 @@ const envioPorAgencia =
   envioPedido?.zona === "provincia" ||
   envioPedido?.zona === "lima_agencia";
 
+const envioMotorizado =
+  envioPedido?.tipoEnvio === "motorizado" ||
+  (
+    envioPedido?.contraEntrega === true &&
+    envioPedido?.requiereAdelanto === false
+  );
+
 let pasoFinal =
   memoria.paso === "postventa"
     ? "postventa"
@@ -782,13 +810,17 @@ const rechazoDefinitivo =
 
 if (rechazoDefinitivo) {
   /*
-   * Cancelar solamente el intento de pedido actual.
-   * Conservamos identidad y ciudad del cliente, pero
-   * eliminamos los datos transitorios del cierre.
+   * Cancelar el intento de pedido actual.
+   * Conservamos identidad del cliente, pero
+   * limpiamos ubicacion y datos transitorios del cierre.
    */
+  delete contexto.ciudad;
   delete contexto.agencia;
   delete contexto.cantidad;
   delete contexto.sede_envio;
+  delete contexto.direccion;
+  delete contexto.tipo_envio;
+  delete contexto.contra_entrega;
   delete contexto.resumen_confirmado;
   delete contexto.precio_acordado;
 
@@ -863,6 +895,195 @@ if (
   pasoFinal = "esperando_ciudad";
   mensajeControlado =
     "Perfecto. ¿Desde que ciudad o distrito del Peru nos escribes?";
+}
+
+
+/*
+ * =========================================================
+ * CIERRE DETERMINISTICO PARA MOTORIZADO CONTRAENTREGA
+ * =========================================================
+ */
+if (
+  !mensajeControlado &&
+  pasoFinal !== "postventa" &&
+  envioMotorizado &&
+  producto
+) {
+  delete contexto.agencia;
+  delete contexto.sede_envio;
+
+  contexto.tipo_envio = "motorizado";
+  contexto.contra_entrega = true;
+
+  if (
+    pasoFinal === "esperando_agencia" ||
+    pasoFinal === "esperando_sede_envio" ||
+    pasoFinal === "esperando_pago" ||
+    pasoFinal === "esperando_dni"
+  ) {
+    pasoFinal = "conversacion";
+    delete contexto.resumen_confirmado;
+  }
+
+  const continuarCierreMotorizado = () => {
+    if (!nombreCompletoValido(contexto.nombre)) {
+      pasoFinal = "esperando_nombre";
+      mensajeControlado =
+        "Perfecto. Enviame tus nombres y apellidos completos para registrar el pedido.";
+      return;
+    }
+
+    if (!contexto.cantidad || Number(contexto.cantidad) <= 0) {
+      pasoFinal = "esperando_cantidad";
+      mensajeControlado = "¿Cuantas unidades deseas?";
+      return;
+    }
+
+    if (!contexto.direccion) {
+      pasoFinal = "esperando_direccion";
+      mensajeControlado =
+        `Perfecto. Indicame tu direccion exacta en ${contexto.ciudad} para coordinar la entrega motorizada.`;
+      return;
+    }
+
+    contexto.resumen_confirmado = false;
+    pasoFinal = "esperando_confirmacion_resumen";
+    mensajeControlado =
+      construirResumenPedido({
+        contexto,
+        producto: productoDetalle,
+        requiereAdelanto: false,
+        tipoEnvio: "motorizado",
+        contraEntrega: true,
+      });
+  };
+
+  if (pasoFinal === "esperando_nombre") {
+    if (
+      analisis.nombre &&
+      nombreCompletoValido(analisis.nombre)
+    ) {
+      contexto.nombre = analisis.nombre.trim();
+      continuarCierreMotorizado();
+    } else {
+      mensajeControlado =
+        "Para registrar el pedido necesito tus nombres y apellidos completos.";
+    }
+  }
+
+  else if (pasoFinal === "esperando_cantidad") {
+    const cantidad =
+      detectarCantidadPedido(texto);
+
+    if (cantidad && cantidad > 0) {
+      contexto.cantidad = cantidad;
+      continuarCierreMotorizado();
+    } else {
+      mensajeControlado = "¿Cuantas unidades deseas?";
+    }
+  }
+
+  else if (pasoFinal === "esperando_direccion") {
+    const direccion = String(texto || "").trim();
+    const direccionNormalizada = normalizar(direccion);
+    const parecePregunta = /[?¿]/.test(direccion);
+    const parecePago =
+      /\b(?:pago|pagar|yape|plin|bcp|bbva|interbank|banco|adelanto|transferencia|deposito)\b/.test(
+        direccionNormalizada
+      );
+
+    if (
+      direccion.length >= 5 &&
+      direccion.length <= 180 &&
+      !parecePregunta &&
+      !parecePago
+    ) {
+      contexto.direccion = direccion;
+      continuarCierreMotorizado();
+    } else {
+      mensajeControlado =
+        `Para coordinar el motorizado necesito tu direccion exacta en ${contexto.ciudad}.`;
+    }
+  }
+
+  else if (
+    pasoFinal === "esperando_confirmacion_resumen"
+  ) {
+    const correccionCantidad =
+      /\b(cantidad|unidad|unidades)\b/i.test(String(texto || ""))
+        ? detectarCantidadPedido(texto)
+        : null;
+
+    const textoCorreccion = String(texto || "").trim();
+
+    const corrigeDireccion =
+      /\b(?:direccion|domicilio)\b/i.test(textoCorreccion) &&
+      !/[?¿]/.test(textoCorreccion);
+
+    if (
+      analisis.nombre &&
+      nombreCompletoValido(analisis.nombre)
+    ) {
+      contexto.nombre = analisis.nombre.trim();
+    }
+
+    if (
+      analisis.dni &&
+      dniValido(analisis.dni)
+    ) {
+      contexto.dni = limpiarDni(analisis.dni);
+    }
+
+    if (correccionCantidad) {
+      contexto.cantidad = correccionCantidad;
+    }
+
+    if (corrigeDireccion) {
+      const direccionCorregida =
+        textoCorreccion
+          .replace(
+            /^.*?\b(?:direccion|domicilio)\b\s*(?:es|:|-)?\s*/i,
+            ""
+          )
+          .trim();
+
+      if (direccionCorregida.length >= 5) {
+        contexto.direccion = direccionCorregida;
+      }
+    }
+
+    const hizoCorreccion =
+      Boolean(
+        analisis.nombre ||
+        analisis.dni ||
+        correccionCantidad ||
+        corrigeDireccion
+      );
+
+    if (esConfirmacionResumen(texto)) {
+      contexto.resumen_confirmado = true;
+      pasoFinal = "postventa";
+      mensajeControlado =
+        `Perfecto${contexto.nombre ? `, ${contexto.nombre}` : ""}. Tu pedido queda confirmado para entrega por motorizado contraentrega en ${contexto.ciudad}. Pagas directamente al motorizado cuando recibas tu pedido. No necesitas adelanto.`;
+    } else if (hizoCorreccion) {
+      contexto.resumen_confirmado = false;
+      mensajeControlado =
+        construirResumenPedido({
+          contexto,
+          producto: productoDetalle,
+          requiereAdelanto: false,
+          tipoEnvio: "motorizado",
+          contraEntrega: true,
+        });
+    } else {
+      mensajeControlado =
+        "Necesito que confirmes si los datos del resumen estan correctos. Puedes responder: si, o indicarme el dato que deseas corregir.";
+    }
+  }
+
+  else {
+    continuarCierreMotorizado();
+  }
 }
 
 
@@ -1400,9 +1621,24 @@ if (
  * conservar el comportamiento normal.
  */
 const datosPago =
-  construirDatosPago(
-    textoAccion ?? texto
-  );
+  contexto.tipo_envio === "motorizado" &&
+  contexto.contra_entrega === true
+    ? null
+    : construirDatosPago(
+        textoAccion ?? texto
+      );
+
+if (
+  !mensajeControlado &&
+  contexto.tipo_envio === "motorizado" &&
+  contexto.contra_entrega === true &&
+  /\b(?:le pago al motorizado|pago al motorizado|pagare al motorizado|contraentrega|contra entrega)\b/.test(
+    textoNormalizado
+  )
+) {
+  mensajeControlado =
+    "Si. Pagas directamente al motorizado cuando recibas tu pedido. No necesitas adelanto.";
+}
 
 const mensajeFinal =
   mensajeControlado ||
