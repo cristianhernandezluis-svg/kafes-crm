@@ -667,6 +667,57 @@ export async function decidirRespuestaBot({
 
     if (
       enPostventa &&
+      !cierreSocialActivo &&
+      respuestaCortaDeCierre
+    ) {
+      const primerNombre =
+        String(contextoSocial.nombre || "")
+          .trim()
+          .split(/\s+/)[0];
+
+      const esSaludoDevuelto =
+        /^(?:buen dia|buenas tardes|buenas noches|igualmente|gracias igualmente)$/.test(
+          textoNormalizado
+        );
+
+      const esAgradecimiento =
+        /^(?:gracias)$/.test(
+          textoNormalizado
+        );
+
+      const mensajeCierre =
+        esSaludoDevuelto
+          ? primerNombre
+            ? `Igualmente, ${primerNombre} 😊`
+            : "Igualmente 😊"
+          : esAgradecimiento
+            ? primerNombre
+              ? `Con gusto, ${primerNombre} 😊 ¡Que tengas un buen día!`
+              : "Con gusto 😊 ¡Que tengas un buen día!"
+            : primerNombre
+              ? `Perfecto, ${primerNombre} 😊 ¡Que tengas un buen día!`
+              : "Perfecto 😊 ¡Que tengas un buen día!";
+
+      return {
+        tipo: "cierre_social_postventa",
+        producto: memoria.producto || null,
+        accion: "responder",
+        mensaje: mensajeCierre,
+        multimedia: "ninguno",
+        handoff: false,
+        memoria: {
+          ...memoria,
+          paso: "postventa",
+          contexto: {
+            ...contextoSocial,
+            conversacion_cerrada_social: true,
+          },
+        },
+      };
+    }
+
+    if (
+      enPostventa &&
       cierreSocialActivo &&
       respuestaCortaDeCierre
     ) {
