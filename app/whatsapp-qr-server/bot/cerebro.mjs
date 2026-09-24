@@ -287,6 +287,220 @@ function detectarSedePedidoEnMensaje(
   return null;
 }
 
+
+function extraerDatosAgenciaAgrupados(texto) {
+  const lineas = String(texto || "")
+    .split(/\r?\n/)
+    .map((linea) =>
+      linea
+        .replace(/^[\s\u2022*-]+/, "")
+        .trim()
+    )
+    .filter(Boolean);
+
+  const tieneEtiquetas =
+    lineas.some((linea) =>
+      /^(?:nombre(?:\s+completo)?|dni|d\.?n\.?i\.?|cantidad|unidades?|sede|localidad|agencia)\s*[:=-]/i.test(
+        linea
+      )
+    );
+
+  if (lineas.length < 2 && !tieneEtiquetas) {
+    return null;
+  }
+
+  const resultado = {
+    nombre: null,
+    dni: null,
+    cantidad: null,
+    sede: null,
+  };
+
+  const usados = new Set();
+
+  for (let i = 0; i < lineas.length; i += 1) {
+    const linea = lineas[i];
+
+    let m = linea.match(
+      /^(?:nombre(?:\s+completo)?)\s*[:=-]\s*(.+)$/i
+    );
+    if (m) {
+      const valor = m[1].trim();
+      if (nombreCompletoValido(valor)) {
+        resultado.nombre = valor;
+        usados.add(i);
+      }
+      continue;
+    }
+
+    m = linea.match(
+      /^(?:dni|d\.?n\.?i\.?)\s*[:=-]\s*(.+)$/i
+    );
+    if (m) {
+      const valor = limpiarDni(m[1]);
+      if (dniValido(valor)) {
+        resultado.dni = valor;
+        usados.add(i);
+      }
+      continue;
+    }
+
+    m = linea.match(
+      /^(?:cantidad|unidades?)\s*[:=-]\s*(.+)$/i
+    );
+    if (m) {
+      const valor = detectarCantidadPedido(m[1]);
+      if (valor && valor > 0) {
+        resultado.cantidad = valor;
+        usados.add(i);
+      }
+      continue;
+    }
+
+    m = linea.match(
+      /^(?:sede|localidad|agencia)\s*[:=-]\s*(.+)$/i
+    );
+    if (m) {
+      const valor = m[1].trim();
+      if (valor) {
+        resultado.sede = valor;
+        usados.add(i);
+      }
+    }
+  }
+
+  if (!resultado.dni) {
+    for (let i = 0; i < lineas.length; i += 1) {
+      if (usados.has(i)) continue;
+      if (/^\d{8}$/.test(lineas[i])) {
+        resultado.dni = lineas[i];
+        usados.add(i);
+        break;
+      }
+    }
+  }
+
+  if (!resultado.cantidad) {
+    for (let i = 0; i < lineas.length; i += 1) {
+      if (usados.has(i)) continue;
+      const valor = detectarCantidadExplicita(lineas[i]);
+      if (valor && valor > 0) {
+        resultado.cantidad = valor;
+        usados.add(i);
+        break;
+      }
+    }
+  }
+
+  if (!resultado.nombre) {
+    for (let i = 0; i < lineas.length; i += 1) {
+      if (usados.has(i)) continue;
+      const valor = lineas[i]
+        .replace(
+          /^(?:nombre(?:\s+completo)?)\s*[:=-]\s*/i,
+          ""
+        )
+        .trim();
+
+      if (
+        nombreCompletoValido(valor) &&
+        !/\d/.test(valor) &&
+        !detectarAgenciaPedido(valor)
+      ) {
+        resultado.nombre = valor;
+        usados.add(i);
+        break;
+      }
+    }
+  }
+
+  if (!resultado.sede) {
+    for (let i = lineas.length - 1; i >= 0; i -= 1) {
+      if (usados.has(i)) continue;
+      const valor = lineas[i]
+        .replace(
+          /^(?:sede|localidad|agencia)\s*[:=-]\s*/i,
+          ""
+        )
+        .trim();
+
+      if (
+        valor &&
+        valor.length <= 120 &&
+        !/[?¿]/.test(valor) &&
+        !dniValido(valor) &&
+        !detectarCantidadExplicita(valor) &&
+        !detectarAgenciaPedido(valor)
+      ) {
+        resultado.sede = valor;
+        usados.add(i);
+        break;
+      }
+    }
+  }
+
+  return (
+    resultado.nombre ||
+    resultado.dni ||
+    resultado.cantidad ||
+    resultado.sede
+  )
+    ? resultado
+    : null;
+}
+
+function nombreAgenciaNatural(agencia) {
+  if (agencia === "SHALOM") return "Shalom";
+  if (agencia === "OLVA COURIER") return "Olva Courier";
+  return String(agencia || "la agencia");
+}
+
+function construirSolicitudDatosAgencia(contexto) {
+  const agencia = nombreAgenciaNatural(contexto.agencia);
+  const campos = [];
+
+  if (!nombreCompletoValido(contexto.nombre)) {
+    campos.push({ tipo: "nombre", texto: "Nombre completo:" });
+  }
+
+  if (!dniValido(contexto.dni)) {
+    campos.push({ tipo: "dni", texto: "DNI:" });
+  }
+
+  if (!contexto.cantidad || Number(contexto.cantidad) <= 0) {
+    campos.push({ tipo: "cantidad", texto: "Cantidad:" });
+  }
+
+  if (!contexto.sede_envio) {
+    campos.push({
+      tipo: "sede",
+      texto: "Sede o localidad de " + agencia + " donde deseas recoger:",
+    });
+  }
+
+  if (campos.length === 1) {
+    const unico = campos[0];
+    if (unico.tipo === "nombre") {
+      return "Perfecto \u{1F60A} Para registrar tu pedido, enviame tus nombres y apellidos completos.";
+    }
+    if (unico.tipo === "dni") {
+      return "Perfecto. Ahora enviame tu DNI de 8 digitos.";
+    }
+    if (unico.tipo === "cantidad") {
+      return "Perfecto. ¿Cuantas unidades deseas?";
+    }
+    return "Perfecto. ¿A que sede o localidad de " + agencia + " deseas que llegue tu pedido?";
+  }
+
+  return [
+    "Perfecto \u{1F60A} Para registrar tu pedido, enviame por favor los siguientes datos:",
+    "",
+    ...campos.map((campo) => "\u2022 " + campo.texto),
+    "",
+    "Con esos datos registramos tu pedido y te mostramos el resumen para que verifiques que todo este correcto.",
+  ].join("\n");
+}
+
 function dniValido(dni) {
   const limpio = String(dni || "")
     .replace(/\D/g, "");
@@ -997,6 +1211,37 @@ if (
     cantidadExplicitaGlobal;
 }
 
+const pasosDatosAgencia = new Set([
+  "esperando_nombre",
+  "esperando_dni",
+  "esperando_cantidad",
+  "esperando_sede_envio",
+]);
+
+const datosAgenciaAgrupados =
+  contexto.agencia &&
+  pasosDatosAgencia.has(pasoFinal)
+    ? extraerDatosAgenciaAgrupados(texto)
+    : null;
+
+if (datosAgenciaAgrupados) {
+  if (datosAgenciaAgrupados.nombre) {
+    contexto.nombre = datosAgenciaAgrupados.nombre;
+  }
+
+  if (datosAgenciaAgrupados.dni) {
+    contexto.dni = limpiarDni(datosAgenciaAgrupados.dni);
+  }
+
+  if (datosAgenciaAgrupados.cantidad) {
+    contexto.cantidad = datosAgenciaAgrupados.cantidad;
+  }
+
+  if (datosAgenciaAgrupados.sede && !contexto.sede_envio) {
+    contexto.sede_envio = datosAgenciaAgrupados.sede;
+  }
+}
+
 const sedeDetectadaGlobal =
   detectarSedePedidoEnMensaje(
     texto,
@@ -1385,23 +1630,42 @@ if (
       ) {
         pasoFinal =
           "esperando_nombre";
-
-        mensajeControlado =
-          `Perfecto, envia tus nombres y apellidos completos para registrar el pedido.`;
       } else if (
         !dniValido(contexto.dni)
       ) {
         pasoFinal =
           "esperando_dni";
-
-        mensajeControlado =
-          `Perfecto ${contexto.nombre}. Ahora enviame solamente tu DNI de 8 digitos.`;
-      } else {
+      } else if (
+        !contexto.cantidad ||
+        Number(contexto.cantidad) <= 0
+      ) {
         pasoFinal =
           "esperando_cantidad";
+      } else if (
+        !contexto.sede_envio
+      ) {
+        pasoFinal =
+          "esperando_sede_envio";
+      } else {
+        pasoFinal =
+          "esperando_confirmacion_resumen";
+      }
 
+      if (
+        pasoFinal ===
+        "esperando_confirmacion_resumen"
+      ) {
+        contexto.resumen_confirmado = false;
         mensajeControlado =
-          "¿Cuantas unidades deseas?";
+          construirResumenPedido({
+            contexto,
+            producto: productoDetalle,
+            requiereAdelanto:
+              envioPedido?.requiereAdelanto === true,
+          });
+      } else {
+        mensajeControlado =
+          construirSolicitudDatosAgencia(contexto);
       }
     } else {
       /*
@@ -1775,14 +2039,19 @@ if (
     pasoFinal =
       "esperando_agencia";
 
+    const ciudadMostrada =
+      String(contexto.ciudad || "")
+        .trim()
+        .replace(/^./, (c) => c.toUpperCase());
+
     const adelanto =
       envioPedido
         ?.requiereAdelanto === true
-        ? "Se trabaja con un adelanto de S/30 y el saldo se paga cuando el producto ya se encuentre en la agencia."
-        : "";
+        ? "Trabajamos por Shalom u Olva Courier. Para el envio solicitamos un adelanto de S/30 y el saldo lo pagas cuando tu pedido ya se encuentre en la agencia."
+        : "Trabajamos por Shalom u Olva Courier.";
 
     mensajeControlado =
-      `${adelanto}\n\n¿Prefieres Shalom u Olva Courier?`.trim();
+      `Perfecto, hacemos envios a ${ciudadMostrada} \u{1F60A}\n\n${adelanto}\n\n¿Prefieres Shalom u Olva Courier?`.trim();
   }
 }
 
