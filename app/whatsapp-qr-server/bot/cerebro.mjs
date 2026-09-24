@@ -637,6 +637,99 @@ export async function decidirRespuestaBot({
       .toLowerCase()
       .trim();
 
+    /*
+     * CIERRE SOCIAL DE POSTVENTA
+     *
+     * Una despedida explicita cierra socialmente la conversacion.
+     * Respuestas cortas posteriores como "buen dia" u "ok"
+     * se guardan en memoria pero no generan otra respuesta.
+     * Si el cliente vuelve con una consulta real, se reactiva.
+     */
+    const contextoSocial = {
+      ...(memoria.contexto || {}),
+    };
+
+    const enPostventa =
+      memoria.paso === "postventa";
+
+    const cierreSocialActivo =
+      contextoSocial.conversacion_cerrada_social === true;
+
+    const respuestaCortaDeCierre =
+      /^(?:ok|okay|listo|perfecto|de acuerdo|esta bien|todo bien|gracias|gracias igualmente|igualmente|buen dia|buenas tardes|buenas noches|chau|chao|hasta luego|nos vemos)$/.test(
+        textoNormalizado
+      );
+
+    const despedidaSocialExplicita =
+      /\b(?:eso seria todo|eso es todo|seria todo|nada mas|muchas gracias|gracias por todo|muy amable|hasta luego|chau|chao|nos vemos)\b/.test(
+        textoNormalizado
+      );
+
+    if (
+      enPostventa &&
+      cierreSocialActivo &&
+      respuestaCortaDeCierre
+    ) {
+      return {
+        tipo: "silencio_postventa",
+        producto: memoria.producto || null,
+        accion: "esperar",
+        mensaje: null,
+        multimedia: "ninguno",
+        handoff: false,
+        memoria: {
+          ...memoria,
+          paso: "postventa",
+          contexto: {
+            ...contextoSocial,
+            conversacion_cerrada_social: true,
+          },
+        },
+      };
+    }
+
+    if (
+      enPostventa &&
+      cierreSocialActivo &&
+      !respuestaCortaDeCierre
+    ) {
+      delete contextoSocial.conversacion_cerrada_social;
+
+      memoria = {
+        ...memoria,
+        contexto: contextoSocial,
+      };
+    }
+
+    if (
+      enPostventa &&
+      despedidaSocialExplicita
+    ) {
+      const primerNombre =
+        String(contextoSocial.nombre || "")
+          .trim()
+          .split(/\s+/)[0];
+
+      return {
+        tipo: "cierre_social_postventa",
+        producto: memoria.producto || null,
+        accion: "responder",
+        mensaje: primerNombre
+          ? `Con gusto, ${primerNombre} 😊 ¡Hasta luego!`
+          : "Con gusto 😊 ¡Hasta luego!",
+        multimedia: "ninguno",
+        handoff: false,
+        memoria: {
+          ...memoria,
+          paso: "postventa",
+          contexto: {
+            ...contextoSocial,
+            conversacion_cerrada_social: true,
+          },
+        },
+      };
+    }
+
     const consultaGenericaProducto =
       /^(precio|info|informacion|me interesa|hola|quiero saber|cuanto|cuanto cuesta|cuanto cuestan)$/.test(textoNormalizado);
 
