@@ -773,7 +773,10 @@ const textoRechazo =
     .trim();
 
 const rechazoDefinitivo =
-  /^(?:no quiero|no quiero nada|ya no quiero|no me interesa|ya no me interesa|no estoy interesado|no estoy interesada|no me escribas|no me escriban|ya compre en otro lado|ya compre otro|ya lo compre en otro lado|no gracias|dejalo nomas|dejalo no mas)(?: gracias| por favor)?$/.test(
+  /\\b(?:no quiero nada|ya no quiero nada|ya no me interesa|no me interesa|no estoy interesado|no estoy interesada|no me escribas|no me escriban|ya compre en otro lado|ya lo compre en otro lado)\\b/.test(
+    textoRechazo
+  ) ||
+  /^(?:no quiero|no gracias|dejalo nomas|dejalo no mas)(?: gracias| por favor)?$/.test(
     textoRechazo
   );
 
