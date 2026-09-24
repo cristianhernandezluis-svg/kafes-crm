@@ -1514,6 +1514,7 @@ if (
 
   const puedeAvanzarPorDatos =
     contexto.agencia &&
+    pasoFinal !== "esperando_agencia" &&
     pasoFinal !==
       "esperando_confirmacion_resumen" &&
     pasoFinal !== "esperando_pago" &&
