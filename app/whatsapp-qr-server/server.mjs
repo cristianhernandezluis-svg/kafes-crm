@@ -2538,14 +2538,48 @@ try {
     if (connection === "close") {
       estado = "desconectado";
 
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const statusCode =
+        lastDisconnect?.error?.output?.statusCode;
 
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      const errorTexto = String(
+        lastDisconnect?.error?.message ||
+        lastDisconnect?.error ||
+        ""
+      ).toLowerCase();
 
-      console.log("Conexion cerrada. Reintentando:", shouldReconnect);
+      const fueLogout =
+        statusCode === DisconnectReason.loggedOut;
+
+      const fueReemplazo =
+        statusCode ===
+          DisconnectReason.connectionReplaced ||
+        errorTexto.includes("conflict") ||
+        errorTexto.includes("replaced");
+
+      const shouldReconnect =
+        !fueLogout &&
+        !fueReemplazo;
+
+      console.log("Conexion cerrada:", {
+        statusCode,
+        fueLogout,
+        fueReemplazo,
+        shouldReconnect,
+      });
 
       if (shouldReconnect) {
-        iniciarWhatsApp();
+        setTimeout(() => {
+          iniciarWhatsApp().catch((error) => {
+            console.error(
+              "ERROR RECONEXION WHATSAPP:",
+              error?.message || error
+            );
+          });
+        }, 2500);
+      } else if (fueReemplazo) {
+        console.log(
+          "Reconexion omitida: otra instancia reemplazo esta sesion."
+        );
       }
     }
   });
