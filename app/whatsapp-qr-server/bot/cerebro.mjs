@@ -323,7 +323,7 @@ function quitarPreguntaFinal(texto) {
   const valor = String(texto || "").trim();
 
   const indicePregunta =
-    valor.lastIndexOf("Â¿");
+    valor.lastIndexOf("¿");
 
   if (
     indicePregunta >= 0 &&
@@ -527,7 +527,7 @@ function construirResumenPedido({
 
   lineas.push("");
   lineas.push(
-    "Por favor, corrobora que todos tus datos esten correctos. Â¿Todo esta bien?"
+    "Por favor, corrobora que todos tus datos esten correctos. ¿Todo esta bien?"
   );
 
   return lineas.join("\n");
@@ -862,7 +862,7 @@ if (
 ) {
   pasoFinal = "esperando_ciudad";
   mensajeControlado =
-    "Perfecto. Â¿Desde que ciudad o distrito del Peru nos escribes?";
+    "Perfecto. ¿Desde que ciudad o distrito del Peru nos escribes?";
 }
 
 
@@ -889,7 +889,7 @@ if (
       String(texto || "").trim();
 
     const parecePreguntaSede =
-      /[?Â¿]/.test(sedeDirecta);
+      /[?¿]/.test(sedeDirecta);
 
     if (
       sedeDirecta &&
@@ -915,7 +915,7 @@ if (
 
   if (puedeAvanzarPorDatos) {
     const parecePregunta =
-      /[?Â¿]/.test(String(texto || ""));
+      /[?¿]/.test(String(texto || ""));
 
     const respuestaDuda =
       parecePregunta
@@ -955,7 +955,7 @@ if (
       pasoFinal = "esperando_cantidad";
       mensajeControlado =
         conRespuestaDuda(
-          "Â¿Cuantas unidades deseas?"
+          "¿Cuantas unidades deseas?"
         );
     } else if (
       !contexto.sede_envio
@@ -963,7 +963,7 @@ if (
       pasoFinal = "esperando_sede_envio";
       mensajeControlado =
         conRespuestaDuda(
-          `Perfecto. Â¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`
+          `Perfecto. ¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`
         );
     } else {
       contexto.resumen_confirmado = false;
@@ -1036,7 +1036,7 @@ if (
           "esperando_cantidad";
 
         mensajeControlado =
-          "Â¿Cuantas unidades deseas?";
+          "¿Cuantas unidades deseas?";
       }
     } else {
       /*
@@ -1052,7 +1052,7 @@ if (
         "esperando_agencia";
 
       mensajeControlado =
-        `${respuestaDuda}\n\nÂ¿Prefieres Shalom u Olva Courier?`.trim();
+        `${respuestaDuda}\n\n¿Prefieres Shalom u Olva Courier?`.trim();
     }
   }
 
@@ -1092,7 +1092,7 @@ if (
           "esperando_cantidad";
 
         mensajeControlado =
-          "Â¿Cuantas unidades deseas?";
+          "¿Cuantas unidades deseas?";
       }
     } else {
       pasoFinal =
@@ -1122,7 +1122,7 @@ if (
         "esperando_cantidad";
 
       mensajeControlado =
-        "Â¿Cuantas unidades deseas?";
+        "¿Cuantas unidades deseas?";
     } else {
       pasoFinal =
         "esperando_dni";
@@ -1151,13 +1151,13 @@ if (
         "esperando_sede_envio";
 
       mensajeControlado =
-        `Perfecto. Â¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`;
+        `Perfecto. ¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`;
     } else {
       pasoFinal =
         "esperando_cantidad";
 
       mensajeControlado =
-        "Â¿Cuantas unidades deseas?";
+        "¿Cuantas unidades deseas?";
     }
   }
 
@@ -1173,7 +1173,7 @@ if (
     ).trim();
 
     const parecePregunta =
-      /[?Â¿]/.test(sede);
+      /[?¿]/.test(sede);
 
     if (
       sede &&
@@ -1208,7 +1208,7 @@ if (
         "esperando_sede_envio";
 
       mensajeControlado =
-        `${respuestaDuda}\n\nÂ¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`.trim();
+        `${respuestaDuda}\n\n¿A que sede o localidad de ${contexto.agencia} deseas que llegue tu pedido?`.trim();
     }
   }
 
@@ -1391,7 +1391,7 @@ if (
         : "";
 
     mensajeControlado =
-      `${adelanto}\n\nÂ¿Prefieres Shalom u Olva Courier?`.trim();
+      `${adelanto}\n\n¿Prefieres Shalom u Olva Courier?`.trim();
   }
 }
 
