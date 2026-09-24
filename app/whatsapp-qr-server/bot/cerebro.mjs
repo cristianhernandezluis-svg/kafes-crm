@@ -1634,6 +1634,8 @@ if (
       contexto.resumen_confirmado =
         true;
 
+      delete contexto.confirmacion_corta_pago_respondida;
+
       pasoFinal =
         "esperando_pago";
 
@@ -1716,8 +1718,32 @@ if (
       mensajeControlado =
         "Perfecto. Enviame el comprobante por aqui para continuar con la confirmacion.";
     } else if (confirmacionCorta) {
+      const confirmacionPagoYaRespondida =
+        contexto.confirmacion_corta_pago_respondida === true;
+
+      if (confirmacionPagoYaRespondida) {
+        return {
+          tipo: "silencio_esperando_pago",
+          producto: memoria.producto || null,
+          accion: "esperar",
+          mensaje: null,
+          multimedia: "ninguno",
+          handoff: false,
+          memoria: {
+            ...memoria,
+            paso: "esperando_pago",
+            contexto: {
+              ...contexto,
+              confirmacion_corta_pago_respondida: true,
+            },
+          },
+        };
+      }
+
+      contexto.confirmacion_corta_pago_respondida = true;
+
       mensajeControlado =
-        "Perfecto ðŸ‘ Quedo atento al comprobante.";
+        "Perfecto \u{1F44D} Quedo atento al comprobante.";
     } else if (pidePago) {
       const datosSolicitados =
         construirDatosPago(
