@@ -2014,10 +2014,22 @@ if (mensajeDuranteEspera.rowCount > 0) {
     }
   }
 
-      const mensajeBotCompleto =
+      const mensajeBotOriginal =
     String(respuestaBot.mensaje || "")
-      .replace(/\s+/g, " ")
+      .replace(/\r\n/g, "\n")
       .trim();
+
+  const esResumenPedido =
+    /(?:^|\n)NOMBRE:\s*/i.test(mensajeBotOriginal) &&
+    /(?:^|\n)PEDIDO:\s*/i.test(mensajeBotOriginal) &&
+    /(?:^|\n)TOTAL:\s*S\//i.test(mensajeBotOriginal);
+
+  const mensajeBotCompleto =
+    esResumenPedido
+      ? mensajeBotOriginal
+      : mensajeBotOriginal
+          .replace(/\s+/g, " ")
+          .trim();
 
   const dividirRespuestaHumana = (texto) => {
     const oraciones = (
@@ -2075,9 +2087,11 @@ if (mensajeDuranteEspera.rowCount > 0) {
   };
 
   const partesRespuesta =
-    dividirRespuestaHumana(
-      mensajeBotCompleto
-    );
+    esResumenPedido
+      ? [mensajeBotCompleto]
+      : dividirRespuestaHumana(
+          mensajeBotCompleto
+        );
 
   for (
     let i = 0;
