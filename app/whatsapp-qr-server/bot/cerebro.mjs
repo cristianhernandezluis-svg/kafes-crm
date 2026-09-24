@@ -314,7 +314,7 @@ function esConfirmacionResumen(texto) {
     .replace(/\s+/g, " ")
     .trim();
 
-  return /^(?:si|correcto|esta bien|todo bien|todo correcto|todo ok|ok|okay|confirmo|confirmado|ya esta|si esta bien|si todo bien|si todo ok|si correcto|si todo correcto|dale|listo|de acuerdo)$/.test(
+  return /^(?:si|bien|estan bien|correcto|esta correcto|esta bien|todo esta bien|todo bien|todo correcto|todo ok|ok|okay|confirmo|confirmado|ya esta|si esta bien|si todo esta bien|si todo bien|si todo ok|si correcto|si todo correcto|dale|listo|de acuerdo)$/.test(
     t
   );
 }

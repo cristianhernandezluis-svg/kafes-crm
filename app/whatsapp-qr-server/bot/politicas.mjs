@@ -194,6 +194,8 @@ function contieneLugar(texto, lugar) {
 
 const ALIAS_DISTRITOS_LIMA = {
   sjl: "san juan de lurigancho",
+
+  sjm: "san juan de miraflores",
   smp: "san martin de porres",
   vmt: "villa maria del triunfo",
   ves: "villa el salvador",
