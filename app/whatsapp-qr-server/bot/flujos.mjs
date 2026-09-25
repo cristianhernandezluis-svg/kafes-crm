@@ -1287,6 +1287,42 @@ async function procesarFlujoClienteInterno({
     };
   }
 
+  const productoFlujoActivo = String(
+    cargado?.flujo?.producto_slug || ""
+  ).trim();
+
+  if (
+    productoFlujoActivo &&
+    estado.bot_producto !== productoFlujoActivo
+  ) {
+    await pool.query(
+      `
+      UPDATE clientes_whatsapp_qr
+      SET bot_producto = $3,
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
+        AND bot_producto IS DISTINCT FROM $3
+      `,
+      [
+        clienteId,
+        whatsappQrId,
+        productoFlujoActivo,
+      ]
+    );
+
+    estado.bot_producto = productoFlujoActivo;
+
+    console.log(
+      "PRODUCTO ACTIVO DESDE FLUJO:",
+      {
+        clienteId,
+        flujoId,
+        producto: productoFlujoActivo,
+      }
+    );
+  }
+
   const nodosPorId =
     new Map(
       cargado.nodos.map(
