@@ -77,6 +77,9 @@ let estado = "desconectado";
 let whatsappQrId = null;
 let empresaQrId = null;
 let productoQrSlug = null;
+
+const BOT_GLOBAL_PAUSADO = true;
+const SEGUIMIENTOS_GLOBAL_PAUSADOS = true;
 let numeroWhatsappActual = null;
 let resolviendoCanalPromise = null;
 const telefonoPorLidHistorial = new Map();
@@ -797,6 +800,7 @@ function mensajeSeguimientoExplicito() {
 let seguimientoExplicitoEnCurso = false;
 
 async function procesarSeguimientosExplicitos() {
+  if (SEGUIMIENTOS_GLOBAL_PAUSADOS) return;
   if (seguimientoExplicitoEnCurso) return;
   if (!sock || estado !== "conectado" || !empresaQrId || !whatsappQrId) return;
 
@@ -1115,6 +1119,7 @@ function mensajeSeguimientoSilencio(intento) {
 }
 
 async function procesarSeguimientosSilencio() {
+  if (SEGUIMIENTOS_GLOBAL_PAUSADOS) return;
   if (seguimientoSilencioEnCurso) return;
   if (!sock || estado !== "conectado" || !empresaQrId || !whatsappQrId) return;
 
@@ -1423,6 +1428,7 @@ async function procesarSeguimientosSilencio() {
 }
 
 async function procesarLoteBot(lote) {
+  if (BOT_GLOBAL_PAUSADO) return;
   if (!Array.isArray(lote) || lote.length === 0) return;
 
   const ultimo = lote[lote.length - 1];
@@ -3138,7 +3144,7 @@ console.log("Mensaje guardado en PostgreSQL");
 
 let resultadoFlujo = null;
 
-if (!esMio) {
+if (!esMio && !BOT_GLOBAL_PAUSADO) {
   try {
     const jidFlujo =
       msg.key.remoteJidAlt ||
