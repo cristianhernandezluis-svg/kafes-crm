@@ -1,28 +1,53 @@
+
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
+import { obtenerSesion } from "@/lib/auth";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const empresaId = searchParams.get("empresa_id");
+async function administradorAutorizado() {
+  const sesion = await obtenerSesion();
 
-    if (!empresaId) {
-      return NextResponse.json({ success: false, error: "empresa_id obligatorio" });
+  if (!sesion) return null;
+
+  const result = await pool.query(
+    `SELECT id, empresa_id, rol
+     FROM usuarios
+     WHERE id = $1 AND empresa_id = $2
+     LIMIT 1`,
+    [sesion.id, sesion.empresa_id]
+  );
+
+  const usuario = result.rows[0];
+
+  if (!usuario || usuario.rol !== "admin") {
+    return null;
+  }
+
+  return usuario;
+}
+
+export async function GET() {
+  try {
+    const usuario = await administradorAutorizado();
+
+    if (!usuario) {
+      return NextResponse.json(
+        { success: false, error: "Acceso no autorizado" },
+        { status: 403 }
+      );
     }
 
     const result = await pool.query(
-      `
-      SELECT id, empresa_id, phone_number_id, waba_id, verify_token, estado, created_at
-      FROM integraciones_whatsapp
-      WHERE empresa_id = $1
-      ORDER BY created_at DESC
-      LIMIT 1
-      `,
-      [empresaId]
+      `SELECT id, empresa_id, phone_number_id,
+              waba_id, estado, created_at
+       FROM integraciones_whatsapp
+       WHERE empresa_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [usuario.empresa_id]
     );
 
     return NextResponse.json({
@@ -30,60 +55,22 @@ export async function GET(request: Request) {
       integracion: result.rows[0] || null,
     });
   } catch (error) {
-    console.error("ERROR GET WHATSAPP CONFIG:", error);
-    return NextResponse.json({ success: false, error: "Error interno" }, { status: 500 });
+    console.error("ERROR CONFIG WHATSAPP:", error);
+
+    return NextResponse.json(
+      { success: false, error: "Error interno" },
+      { status: 500 }
+    );
   }
 }
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-
-    const {
-      empresa_id,
-      phone_number_id,
-      waba_id,
-      token,
-      verify_token,
-    } = body;
-
-    if (!empresa_id || !phone_number_id || !token) {
-      return NextResponse.json(
-        { success: false, error: "empresa_id, phone_number_id y token son obligatorios" },
-        { status: 400 }
-      );
-    }
-
-    await pool.query(
-      `
-      DELETE FROM integraciones_whatsapp
-      WHERE empresa_id = $1
-      `,
-      [empresa_id]
-    );
-
-    const result = await pool.query(
-      `
-      INSERT INTO integraciones_whatsapp (
-        empresa_id,
-        phone_number_id,
-        waba_id,
-        token,
-        verify_token,
-        estado
-      )
-      VALUES ($1, $2, $3, $4, $5, 'activo')
-      RETURNING id, empresa_id, phone_number_id, waba_id, verify_token, estado, created_at
-      `,
-      [empresa_id, phone_number_id, waba_id, token, verify_token]
-    );
-
-    return NextResponse.json({
-      success: true,
-      integracion: result.rows[0],
-    });
-  } catch (error) {
-    console.error("ERROR GUARDANDO WHATSAPP CONFIG:", error);
-    return NextResponse.json({ success: false, error: "No se pudo guardar" }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json(
+    {
+      success: false,
+      error:
+        "La conexión manual está deshabilitada. Utiliza el registro oficial de Meta cuando esté habilitado.",
+    },
+    { status: 403 }
+  );
 }
