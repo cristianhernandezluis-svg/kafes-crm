@@ -14,7 +14,9 @@ export async function POST(request: Request) {
   try {
     // Comprobar que la petición proviene del CRM.
     const origin = request.headers.get("origin");
-    const expectedOrigin = new URL(request.url).origin;
+const expectedOrigin = process.env.APP_URL
+  ? new URL(process.env.APP_URL).origin
+  : new URL(request.url).origin;
 
     if (!origin || origin !== expectedOrigin) {
       return NextResponse.json(

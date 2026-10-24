@@ -22,9 +22,14 @@ function errorRespuesta(mensaje: string, status: number) {
 export async function POST(request: Request) {
   try {
     const origen = request.headers.get("origin");
-    if (!origen || origen !== new URL(request.url).origin) {
-      return errorRespuesta("Origen no autorizado", 403);
-    }
+
+const origenPermitido = process.env.APP_URL
+  ? new URL(process.env.APP_URL).origin
+  : new URL(request.url).origin;
+
+if (!origen || origen !== origenPermitido) {
+  return errorRespuesta("Origen no autorizado", 403);
+}
 
     const sesion = await obtenerSesion();
     if (!sesion) return errorRespuesta("Inicia sesión nuevamente", 401);
