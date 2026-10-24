@@ -48,6 +48,12 @@ const opciones = [
   },
 
 {
+  href: "/respuestas-automaticas",
+  icono: "\uD83E\uDD16",
+  texto: "Respuestas automáticas",
+},
+
+{
   href: "/distribucion",
   icono: "\uD83C\uDFAF",
   texto: "Distribuci\u00f3n",
