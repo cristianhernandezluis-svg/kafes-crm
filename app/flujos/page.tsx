@@ -26,6 +26,13 @@ import "@xyflow/react/dist/style.css";
 import Sidebar from "../components/Sidebar";
 import { useTemaCRM } from "@/components/TemaProvider";
 
+type AgenteIA = {
+  id: string;
+  nombre: string;
+  modelo: string;
+  activo: boolean;
+};
+
 type Flujo = {
   id: number;
   nombre: string;
@@ -102,13 +109,19 @@ type GrupoCondicion = {
 
 type DatosNodo = {
   titulo?: string;
+  agenteId?: string;
+  productoId?: string;
   contenidos?: ContenidoNodo[];
   subtitulo?: string;
   tipoMensaje?: "omnichannel" | "webchat";
   esperaSegundos?: number;
   accionFlujo?:
     | "activar_bot"
-    | "finalizar_flujo";
+    | "finalizar_flujo"
+    | "establecer_campo";
+  campoAccion?: "source_id";
+  operacionAccion?: "asignar";
+  valorAccion?: string;
   flujoDestinoId?: number | null;
   flujoDestinoNombre?: string;
 
@@ -1006,6 +1019,8 @@ function NodoAccion({
   const descripcion =
     accion === "finalizar_flujo"
       ? "Finalizar flujo"
+      : accion === "establecer_campo"
+      ? `POST ID = ${d.valorAccion || "{{last_ad}}"}`
       : "Activar bot";
 
   return (
@@ -1099,6 +1114,59 @@ function NodoEsperarTiempo({
   );
 }
 
+
+function NodoAgenteIA({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const d = data as DatosNodo;
+
+  return (
+    <div
+      className={`min-w-[230px] rounded-xl bg-white text-slate-900 shadow-lg ${
+        selected
+          ? "border-2 border-purple-600"
+          : "border border-purple-300"
+      }`}
+    >
+      <BarraAccionesNodo
+        nodeId={id}
+        selected={selected}
+      />
+
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!h-3 !w-3 !bg-white"
+      />
+
+      <div className="rounded-t-xl bg-purple-100 px-4 py-2 text-xs font-black text-purple-800">
+        🤖 {d.titulo || "Agente de IA"}
+      </div>
+
+      <div className="space-y-1 px-4 py-3 text-xs">
+        <p>
+          Agente: {d.agenteId || "Sin seleccionar"}
+        </p>
+        <p>
+          Producto: {d.productoId || "Del flujo"}
+        </p>
+        <p className="text-amber-600">
+          Configuración, aún sin ejecución automática
+        </p>
+      </div>
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!h-3 !w-3 !bg-white"
+      />
+    </div>
+  );
+}
+
+
 const nodeTypes = {
   inicio: NodoInicio,
   mensaje: NodoMensaje,
@@ -1108,6 +1176,7 @@ const nodeTypes = {
   esperar_tiempo: NodoEsperarTiempo,
   esperar_respuesta: NodoEsperar,
   activar_bot: NodoBot,
+  agente_ia: NodoAgenteIA,
 };
 
 export default function FlujosPage() {
@@ -1120,6 +1189,48 @@ export default function FlujosPage() {
   const [flujos, setFlujos] = useState<
     Flujo[]
   >([]);
+
+const [agentesIA, setAgentesIA] = useState<AgenteIA[]>([]);
+
+useEffect(() => {
+  let cancelado = false;
+
+  async function cargarAgentesIA() {
+    try {
+      const res = await fetch("/api/agentes-ia", {
+        credentials: "same-origin",
+      });
+
+      if (!res.ok) return;
+
+      const datos = await res.json();
+
+      if (!cancelado && Array.isArray(datos.agentes)) {
+        setAgentesIA(
+          datos.agentes.map((a: {
+            id: string | number;
+            nombre: string;
+            modelo: string;
+            activo: boolean;
+          }) => ({
+            id: String(a.id),
+            nombre: a.nombre,
+            modelo: a.modelo,
+            activo: a.activo,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("No se pudieron cargar los agentes de IA");
+    }
+  }
+
+  cargarAgentesIA();
+
+  return () => {
+    cancelado = true;
+  };
+}, []);
 
   const [flujoActivo, setFlujoActivo] =
     useState<Flujo | null>(null);
@@ -2036,6 +2147,31 @@ const renombrarFlujo = async (
     setNodoSeleccionadoId(id);
   };
 
+
+const agregarPasoAgenteIA = () => {
+  if (!flujoActivo) return;
+
+  const id = idNuevo("agente_ia");
+  const position = obtenerPosicionNuevoPaso();
+
+  setNodes((actuales) => [
+    ...actuales,
+    {
+      id,
+      type: "agente_ia",
+      position,
+      data: {
+        titulo: "Agente de IA",
+        agenteId: "",
+        productoId: "",
+      },
+    },
+  ]);
+
+  setNodoSeleccionadoId(id);
+};
+
+
   const agregarPasoBot = () => {
     if (!flujoActivo) return;
 
@@ -2586,10 +2722,91 @@ const renombrarFlujo = async (
                   }
                   className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-left text-sm"
                 >
+
+
+<button
+  onClick={agregarPasoAgenteIA}
+  className="mt-2 w-full rounded-lg border border-purple-300 px-3 py-3 text-left text-sm hover:bg-purple-50"
+>
+  🤖 Agente de IA
+</button>
+
                   🤖 Activar bot
                 </button>
               </div>
             )}
+
+
+{nodoSeleccionado?.type === "agente_ia" && (
+  <div className="space-y-4 p-4">
+    <button
+      onClick={() => setNodoSeleccionadoId(null)}
+      className="text-xs text-orange-500"
+    >
+      ← Volver
+    </button>
+
+    <h3 className="font-black">AGENTE DE IA</h3>
+
+    <div>
+      <label className="mb-2 block text-xs font-bold">
+        Prompt Maestro / Agente
+      </label>
+
+      <select
+        value={
+          (nodoSeleccionado.data as DatosNodo).agenteId || ""
+        }
+        onChange={(e) =>
+          actualizarDataNodo({ agenteId: e.target.value })
+        }
+        className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-900"
+      >
+        <option value="">Seleccionar agente</option>
+
+        {agentesIA.map((agente) => (
+          <option key={agente.id} value={agente.id}>
+            {agente.nombre} — {agente.modelo}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <div>
+      <label className="mb-2 block text-xs font-bold">
+        ID del producto
+      </label>
+
+      <input
+        value={
+          (nodoSeleccionado.data as DatosNodo).productoId || ""
+        }
+        onChange={(e) =>
+          actualizarDataNodo({ productoId: e.target.value })
+        }
+        placeholder="Vacío = usar producto del flujo"
+        className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-900"
+      />
+
+      <p className="mt-2 text-xs text-slate-500">
+        Si lo dejas vacío, el agente utilizará el producto
+        identificado previamente por el flujo.
+      </p>
+    </div>
+
+    <div className="rounded-lg bg-purple-50 p-3 text-xs text-purple-900">
+      El Prompt Maestro define cómo actuar.
+      El producto vinculado determinará qué información
+      comercial debe consultar la IA.
+    </div>
+
+    <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+      Este bloque todavía no ejecuta respuestas automáticas.
+      Solo guarda la configuración.
+    </div>
+  </div>
+)}
+
 
           {nodoSeleccionado?.type ===
             "mensaje" && (
@@ -3680,14 +3897,26 @@ const renombrarFlujo = async (
                   ).accionFlujo ||
                   "activar_bot"
                 }
-                onChange={(e) =>
+                onChange={(e) => {
+                  const nuevaAccion =
+                    e.target.value as
+                      | "activar_bot"
+                      | "finalizar_flujo"
+                      | "establecer_campo";
+
                   actualizarDataNodo({
-                    accionFlujo:
-                      e.target.value as
-                        | "activar_bot"
-                        | "finalizar_flujo",
-                  })
-                }
+                    accionFlujo: nuevaAccion,
+                    ...(nuevaAccion === "establecer_campo"
+                      ? {
+                          campoAccion: "source_id",
+                          operacionAccion: "asignar",
+                          valorAccion:
+                            (nodoSeleccionado.data as DatosNodo).valorAccion ||
+                            "{{last_ad}}",
+                        }
+                      : {}),
+                  });
+                }}
                 className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
               >
                 <option value="activar_bot">
@@ -3697,7 +3926,76 @@ const renombrarFlujo = async (
                 <option value="finalizar_flujo">
                   Finalizar flujo
                 </option>
+
+                <option value="establecer_campo">
+                  Establecer campo personalizado
+                </option>
               </select>
+
+              {(
+                nodoSeleccionado.data as DatosNodo
+              ).accionFlujo === "establecer_campo" && (
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500">
+                      Campo personalizado
+                    </label>
+                    <select
+                      value={
+                        (nodoSeleccionado.data as DatosNodo).campoAccion ||
+                        "source_id"
+                      }
+                      onChange={(e) =>
+                        actualizarDataNodo({
+                          campoAccion: e.target.value as "source_id",
+                        })
+                      }
+                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                    >
+                      <option value="source_id">POST ID</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500">
+                      Operacion
+                    </label>
+                    <select
+                      value={
+                        (nodoSeleccionado.data as DatosNodo).operacionAccion ||
+                        "asignar"
+                      }
+                      onChange={(e) =>
+                        actualizarDataNodo({
+                          operacionAccion: e.target.value as "asignar",
+                        })
+                      }
+                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                    >
+                      <option value="asignar">Asignar A</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500">
+                      Valor
+                    </label>
+                    <input
+                      value={
+                        (nodoSeleccionado.data as DatosNodo).valorAccion ||
+                        "{{last_ad}}"
+                      }
+                      onChange={(e) =>
+                        actualizarDataNodo({
+                          valorAccion: e.target.value,
+                        })
+                      }
+                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                      placeholder="{{last_ad}}"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4 rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
                 {(
