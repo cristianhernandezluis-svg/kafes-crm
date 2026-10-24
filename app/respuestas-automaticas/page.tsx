@@ -41,6 +41,9 @@ export default function RespuestasAutomaticasPage() {
   const [prompt, setPrompt] = useState("");
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+const [mensajePrueba, setMensajePrueba] = useState("");
+const [respuestaPrueba, setRespuestaPrueba] = useState("");
+const [probando, setProbando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
 
@@ -136,6 +139,44 @@ export default function RespuestasAutomaticasPage() {
       setGuardando(false);
     }
   }
+
+
+async function probarAgente() {
+  if (!seleccionado || !mensajePrueba.trim() || probando) return;
+
+  setProbando(true);
+  setRespuestaPrueba("");
+  setError("");
+
+  try {
+    const respuesta = await fetch("/api/agentes-ia/probar", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        agente_id: seleccionado,
+        mensaje: mensajePrueba.trim(),
+      }),
+    });
+
+    const datos: {
+      success?: boolean;
+      respuesta?: string;
+      error?: string;
+    } = await respuesta.json();
+
+    if (!respuesta.ok || !datos.success) {
+      throw new Error(datos.error || "No se pudo probar el agente");
+    }
+
+    setRespuestaPrueba(datos.respuesta || "Sin respuesta");
+  } catch (e) {
+    setError(e instanceof Error ? e.message : "Error al probar");
+  } finally {
+    setProbando(false);
+  }
+}
+
 
   async function eliminar() {
     if (!seleccionado || guardando) return;
@@ -325,6 +366,54 @@ export default function RespuestasAutomaticasPage() {
                 <p className="text-xs text-amber-500">
                   Guardar este agente no activa respuestas en WhatsApp.
                 </p>
+
+
+<div className="rounded-2xl border border-green-500/30 p-5 space-y-4">
+  <h3 className="font-bold text-lg">
+    Laboratorio de pruebas
+  </h3>
+
+  <p className="text-xs text-slate-400">
+    Prueba el Prompt Maestro guardado sin enviar mensajes
+    reales por WhatsApp. Esta operación consume créditos de OpenAI.
+  </p>
+
+  <textarea
+    value={mensajePrueba}
+    onChange={(e) => setMensajePrueba(e.target.value)}
+    maxLength={1500}
+    rows={3}
+    placeholder="Ejemplo: ¿Cuánto cuesta el soporte telescópico?"
+    className={`w-full border rounded-xl p-3 ${campo}`}
+  />
+
+  <button
+    type="button"
+    disabled={!seleccionado || !mensajePrueba.trim() || probando || guardando}
+    onClick={probarAgente}
+    className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white disabled:opacity-50"
+  >
+    {probando ? "Consultando OpenAI..." : "Probar agente"}
+  </button>
+
+  {!seleccionado && (
+    <p className="text-xs text-amber-500">
+      Primero guarda el agente para poder probarlo.
+    </p>
+  )}
+
+  {respuestaPrueba && (
+    <div className="rounded-xl border border-slate-700 p-4">
+      <p className="font-semibold text-sm mb-2">
+        Respuesta de OpenAI
+      </p>
+      <p className="text-sm whitespace-pre-wrap">
+        {respuestaPrueba}
+      </p>
+    </div>
+  )}
+</div>
+
 
                 {error && (
                   <p role="alert" className="text-sm text-red-500">{error}</p>
