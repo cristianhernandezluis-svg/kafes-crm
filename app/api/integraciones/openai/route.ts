@@ -60,20 +60,22 @@ export async function GET() {
     }
 
     const resultado = await pool.query(
-      `SELECT estado, actualizado_en
-       FROM integraciones_ia
-       WHERE empresa_id = $1
-         AND proveedor = $2
-       LIMIT 1`,
+      `SELECT estado, actualizado_en,
+        respuesta_automatica, transcribir_audio
+ FROM integraciones_ia
+ WHERE empresa_id = $1
+   AND proveedor = $2
+ LIMIT 1`,
       [admin.empresa_id, PROVEEDOR]
     );
 
     return NextResponse.json({
-      success: true,
-      conectado: resultado.rows[0]?.estado === "activo",
-      actualizado_en:
-        resultado.rows[0]?.actualizado_en || null,
-    });
+  success: true,
+  conectado: resultado.rows[0]?.estado === "activo",
+  respuesta_automatica: resultado.rows[0]?.respuesta_automatica === true,
+  transcribir_audio: resultado.rows[0]?.transcribir_audio === true,
+  actualizado_en: resultado.rows[0]?.actualizado_en || null,
+});
   } catch (error) {
     console.error(
       "ERROR ESTADO OPENAI:",
@@ -217,6 +219,82 @@ export async function DELETE(request: Request) {
 
     return respuestaError(
       "No se pudo desconectar OpenAI",
+      500
+    );
+  }
+}
+
+
+export async function PATCH(request: Request) {
+  try {
+    if (!origenAutorizado(request)) {
+      return respuestaError("Origen no autorizado", 403);
+    }
+
+    const admin = await obtenerAdministrador();
+
+    if (!admin) {
+      return respuestaError("Acceso no autorizado", 403);
+    }
+
+    const body: unknown = await request.json().catch(() => null);
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return respuestaError("Datos inválidos", 400);
+    }
+
+    const datos = body as Record<string, unknown>;
+    const campo = datos.campo;
+    const valor = datos.valor;
+
+    if (
+      (campo !== "respuesta_automatica" &&
+       campo !== "transcribir_audio") ||
+      typeof valor !== "boolean"
+    ) {
+      return respuestaError("Configuración inválida", 400);
+    }
+
+    const resultado = await pool.query(
+      `UPDATE integraciones_ia
+       SET
+         respuesta_automatica = CASE
+           WHEN $2 = 'respuesta_automatica'
+           THEN $3::boolean
+           ELSE respuesta_automatica
+         END,
+         transcribir_audio = CASE
+           WHEN $2 = 'transcribir_audio'
+           THEN $3::boolean
+           ELSE transcribir_audio
+         END,
+         actualizado_en = NOW()
+       WHERE empresa_id = $1
+         AND proveedor = 'openai'
+         AND estado = 'activo'
+       RETURNING respuesta_automatica, transcribir_audio`,
+      [admin.empresa_id, campo, valor]
+    );
+
+    if (resultado.rows.length === 0) {
+      return respuestaError(
+        "Primero debes conectar OpenAI",
+        409
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      configuracion: resultado.rows[0],
+    });
+  } catch (error) {
+    console.error(
+      "ERROR CONFIGURACIÓN IA:",
+      error instanceof Error ? error.name : "Error"
+    );
+
+    return respuestaError(
+      "No se pudo guardar la configuración",
       500
     );
   }
