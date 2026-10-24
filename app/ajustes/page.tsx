@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import OpenAIIntegracion from "./OpenAIIntegracion";
 import { useEffect, useRef, useState } from "react";
 import {
   BarChart3, MessageCircle, Users, KanbanSquare, Mail, FileText,
@@ -409,6 +410,7 @@ export default function AjustesPage() {
 
           {tab === "Integraciones" && (
             <div className="grid md:grid-cols-2 gap-4">
+<OpenAIIntegracion />
               {[[Cloud, "Meta / WhatsApp", "API oficial y webhooks", "Pendiente"], [Workflow, "Automatizaciones", "Flujos y respuestas automáticas", "Por revisar"], [Plug, "Inteligencia artificial", "Asistente de respuestas", "Por configurar"], [Database, "Base de datos", "Contactos, pedidos y conversaciones", "Revisar conexión"]].map(([Icon, name, description, status]) => {
                 const I = Icon as typeof Cloud;
                 return <section key={name as string} className={`border rounded-2xl p-5 ${container}`}><div className="flex gap-3 items-center"><I size={22} className="text-green-500" /><h3 className="font-bold">{name as string}</h3></div><p className={`${muted} text-sm mt-2`}>{description as string}</p><p className="mt-4 text-xs text-amber-500">{status as string}</p></section>;
