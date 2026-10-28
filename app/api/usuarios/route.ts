@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
+import { obtenerSesion } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 
 const pool = new Pool({
@@ -8,8 +9,52 @@ const pool = new Pool({
 
 export async function GET(request: Request) {
   try {
+    const sesion = await obtenerSesion();
+
+    if (!sesion) {
+      return NextResponse.json(
+        { success: false, error: "No autorizado" },
+        { status: 401 }
+      );
+    }
+
+    const usuarioResult = await pool.query(
+      `SELECT id, rol
+       FROM usuarios
+       WHERE id = $1
+         AND empresa_id = $2
+       LIMIT 1`,
+      [sesion.id, sesion.empresa_id]
+    );
+
+    if (usuarioResult.rowCount === 0) {
+      return NextResponse.json(
+        { success: false, error: "Usuario no autorizado" },
+        { status: 403 }
+      );
+    }
+
+    if (usuarioResult.rows[0].rol !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "Solo administradores" },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const empresaId = searchParams.get("empresa_id");
+    const empresaIdSolicitada = searchParams.get("empresa_id");
+
+    if (
+      empresaIdSolicitada !== null &&
+      Number(empresaIdSolicitada) !== sesion.empresa_id
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Acceso denegado a esta empresa" },
+        { status: 403 }
+      );
+    }
+
+    const empresaId = sesion.empresa_id;
 
     if (!empresaId) {
       return NextResponse.json({
@@ -45,16 +90,73 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const sesion = await obtenerSesion();
+
+    if (!sesion) {
+      return NextResponse.json(
+        { success: false, error: "No autorizado" },
+        { status: 401 }
+      );
+    }
+
+    const usuarioResult = await pool.query(
+      `SELECT id, rol
+       FROM usuarios
+       WHERE id = $1
+         AND empresa_id = $2
+       LIMIT 1`,
+      [sesion.id, sesion.empresa_id]
+    );
+
+    if (usuarioResult.rowCount === 0) {
+      return NextResponse.json(
+        { success: false, error: "Usuario no autorizado" },
+        { status: 403 }
+      );
+    }
+
+    if (usuarioResult.rows[0].rol !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "Solo administradores" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
-    const { empresa_id, nombre, email, password, rol = "asesor" } = body;
+    const {
+      nombre,
+      email,
+      password,
+      rol = "asesor",
+    } = body;
 
-    if (!empresa_id || !nombre || !email || !password) {
+    if (
+      body.empresa_id != null &&
+      Number(body.empresa_id) !== sesion.empresa_id
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Acceso denegado a esta empresa" },
+        { status: 403 }
+      );
+    }
+
+    // Por seguridad, desde esta API solo se crean asesores.
+    if (rol !== "asesor") {
+      return NextResponse.json(
+        { success: false, error: "Rol no permitido" },
+        { status: 403 }
+      );
+    }
+
+    if (!nombre || !email || !password) {
       return NextResponse.json(
         { success: false, error: "Faltan datos obligatorios" },
         { status: 400 }
       );
     }
+
+    const empresa_id = sesion.empresa_id;
 
     const empresaResult = await pool.query(
       "SELECT plan FROM empresas WHERE id = $1",

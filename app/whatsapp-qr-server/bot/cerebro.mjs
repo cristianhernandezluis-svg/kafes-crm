@@ -1,4 +1,4 @@
-﻿import { consultarIA } from "./ia.mjs";
+import { consultarIA } from "./ia.mjs";
 import {
   buscarProducto,
   buscarProductoPorSlug,
@@ -47,7 +47,7 @@ function detectarMetodoPago(texto) {
   return null;
 }
 
-function construirDatosPago(texto) {
+function construirDatosPago(texto, datosPagoEmpresa) {
   const metodo = detectarMetodoPago(texto);
 
   if (!metodo) {
@@ -78,7 +78,7 @@ function construirDatosPago(texto) {
     return null;
   }
 
-  const datos = obtenerDatosPagoPrivados();
+  const datos = datosPagoEmpresa || {};
   const valor = datos[metodo];
 
   if (!valor) {
@@ -553,9 +553,8 @@ function quitarPreguntaFinal(texto) {
   return valor;
 }
 
-function obtenerDatoPagoPrincipal() {
-  const datos =
-    obtenerDatosPagoPrivados();
+function obtenerDatoPagoPrincipal(datosPagoEmpresa) {
+  const datos = datosPagoEmpresa || {};
 
   const opciones = [
     ["yape", "Yape"],
@@ -757,12 +756,24 @@ function construirResumenPedido({
   }
 
   if (requiereAdelanto) {
-    lineas.push("ADELANTO PARA CONFIRMAR: S/30.00");
+  const adelanto = 30;
+
+  lineas.push(
+    `ADELANTO PARA CONFIRMAR: S/${adelanto.toFixed(2)}`
+  );
+
+  if (Number.isFinite(total) && total > 0) {
+    const saldo = Math.max(0, total - adelanto);
+
+    lineas.push(
+      `SALDO PENDIENTE: S/${saldo.toFixed(2)}`
+    );
   }
+}
 
   lineas.push("");
   lineas.push(
-    "Por favor, corrobora que todos tus datos esten correctos. ¿Todo esta bien?"
+    "Por favor, verifica que todos tus datos estén correctos. ¿Todo está bien?"
   );
 
   return lineas.join("\n");
@@ -796,7 +807,7 @@ async function respuestaRespaldo(texto, memoria = {}, empresaId = null) {
       return {
         tipo: "respaldo_precio",
         producto: producto.slug,
-        mensaje: `${producto.nombre} estÃ¡ a S/${producto.precio}. Si quieres, te muestro cÃ³mo viene y quÃ© incluye.`,
+        mensaje: `${producto.nombre} está a S/${producto.precio}. Si quieres, te muestro cómo viene y qué incluye.`,
         memoria: {
           producto: producto.slug,
           paso: memoria.paso || "conversacion",
@@ -808,7 +819,7 @@ async function respuestaRespaldo(texto, memoria = {}, empresaId = null) {
     return {
       tipo: "respaldo_producto",
       producto: producto.slug,
-      mensaje: `Claro ðŸ‘‹ Te cuento sobre ${producto.nombre}. EstÃ¡ a S/${producto.precio}.`,
+      mensaje: `Claro 👋 Te cuento sobre ${producto.nombre}. Está a S/${producto.precio}.`,
       memoria: {
         producto: producto.slug,
         paso: memoria.paso || "conversacion",
@@ -820,7 +831,7 @@ async function respuestaRespaldo(texto, memoria = {}, empresaId = null) {
   return {
     tipo: "respaldo_general",
     mensaje:
-      "Claro ðŸ‘‹ Dime quÃ© producto viste y te paso la informaciÃ³n.",
+      "Claro 👋 Dime qué producto viste y te paso la información.",
     memoria: {
       producto: memoria.producto || null,
       paso: memoria.paso || "conversacion",
@@ -830,6 +841,7 @@ async function respuestaRespaldo(texto, memoria = {}, empresaId = null) {
 }
 
 export async function decidirRespuestaBot({
+  pool = null,
   texto,
   textoAccion,
   calificacion,
@@ -837,6 +849,7 @@ export async function decidirRespuestaBot({
   historial = [],
   empresaId = null,
   productoPrincipal = null,
+  agenteId = null,
   telefono = null,
 }) {
 
@@ -845,6 +858,69 @@ export async function decidirRespuestaBot({
   }
 
   try {
+
+    // Obtener exclusivamente los datos de pago de esta empresa.
+    // Nunca utilizar cuentas globales como respaldo de otra empresa.
+    let datosPagoEmpresa = {
+      titular: null,
+      yape: null,
+      plin: null,
+      bcp: null,
+      interbank: null,
+      bbva: null,
+      bancoNacion: null,
+      adelantoMonto: null,
+    };
+
+    if (pool && empresaId != null) {
+      const resultadoPagos = await pool.query(
+        `
+        SELECT
+          titular,
+          yape,
+          plin,
+          bcp,
+          interbank,
+          bbva,
+          banco_nacion,
+          adelanto_monto
+        FROM configuracion_pagos_empresa
+        WHERE empresa_id = $1
+        LIMIT 1
+        `,
+        [empresaId]
+      );
+
+      if (resultadoPagos.rows.length > 0) {
+        const fila = resultadoPagos.rows[0];
+
+        datosPagoEmpresa = {
+          titular: fila.titular,
+          yape: fila.yape,
+          plin: fila.plin,
+          bcp: fila.bcp,
+          interbank: fila.interbank,
+          bbva: fila.bbva,
+          bancoNacion: fila.banco_nacion,
+          adelantoMonto: fila.adelanto_monto,
+        };
+      }
+    }
+
+    const adelantoConfigurado = Number(datosPagoEmpresa.adelantoMonto);
+
+    const adelantoMonto =
+      datosPagoEmpresa.adelantoMonto != null &&
+      Number.isFinite(adelantoConfigurado) &&
+      adelantoConfigurado >= 0
+        ? adelantoConfigurado
+        : null;
+
+    const adelantoTexto =
+      adelantoMonto != null
+        ? `S/${adelantoMonto.toFixed(2)}`
+        : "el monto de adelanto que te confirme un asesor";
+
     const textoNormalizado = String(texto || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -1010,14 +1086,18 @@ export async function decidirRespuestaBot({
     console.log('DEBUG PRODUCTO PRINCIPAL:', { texto, productoPrincipal, consultaGenericaProducto, memoriaProducto: memoria?.producto, memoriaParaIAProducto: memoriaParaIA?.producto, memoriaPaso: memoria?.paso, memoriaParaIAPaso: memoriaParaIA?.paso });
 
     const analisis = await consultarIA({
-      mensaje: texto,
-      memoria: memoriaParaIA,
-      historial,
-      empresaId,
-      productoPrincipal,
-    });
+  pool,
+  mensaje: texto,
+  memoria: memoriaParaIA,
+  historial,
+  empresaId,
+  datosPagoEmpresa,
+  productoPrincipal,
+  agenteId,
+});
 
     if (!analisis) {
+      if (agenteId) return null;
       return await respuestaRespaldo(texto, memoria, empresaId);
     }
 
@@ -1905,15 +1985,15 @@ if (
         "esperando_pago";
 
       const datoPago =
-        obtenerDatoPagoPrincipal();
+        obtenerDatoPagoPrincipal(datosPagoEmpresa);
 
       mensajeControlado = datoPago
-        ? `Perfecto, tus datos estan confirmados.\n\nPara confirmar el pedido realiza el adelanto de S/30:\n\n${datoPago}\n\nCuando realices el pago, enviame el comprobante por aqui.`
-        : `Perfecto, tus datos estan confirmados. Para confirmar el pedido corresponde el adelanto de S/30. En este momento no tengo un dato de pago disponible para mostrarte.`;
+        ? `Perfecto, tus datos estan confirmados.\n\nPara confirmar el pedido realiza el adelanto de ${adelantoTexto}:\n\n${datoPago}\n\nCuando realices el pago, enviame el comprobante por aqui.`
+: `Perfecto, tus datos estan confirmados. Para confirmar el pedido corresponde el adelanto de ${adelantoTexto}. En este momento no tengo un dato de pago disponible para mostrarte.`;
     } else {
       /*
        * Si detectamos que corrigio algun dato,
-       * volver a enseÃ±ar el resumen actualizado.
+       * volver a enseñar el resumen actualizado.
        */
       const hizoCorreccion =
         Boolean(
@@ -2011,17 +2091,18 @@ if (
         "Perfecto \u{1F44D} Quedo atento al comprobante.";
     } else if (pidePago) {
       const datosSolicitados =
-        construirDatosPago(
-          textoAccion ?? texto
+construirDatosPago(
+  textoAccion ?? texto,
+  datosPagoEmpresa
         );
 
       const datoPago =
         datosSolicitados ||
-        obtenerDatoPagoPrincipal();
+        obtenerDatoPagoPrincipal(datosPagoEmpresa);
 
       if (datoPago) {
         mensajeControlado =
-          `Aqui tienes los datos para realizar el adelanto de S/30:\n\n${datoPago}\n\nCuando realices el pago, enviame el comprobante por aqui.`;
+          `Aqui tienes los datos para realizar el adelanto de ${adelantoTexto}:\n\n${datoPago}\n\nCuando realices el pago, enviame el comprobante por aqui.`;
       }
     }
   }
@@ -2048,7 +2129,7 @@ if (
     const adelanto =
       envioPedido
         ?.requiereAdelanto === true
-        ? "Trabajamos por Shalom u Olva Courier. Para el envio solicitamos un adelanto de S/30 y el saldo lo pagas cuando tu pedido ya se encuentre en la agencia."
+        ? `Trabajamos por Shalom u Olva Courier. Para el envio solicitamos un adelanto de ${adelantoTexto} y el saldo lo pagas cuando tu pedido ya se encuentre en la agencia.`
         : "Trabajamos por Shalom u Olva Courier.";
 
     mensajeControlado =
@@ -2065,7 +2146,8 @@ const datosPago =
   contexto.contra_entrega === true
     ? null
     : construirDatosPago(
-        textoAccion ?? texto
+        textoAccion ?? texto,
+        datosPagoEmpresa
       );
 
 if (
@@ -2098,7 +2180,12 @@ const mensajeFinal =
       objecion: analisis.objecion,
       nivelInteres: analisis.nivel_interes,
       accion: analisis.accion,
-      apertura: analisis.apertura || null,
+      apertura:
+  analisis.multimedia === "presentacion"
+    ? producto
+      ? `📦 Te muestro nuestro producto: ${String(producto).replace(/-/g, " ")} 👇`
+      : "📦 Te muestro nuestro producto 👇"
+    : analisis.apertura || null,
       mensaje: mensajeFinal,
       multimedia: analisis.multimedia || "ninguno",
       faseVenta: faseVentaFinal,
@@ -2122,6 +2209,8 @@ const mensajeFinal =
       "ERROR CEREBRO IA:",
       error?.message || error
     );
+
+    if (agenteId) return null;
 
     return await respuestaRespaldo(texto, memoria, empresaId);
   }

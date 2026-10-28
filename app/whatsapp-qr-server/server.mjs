@@ -1,5 +1,9 @@
 import "dotenv/config";
+import { config as cargarEnv } from "dotenv";
+
+cargarEnv({ path: ".env.local" });
 import express from "express";
+import { timingSafeEqual } from "node:crypto";
 import cors from "cors";
 import qrcode from "qrcode";
 import pg from "pg";
@@ -37,6 +41,38 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+function autorizarPeticionInterna(req, res, next) {
+  const tokenEsperado = String(
+    process.env.WHATSAPP_QR_INTERNAL_TOKEN || ""
+  );
+
+  const tokenRecibido = String(
+    req.headers["x-internal-token"] || ""
+  );
+
+  if (!tokenEsperado || tokenEsperado.length < 32) {
+    return res.status(503).json({
+      success: false,
+      error: "Autenticacion interna no configurada",
+    });
+  }
+
+  const esperado = Buffer.from(tokenEsperado, "utf8");
+  const recibido = Buffer.from(tokenRecibido, "utf8");
+
+  if (
+    esperado.length !== recibido.length ||
+    !timingSafeEqual(esperado, recibido)
+  ) {
+    return res.status(401).json({
+      success: false,
+      error: "Solicitud no autorizada",
+    });
+  }
+
+  next();
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
@@ -59,6 +95,11 @@ await pool.query(`
     ADD COLUMN IF NOT EXISTS distribucion_usando_reemplazo BOOLEAN DEFAULT false;
 `);
 
+await pool.query(`
+  ALTER TABLE integraciones_whatsapp_qr
+    ADD COLUMN IF NOT EXISTS flujo_principal_id INTEGER;
+`);
+
   await prepararEsquemaFlujos(pool);
 
   await pool.query(`
@@ -77,9 +118,15 @@ let estado = "desconectado";
 let whatsappQrId = null;
 let empresaQrId = null;
 let productoQrSlug = null;
+let flujoPrincipalQrId = null;
 
 const BOT_GLOBAL_PAUSADO = true;
 const SEGUIMIENTOS_GLOBAL_PAUSADOS = true;
+
+function telefonoAutorizadoPrueba(telefono) {
+  const numero = String(telefono || '').replace(/\D/g, '');
+  return numero.length >= 10 && String(process.env.BOT_TEST_PHONES || '').split(',').map(n => n.replace(/\D/g, '')).includes(numero);
+}
 let numeroWhatsappActual = null;
 let resolviendoCanalPromise = null;
 const telefonoPorLidHistorial = new Map();
@@ -226,6 +273,7 @@ async function cargarIntegracionQr() {
 
   whatsappQrId = null;
   productoQrSlug = null;
+  flujoPrincipalQrId = null;
   numeroWhatsappActual = null;
 
   console.log("Sesion QR cargada:", {
@@ -259,7 +307,7 @@ const whatsappQrIdAnterior =
 
   const existente = await pool.query(
     `
-    SELECT id, empresa_id, numero_whatsapp, producto_slug
+    SELECT id, empresa_id, numero_whatsapp, producto_slug, flujo_principal_id
     FROM integraciones_whatsapp_qr
     WHERE empresa_id = $1
       AND numero_whatsapp = $2
@@ -283,7 +331,7 @@ const whatsappQrIdAnterior =
         estado
       )
       VALUES ($1, $2, $3, NULL, 'conectado')
-      RETURNING id, empresa_id, numero_whatsapp, producto_slug
+      RETURNING id, empresa_id, numero_whatsapp, producto_slug, flujo_principal_id
       `,
       [
         empresaQrId,
@@ -297,6 +345,9 @@ const whatsappQrIdAnterior =
 
   whatsappQrId = integracion.id;
   productoQrSlug = integracion.producto_slug || null;
+  flujoPrincipalQrId = integracion.flujo_principal_id
+    ? Number(integracion.flujo_principal_id)
+    : null;
 
 if (
   whatsappQrIdAnterior &&
@@ -612,24 +663,28 @@ async function actualizarCalificacionCliente(
 
   await pool.query(
     `UPDATE clientes_whatsapp_qr
-     SET bot_activo=true, humano_hasta=NULL, updated_at=NOW()
-     WHERE cliente_id=$1
-       AND whatsapp_qr_id=$2
-       AND bot_activo=false
-       AND COALESCE(modo_humano_permanente, false)=false
-       AND (humano_hasta IS NULL OR humano_hasta <= NOW())`
-,    [clienteId,whatsappQrId]
+SET bot_activo=true, humano_hasta=NULL, updated_at=NOW()
+WHERE cliente_id=$1
+  AND whatsapp_qr_id=$2
+  AND empresa_id=$3
+  AND bot_activo=false
+  AND COALESCE(modo_humano_permanente, false)=false
+  AND COALESCE(requiere_closer, false)=false
+  AND COALESCE(handoff_motivo, '') <> 'validar_pago'
+  AND (humano_hasta IS NULL OR humano_hasta <= NOW())`
+,    [clienteId,whatsappQrId,empresaQrId]
   );
 
-  const r=await pool.query(
-    `SELECT COALESCE(bot_senales,'[]'::jsonb) AS bot_senales,
-            COALESCE(bot_activo,true) AS bot_activo
-     FROM clientes_whatsapp_qr
-     WHERE cliente_id=$1
-       AND whatsapp_qr_id=$2
-     LIMIT 1`,
-    [clienteId,whatsappQrId]
-  );
+const r=await pool.query(
+  `SELECT COALESCE(bot_senales,'[]'::jsonb) AS bot_senales,
+          COALESCE(bot_activo,true) AS bot_activo
+   FROM clientes_whatsapp_qr
+   WHERE cliente_id=$1
+     AND whatsapp_qr_id=$2
+     AND empresa_id=$3
+   LIMIT 1`,
+  [clienteId,whatsappQrId,empresaQrId]
+);
 
   if (!r.rows[0]) return null;
 
@@ -651,13 +706,21 @@ if (
   const score=Math.min(100,senales.reduce((t,x)=>t+(PESOS_SENALES[x]||0),0));
   const temperatura=score>=80?'caliente':score>=25?'tibio':'frio';
 
-  await pool.query(
-    `UPDATE clientes_whatsapp_qr
-     SET bot_senales=$1::jsonb, score=$2, temperatura=$3, updated_at=NOW()
-     WHERE cliente_id=$4
-       AND whatsapp_qr_id=$5`,
-    [JSON.stringify(senales),score,temperatura,clienteId,whatsappQrId]
-  );
+await pool.query(
+  `UPDATE clientes_whatsapp_qr
+   SET bot_senales=$1::jsonb, score=$2, temperatura=$3, updated_at=NOW()
+   WHERE cliente_id=$4
+     AND whatsapp_qr_id=$5
+     AND empresa_id=$6`,
+  [
+    JSON.stringify(senales),
+    score,
+    temperatura,
+    clienteId,
+    whatsappQrId,
+    empresaQrId
+  ]
+);
 
   return {senales,score,temperatura,requiereCloser:false};
 }
@@ -1428,10 +1491,12 @@ async function procesarSeguimientosSilencio() {
 }
 
 async function procesarLoteBot(lote) {
-  if (BOT_GLOBAL_PAUSADO) return;
+  if (BOT_GLOBAL_PAUSADO && (!Array.isArray(lote) || lote.length === 0 || !lote.every(item => telefonoAutorizadoPrueba(item.telefono)))) return;
   if (!Array.isArray(lote) || lote.length === 0) return;
 
   const ultimo = lote[lote.length - 1];
+  const agenteId = ultimo.agenteId || null;
+  const productoId = ultimo.productoId || null;
   const clienteId = ultimo.clienteId;
   const telefono = ultimo.telefono;
   const jidRespuesta = ultimo.jidRespuesta || `${telefono}@s.whatsapp.net`;
@@ -1489,6 +1554,7 @@ const asignacionDistribucion = await pool.query(
 );
 
 const productoAsignado =
+  productoId ||
   asignacionDistribucion.rows[0]?.bot_producto ||
   productoQrSlug;
 
@@ -1502,16 +1568,27 @@ console.log("ASIGNACION BOT RESUELTA:", {
   asesor: asesorAsignado,
 });
 
-  const respuestaBot = await decidirRespuestaBot({
-  texto: textoBot,
-  textoAccion: textoAccion || "",
-  calificacion,
-  memoria,
-  historial,
-  empresaId: empresaQrId,
-  productoPrincipal: productoAsignado,
-  telefono,
-});
+let respuestaBot = null;
+
+try {
+  respuestaBot = await decidirRespuestaBot({
+    pool,
+    texto: textoBot,
+    textoAccion: textoAccion || "",
+    calificacion,
+    memoria,
+    historial,
+    empresaId: empresaQrId,
+    productoPrincipal: productoAsignado,
+    agenteId,
+    telefono,
+  });
+} catch (errorIA) {
+  console.error(
+    "ERROR PROCESANDO AGENTE IA:",
+    errorIA?.message || errorIA
+  );
+}
 
   const mensajeMasNuevo = await pool.query(
   `
@@ -1536,7 +1613,6 @@ if (mensajeMasNuevo.rowCount > 0) {
 
   return;
 }
-
   const analisisCRM = respuestaBot?.analisis || null;
 
 const ciudadDetectada = String(
@@ -1568,21 +1644,63 @@ if (
   }
 }
 
-  const etapaAutomatica = resolverEtapaAutomatica(
-    memoria?.etapa,
-    analisisCRM?.etapa_sugerida
+  // Detectar evidencia de pago en el análisis de archivos.
+// El texto escrito por el cliente no cuenta como comprobante.
+const analisisArchivos = lote
+  .map((item) => String(item.textoBot || ""))
+  .filter((texto) =>
+    texto.includes("[ANALISIS INTERNO DEL ARCHIVO")
+  )
+  .map((texto) =>
+    texto.split("[ANALISIS INTERNO DEL ARCHIVO")[1] || ""
   );
+
+const comprobanteDetectado = analisisArchivos.some((analisis) => {
+  const descripcion = normalizarTexto(analisis);
+
+  const negacionOContextoAjeno =
+    /\b(?:no se puede determinar|no es posible determinar|no se identifica|no se observa|no se detecta|no se muestra|no muestra|no contiene|no parece|no es|sin evidencia de|no hay|no hay evidencia de)\b.{0,65}\b(?:comprobante|voucher|constancia|pago|transferencia|deposito)\b/.test(descripcion) ||
+    /\b(?:publicidad|anuncio|tutorial|instrucciones|ejemplo|plantilla|formulario|como obtener|para obtener|como generar)\b/.test(descripcion);
+
+  const evidencia =
+    /\b(?:comprobante(?: de pago)?|voucher|constancia de pago|transferencia realizada|pago realizado|deposito realizado)\b/.test(descripcion);
+
+  return evidencia && !negacionOContextoAjeno;
+});
+
+// Si OpenAI no responde, utilizar la deteccion ya verificada.
+if (!respuestaBot && comprobanteDetectado) {
+  respuestaBot = {
+    mensaje:
+      "Recibimos tu archivo. Un asesor revisara el comprobante de pago y te confirmara por este medio.",
+    multimedia: "ninguno",
+    apertura: null,
+    handoff: true,
+    memoria,
+    analisis: null,
+  };
+}
+
+const etapaOriginalPedido = memoria?.etapa;
+
+const etapaAutomatica = resolverEtapaAutomatica(
+  memoria?.etapa,
+  comprobanteDetectado
+    ? "Pago por validar"
+    : analisisCRM?.etapa_sugerida
+);
 
   if (etapaAutomatica && etapaAutomatica !== memoria?.etapa) {
     await pool.query(
       `
       UPDATE clientes_whatsapp_qr
-      SET etapa = $2,
-          updated_at = NOW()
-      WHERE cliente_id = $1
-        AND whatsapp_qr_id = $3
+SET etapa = $2,
+    updated_at = NOW()
+WHERE cliente_id = $1
+  AND whatsapp_qr_id = $3
+  AND empresa_id = $4
       `,
-      [clienteId, etapaAutomatica, whatsappQrId]
+      [clienteId, etapaAutomatica, whatsappQrId, empresaQrId]
     );
 
     memoria.etapa = etapaAutomatica;
@@ -1597,16 +1715,27 @@ if (
     );
   }
 
-  const requiereCloserIA =
-    respuestaBot?.handoff === true ||
-    analisisCRM?.requiere_closer === true ||
-    etapaAutomatica === "Pago por validar";
+const etapasProtegidasPago = new Set([
+  "Pagó Adelanto",
+  "Enviado",
+  "Entregado",
+]);
+
+const comprobantePendienteRevision =
+  comprobanteDetectado &&
+  !etapasProtegidasPago.has(etapaOriginalPedido);
+
+const requiereCloserIA =
+  comprobantePendienteRevision ||
+  respuestaBot?.handoff === true ||
+  analisisCRM?.requiere_closer === true ||
+  etapaAutomatica === "Pago por validar";
 
   if (requiereCloserIA) {
     const motivoIA = String(analisisCRM?.motivo_closer || "").trim();
 
-    const handoffMotivo =
-      etapaAutomatica === "Pago por validar"
+const handoffMotivo =
+  comprobantePendienteRevision || etapaAutomatica === "Pago por validar"
         ? "validar_pago"
         : motivoIA && motivoIA !== "ninguno"
         ? motivoIA
@@ -1631,12 +1760,13 @@ const asesorAsignadoResult = await pool.query(
        cwq.empresa_id
    AND closer_distribucion.rol = 'asesor'
 
-  WHERE cwq.cliente_id = $1
-    AND cwq.whatsapp_qr_id = $2
+WHERE cwq.cliente_id = $1
+  AND cwq.whatsapp_qr_id = $2
+  AND cwq.empresa_id = $3
 
-  LIMIT 1
-  `,
-  [clienteId, whatsappQrId]
+LIMIT 1
+`,
+[clienteId, whatsappQrId, empresaQrId]
 );
 
 const filaAsignacion =
@@ -1713,15 +1843,20 @@ console.log("CLOSER HANDOFF RESUELTO:", {
     await pool.query(
       `
       UPDATE clientes_whatsapp_qr
-      SET requiere_closer = true,
-          handoff_motivo = $3,
-          asesor = CASE
+SET requiere_closer = true,
+    handoff_motivo = CASE
+      WHEN handoff_motivo = 'validar_pago'
+        THEN 'validar_pago'
+      ELSE $3
+    END,
+    asesor = CASE
   WHEN $5 = true THEN $2
   ELSE COALESCE(NULLIF(BTRIM(asesor), ''), $2)
 END,
           updated_at = NOW()
       WHERE cliente_id = $1
-        AND whatsapp_qr_id = $4
+  AND whatsapp_qr_id = $4
+  AND empresa_id = $6
       `,
       [
   clienteId,
@@ -1729,6 +1864,7 @@ END,
   handoffMotivo,
   whatsappQrId,
   tieneDistribucion,
+  empresaQrId,
 ]
     );
 
@@ -1742,9 +1878,31 @@ END,
     );
   }
 
-  if (respuestaBot?.memoria) {
-    await guardarMemoriaBot(pool, clienteId, whatsappQrId, respuestaBot.memoria);
-  }
+if (comprobantePendienteRevision) {
+  // Conservar el pedido original mientras un asesor valida el pago.
+  await guardarMemoriaBot(pool, clienteId, whatsappQrId, {
+    producto: memoria.producto || productoAsignado || null,
+    paso: memoria.paso || "esperando_pago",
+    contexto: memoria.contexto || {},
+  });
+} else if (respuestaBot?.memoria) {
+  await guardarMemoriaBot(
+    pool,
+    clienteId,
+    whatsappQrId,
+    respuestaBot.memoria
+  );
+}
+
+// Respuesta controlada para comprobantes pendientes.
+if (comprobantePendienteRevision && respuestaBot) {
+  respuestaBot.mensaje =
+    "📩 Recibimos tu comprobante. Un asesor revisará el pago y te confirmará por este medio.";
+
+  respuestaBot.apertura = null;
+  respuestaBot.multimedia = "ninguno";
+  respuestaBot.handoff = true;
+}
 
   if (!respuestaBot?.mensaje) return;
 
@@ -1788,6 +1946,21 @@ if (mensajeDuranteEspera.rowCount > 0) {
   });
 
   return;
+}
+
+if (BOT_GLOBAL_PAUSADO) {
+  const telefonoDestino = String(telefono || "").replace(/\D/g, "");
+
+  if (
+    !telefonoAutorizadoPrueba(telefonoDestino) ||
+    jidRespuesta !== `${telefonoDestino}@s.whatsapp.net`
+  ) {
+    console.warn("ENVIO BOT BLOQUEADO EN PRUEBA:", {
+      clienteId,
+      telefonoDestino,
+    });
+    return;
+  }
 }
 
   const multimediaSolicitada = respuestaBot?.multimedia || "ninguno";
@@ -2030,67 +2203,74 @@ if (mensajeDuranteEspera.rowCount > 0) {
     /(?:^|\n)PEDIDO:\s*/i.test(mensajeBotOriginal) &&
     /(?:^|\n)TOTAL:\s*S\//i.test(mensajeBotOriginal);
 
-  const mensajeBotCompleto =
-    esResumenPedido
-      ? mensajeBotOriginal
-      : mensajeBotOriginal
-          .replace(/\s+/g, " ")
-          .trim();
+const mensajeBotCompleto =
+  esResumenPedido
+    ? mensajeBotOriginal
+    : mensajeBotOriginal
+        .replace(/[^\S\n]+/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
 
-  const dividirRespuestaHumana = (texto) => {
-    const oraciones = (
-      texto.match(/[^.!?]+(?:[.!?]+|$)/g) || [texto]
-    )
-      .map((parte) => parte.trim())
-      .filter(Boolean);
+const dividirRespuestaHumana = (texto) => {
+  const contenido = String(texto || "").trim();
+  if (!contenido) return [];
 
-    const partes = [];
-    let actual = "";
+  // Separar la pregunta final cuando exista.
+  const preguntas = contenido.match(
+    /(?:^|[\n.!?]\s*)(¿[^\n?]*\?)[\s]*$/
+  );
 
-    for (const oracion of oraciones) {
-      const esPregunta =
-        oracion.startsWith("¿");
+  const preguntaFinal = preguntas?.[1]?.trim() || "";
 
-      const propuesta =
-        actual
-          ? `${actual} ${oracion}`
-          : oracion;
+  const cuerpo = preguntaFinal
+    ? contenido.slice(0, preguntas.index).trim()
+    : contenido;
 
-      // La pregunta final queda como burbuja aparte.
-      if (esPregunta && actual) {
-        partes.push(actual.trim());
-        actual = oracion;
-        continue;
-      }
+  // Mantener los párrafos originales.
+  const parrafos = cuerpo
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
-      // Evita burbujas demasiado largas.
-      if (
-        actual &&
-        propuesta.length > 135
-      ) {
-        partes.push(actual.trim());
-        actual = oracion;
-        continue;
-      }
+  const partes = [];
+  let actual = "";
 
+  for (const parrafo of parrafos) {
+    const propuesta = actual
+      ? `${actual}\n\n${parrafo}`
+      : parrafo;
+
+    if (actual && propuesta.length > 280 && partes.length < 2) {
+      partes.push(actual);
+      actual = parrafo;
+    } else {
       actual = propuesta;
     }
+  }
 
-    if (actual) {
-      partes.push(actual.trim());
+  if (actual) partes.push(actual);
+
+  // La pregunta de cierre se envía aparte.
+  if (preguntaFinal) {
+    if (partes.length >= 3) {
+      partes[1] = partes.slice(1).join("\n\n");
+      partes.length = 2;
     }
 
-    // Evitar que el bot mande demasiadas burbujas.
-    if (partes.length <= 3) {
-      return partes;
-    }
+    partes.push(preguntaFinal);
+  }
 
+  // Máximo 3 burbujas.
+  if (partes.length > 3) {
     return [
       partes[0],
       partes[1],
-      partes.slice(2).join(" "),
+      partes.slice(2).join("\n\n"),
     ];
-  };
+  }
+
+  return partes;
+};
 
   const partesRespuesta =
     esResumenPedido
@@ -2108,6 +2288,21 @@ if (mensajeDuranteEspera.rowCount > 0) {
       partesRespuesta[i];
 
     if (!textoParte) continue;
+
+if (BOT_GLOBAL_PAUSADO) {
+  const numeroDestino = String(telefono || "").replace(/\D/g, "");
+
+  if (
+    !telefonoAutorizadoPrueba(numeroDestino) ||
+    jidRespuesta !== `${numeroDestino}@s.whatsapp.net`
+  ) {
+    console.warn("ENVIO DE TEXTO IA BLOQUEADO:", {
+      clienteId,
+      numeroDestino,
+    });
+    return;
+  }
+}
 
     const enviadoBot =
       await sock.sendMessage(
@@ -2409,10 +2604,6 @@ if (msg.key.fromMe !== true && contextInfoMeta) {
     telefono,
     ctwaClid:
       contextInfoMeta?.ctwaClid || null,
-    conversionSource:
-      contextInfoMeta?.conversionSource || null,
-    entryPointConversionSource:
-      contextInfoMeta?.entryPointConversionSource || null,
     sourceType:
       contextInfoMeta?.sourceType || null,
     sourceId:
@@ -2757,7 +2948,8 @@ let distribucionLead = null;
 if (
   msg.key.fromMe !== true &&
   empresaQrId &&
-  postIdDistribucion
+  postIdDistribucion &&
+  !flujoPrincipalQrId
 ) {
   try {
     distribucionLead =
@@ -2971,12 +3163,73 @@ RETURNING id
 
   const clienteId = cliente.rows[0].id;
 
+
+    // Verificar que el cliente pertenezca al canal QR activo.
+    await pool.query("INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at) VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()", [empresaQrId, clienteId, whatsappQrId, "mensaje"]);
+
+
+if (
+  !esMio &&
+  flujoPrincipalQrId &&
+  postIdDistribucion
+) {
   await pool.query(
-    `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
-     VALUES ($1, $2, $3, 'mensaje', NOW())
-     ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
-    [empresaQrId, clienteId, whatsappQrId]
+    `
+    UPDATE clientes_whatsapp_qr
+    SET
+      bot_producto = NULL,
+      bot_paso = NULL,
+
+      distribucion_post_id = NULL,
+      distribucion_grupo_id = NULL,
+      distribucion_closer_id = NULL,
+      distribucion_usando_reemplazo = false,
+      distribucion_flujo_id = NULL,
+
+      flujo_ejecucion_id = NULL,
+      flujo_pila = '[]'::jsonb,
+      flujo_estado = 'sin_iniciar',
+      flujo_nodo_uid = NULL,
+      flujo_iniciado_at = NULL,
+      flujo_completado_at = NULL,
+
+      bot_contexto =
+        jsonb_strip_nulls(
+          jsonb_build_object(
+            'ciudad',
+              COALESCE(bot_contexto, '{}'::jsonb)->'ciudad',
+            'dni',
+              COALESCE(bot_contexto, '{}'::jsonb)->'dni',
+            'nombre',
+              COALESCE(bot_contexto, '{}'::jsonb)->'nombre',
+            'last_ad',
+              to_jsonb($3::text)
+          )
+        ),
+
+      updated_at = NOW()
+    WHERE cliente_id = $1
+  AND whatsapp_qr_id = $2
+  AND empresa_id = $4
+  AND COALESCE(handoff_motivo, '') <> 'validar_pago'
+    `,
+    [
+  clienteId,
+  whatsappQrId,
+  postIdDistribucion,
+  empresaQrId,
+]
   );
+
+  console.log(
+    "ROUTER PRINCIPAL REINICIADO POR NUEVO ANUNCIO:",
+    {
+      clienteId,
+      flujoPrincipalQrId,
+      lastAd: postIdDistribucion,
+    }
+  );
+}
 
 if (!esMio && distribucionLead) {
   const actualizacionDistribucion =
@@ -3027,9 +3280,11 @@ if (!esMio && distribucionLead) {
 
         updated_at = NOW()
 
-      WHERE cliente_id = $1
-        AND whatsapp_qr_id = $2
-        AND distribucion_post_id IS DISTINCT FROM $5
+WHERE cliente_id = $1
+  AND whatsapp_qr_id = $2
+  AND empresa_id = $10
+  AND COALESCE(handoff_motivo, '') <> 'validar_pago'
+  AND distribucion_post_id IS DISTINCT FROM $5
 
       RETURNING
         bot_producto,
@@ -3039,16 +3294,17 @@ if (!esMio && distribucionLead) {
         flujo_estado
       `,
       [
-        clienteId,
-        whatsappQrId,
-        distribucionLead.productoSlug || null,
-        distribucionLead.closerNombre || null,
-        postIdDistribucion || null,
-        distribucionLead.grupoId || null,
-        distribucionLead.closerId || null,
-        distribucionLead.usandoReemplazo === true,
-        distribucionLead.flujoId || null,
-      ]
+  clienteId,
+  whatsappQrId,
+  distribucionLead.productoSlug || null,
+  distribucionLead.closerNombre || null,
+  postIdDistribucion || null,
+  distribucionLead.grupoId || null,
+  distribucionLead.closerId || null,
+  distribucionLead.usandoReemplazo === true,
+  distribucionLead.flujoId || null,
+  empresaQrId,
+]
     );
 
   if (actualizacionDistribucion.rowCount > 0) {
@@ -3084,6 +3340,36 @@ if (!esMio && distribucionLead) {
     );
   }
 }
+
+  if (!esMio && postIdDistribucion) {
+    await pool.query(
+      `
+      UPDATE clientes_whatsapp_qr
+      SET bot_contexto = jsonb_set(
+            COALESCE(bot_contexto, '{}'::jsonb),
+            '{last_ad}',
+            to_jsonb($3::text),
+            true
+          ),
+          updated_at = NOW()
+      WHERE cliente_id = $1
+        AND whatsapp_qr_id = $2
+      `,
+      [
+        clienteId,
+        whatsappQrId,
+        postIdDistribucion,
+      ]
+    );
+
+    console.log(
+      "LAST_AD GUARDADO:",
+      {
+        clienteId,
+        postId: postIdDistribucion,
+      }
+    );
+  }
 
   if (!esMio) {
     await cancelarSeguimientoSilencio(clienteId, whatsappQrId);
@@ -3144,7 +3430,7 @@ console.log("Mensaje guardado en PostgreSQL");
 
 let resultadoFlujo = null;
 
-if (!esMio && !BOT_GLOBAL_PAUSADO) {
+if (!esMio && (!BOT_GLOBAL_PAUSADO || telefonoAutorizadoPrueba(telefono))) {
   try {
     const jidFlujo =
       msg.key.remoteJidAlt ||
@@ -3163,6 +3449,16 @@ if (!esMio && !BOT_GLOBAL_PAUSADO) {
           tipoMensajeCliente: tipoMensaje || "text",
         jidRespuesta: jidFlujo,
         mediaDir: MEDIA_DIR,
+flujoPruebaId:
+  BOT_GLOBAL_PAUSADO &&
+  telefonoAutorizadoPrueba(telefono)
+    ? Number(process.env.BOT_TEST_FLOW_ID || 0) || null
+    : null,
+
+        flujoPrincipalId:
+  BOT_GLOBAL_PAUSADO && telefonoAutorizadoPrueba(telefono)
+    ? Number(process.env.BOT_TEST_FLOW_ID || 0) || null
+    : flujoPrincipalQrId,
       });
 
     console.log(
@@ -3329,6 +3625,8 @@ if (
     textoBot,
     textoAccion,
     esPrimerContacto,
+  agenteId: resultadoFlujo?.agenteId || null,
+  productoId: resultadoFlujo?.productoId || null,
   });
 
   console.log("BUFFER BOT AGREGADO:", {
@@ -3346,7 +3644,7 @@ if (
   });
 }
 
-app.get("/media/:id", (req, res) => {
+app.get("/media/:id", autorizarPeticionInterna, (req, res) => {
   const id = String(req.params.id || "");
   if (!/^[a-zA-Z0-9._-]+$/.test(id)) return res.status(400).json({ error: "Media invalido" });
   res.sendFile(id, { root: process.cwd() + "/auth/media" }, (err) => {
@@ -3354,7 +3652,7 @@ app.get("/media/:id", (req, res) => {
   });
 });
 
-app.get("/qr", (req, res) => {
+app.get("/qr", autorizarPeticionInterna, (req, res) => {
   res.json({
     estado,
     qr: qrActual,
@@ -3362,12 +3660,18 @@ app.get("/qr", (req, res) => {
     empresa_id: empresaQrId,
     numero_whatsapp: numeroWhatsappActual,
     producto_slug: productoQrSlug,
+    flujo_principal_id: flujoPrincipalQrId,
   });
 });
 
 
-app.patch("/producto-principal", async (req, res) => {
+app.patch("/producto-principal", autorizarPeticionInterna, async (req, res) => {
   try {
+    const empresaPedida = Number(req.body?.empresa_id);
+    const canalPedido = Number(req.body?.whatsapp_qr_id);
+    if (!Number.isSafeInteger(empresaPedida) || !Number.isSafeInteger(canalPedido) || empresaPedida <= 0 || canalPedido <= 0 || empresaPedida !== Number(empresaQrId) || canalPedido !== Number(whatsappQrId)) {
+      return res.status(403).json({ success: false, error: "Empresa o canal no autorizados" });
+    }
     if (!whatsappQrId || !empresaQrId) {
       return res.status(409).json({ success: false, error: "No hay un canal WhatsApp activo" });
     }
@@ -3426,8 +3730,110 @@ app.patch("/producto-principal", async (req, res) => {
   }
 });
 
-app.post("/desconectar", async (req, res) => {
+
+app.patch("/flujo-principal", autorizarPeticionInterna, async (req, res) => {
   try {
+    const empresaPedida = Number(req.body?.empresa_id);
+    const canalPedido = Number(req.body?.whatsapp_qr_id);
+    if (!Number.isSafeInteger(empresaPedida) || !Number.isSafeInteger(canalPedido) || empresaPedida <= 0 || canalPedido <= 0 || empresaPedida !== Number(empresaQrId) || canalPedido !== Number(whatsappQrId)) {
+      return res.status(403).json({ success: false, error: "Empresa o canal no autorizados" });
+    }
+    if (!whatsappQrId || !empresaQrId) {
+      return res.status(409).json({
+        success: false,
+        error: "No hay un canal WhatsApp activo",
+      });
+    }
+
+    const flujoId = Number(req.body?.flujo_principal_id);
+
+    if (!Number.isInteger(flujoId) || flujoId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Flujo principal no valido",
+      });
+    }
+
+    const flujoResult = await pool.query(
+      `
+      SELECT
+        id,
+        nombre,
+        slug,
+        producto_slug,
+        activo
+      FROM flujos_bot
+      WHERE id = $1
+        AND empresa_id = $2
+        AND activo = true
+      LIMIT 1
+      `,
+      [flujoId, empresaQrId]
+    );
+
+    if (flujoResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Flujo no encontrado o inactivo",
+      });
+    }
+
+    const actualizado = await pool.query(
+      `
+      UPDATE integraciones_whatsapp_qr
+      SET flujo_principal_id = $3,
+          updated_at = NOW()
+      WHERE id = $1
+        AND empresa_id = $2
+      RETURNING flujo_principal_id
+      `,
+      [whatsappQrId, empresaQrId, flujoId]
+    );
+
+    if (actualizado.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Canal WhatsApp no encontrado",
+      });
+    }
+
+    flujoPrincipalQrId = Number(
+      actualizado.rows[0].flujo_principal_id
+    );
+
+    console.log("FLUJO PRINCIPAL WHATSAPP ACTUALIZADO:", {
+      whatsappQrId,
+      empresaQrId,
+      flujoPrincipalQrId,
+      flujo: flujoResult.rows[0].nombre,
+    });
+
+    return res.json({
+      success: true,
+      whatsapp_qr_id: whatsappQrId,
+      flujo_principal_id: flujoPrincipalQrId,
+      flujo: flujoResult.rows[0],
+    });
+  } catch (error) {
+    console.error(
+      "ERROR ACTUALIZANDO FLUJO PRINCIPAL WHATSAPP:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: "No se pudo actualizar el flujo principal",
+    });
+  }
+});
+
+app.post("/desconectar", autorizarPeticionInterna, async (req, res) => {
+  try {
+    const empresaSolicitada = Number(req.body?.empresa_id);
+    const canalSolicitado = Number(req.body?.whatsapp_qr_id);
+    if (!Number.isSafeInteger(empresaSolicitada) || !Number.isSafeInteger(canalSolicitado) || empresaSolicitada <= 0 || canalSolicitado <= 0 || empresaSolicitada !== Number(empresaQrId) || canalSolicitado !== Number(whatsappQrId)) {
+      return res.status(403).json({ success: false, error: "Canal o empresa no autorizados" });
+    }
     estado = "desconectando";
     qrActual = null;
 
@@ -3467,6 +3873,7 @@ await pool.query(
 sock = null;
 whatsappQrId = null;
 productoQrSlug = null;
+flujoPrincipalQrId = null;
 numeroWhatsappActual = null;
 estado = "desconectado";
 
@@ -3490,8 +3897,13 @@ estado = "desconectado";
   }
 });
 
-app.post("/sync-contacts", async (req, res) => {
+app.post("/sync-contacts", autorizarPeticionInterna, async (req, res) => {
   try {
+    const empresaSyncSolicitada = Number(req.body?.empresa_id);
+    const canalSyncSolicitado = Number(req.body?.whatsapp_qr_id);
+    if (!Number.isSafeInteger(empresaSyncSolicitada) || !Number.isSafeInteger(canalSyncSolicitado) || empresaSyncSolicitada <= 0 || canalSyncSolicitado <= 0 || empresaSyncSolicitada !== Number(empresaQrId) || canalSyncSolicitado !== Number(whatsappQrId)) {
+      return res.status(403).json({ success: false, error: "Empresa o canal no autorizados" });
+    }
     if (!sock) {
       return res.status(400).json({
         success: false,
@@ -3514,7 +3926,8 @@ app.post("/sync-contacts", async (req, res) => {
       WHERE telefono IS NOT NULL
         AND telefono <> ''
         AND canal = 'qr'
-    `);
+        AND empresa_id = $1
+        AND whatsapp_qr_id = $2\n    `, [empresaQrId, whatsappQrId]);
 
     let contactosSincronizados = 0;
 
@@ -3555,7 +3968,11 @@ app.post("/sync-contacts", async (req, res) => {
     });
   }
 });
-app.post('/send-media', express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
+app.post(
+  '/send-media',
+  autorizarPeticionInterna,
+  express.raw({ type: '*/*', limit: '25mb' }),
+  async (req, res) => {
   try {
     const telefono = String(req.headers['x-telefono'] || '').replace(/\D/g, '');
     const clienteId = Number(req.headers['x-cliente-id']);
@@ -3600,12 +4017,11 @@ app.post('/send-media', express.raw({ type: '*/*', limit: '25mb' }), async (req,
       return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
     }
 
-    await pool.query(
-      `INSERT INTO clientes_whatsapp_qr (empresa_id, cliente_id, whatsapp_qr_id, origen, updated_at)
-       VALUES ($1, $2, $3, 'mensaje', NOW())
-       ON CONFLICT (cliente_id, whatsapp_qr_id) DO UPDATE SET updated_at = NOW()`,
+    const relacionMedia = await pool.query(
+      `SELECT 1 FROM clientes_whatsapp_qr WHERE empresa_id = $1 AND cliente_id = $2 AND whatsapp_qr_id = $3 LIMIT 1`,
       [empresaQrId, clienteId, whatsappQrId]
     );
+    if (relacionMedia.rowCount === 0) return res.status(403).json({ success: false, error: "Cliente no asociado a este canal QR" });
 
     let tipo = 'document';
     let contenido;
@@ -3624,8 +4040,23 @@ app.post('/send-media', express.raw({ type: '*/*', limit: '25mb' }), async (req,
       };
     }
 
-    const jid = `${telefono}@s.whatsapp.net`;
-    const enviado = await sock.sendMessage(jid, contenido);
+    const telefonoRegistrado = String(
+  cliente.rows[0].telefono || ""
+).replace(/\D/g, "");
+
+const telefonoNormalizado = telefonoRegistrado.startsWith("51")
+  ? telefonoRegistrado
+  : `51${telefonoRegistrado}`;
+
+if (!telefonoRegistrado || telefonoNormalizado !== telefono) {
+  return res.status(403).json({
+    success: false,
+    error: "El telefono no coincide con el cliente registrado",
+  });
+}
+
+const jid = `${telefonoNormalizado}@s.whatsapp.net`;
+const enviado = await sock.sendMessage(jid, contenido);
 
     await mkdir(MEDIA_DIR, { recursive: true });
     const mediaId = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionMedia(mimeType)}`;
@@ -3687,7 +4118,7 @@ app.post('/send-media', express.raw({ type: '*/*', limit: '25mb' }), async (req,
   }
 });
 
-app.post("/send", async (req, res) => {
+app.post("/send", autorizarPeticionInterna, async (req, res) => {
   try {
     const { telefono, mensaje, whatsapp_qr_id } = req.body;
     const esperadoQrId = Number(whatsapp_qr_id);
@@ -3704,18 +4135,49 @@ app.post("/send", async (req, res) => {
       return res.status(409).json({ error: "El canal de WhatsApp activo cambio" });
     }
 
-    const enviadoAsesor = await sock.sendMessage(`${telefono}@s.whatsapp.net`, {
-  text: mensaje,
-});
+    const telefonoFinal = String(telefono || "").replace(/\D/g, "");
+
+if (!/^51\d{9}$/.test(telefonoFinal)) {
+  return res.status(400).json({
+    success: false,
+    error: "Numero de telefono no valido",
+  });
+}
+
+if (typeof mensaje !== "string" || !mensaje.trim()) {
+  return res.status(400).json({
+    success: false,
+    error: "Mensaje no valido",
+  });
+}
 
 const cliente = await pool.query(
   `
-  SELECT id FROM clientes
-  WHERE telefono = $1
-    AND empresa_id = $2
+  SELECT id, telefono
+  FROM clientes
+  WHERE empresa_id = $1
+    AND (
+      regexp_replace(telefono, '[^0-9]', '', 'g') = $2
+      OR regexp_replace(telefono, '[^0-9]', '', 'g') = $3
+    )
   LIMIT 1
   `,
-  [telefono, empresaQrId]
+  [empresaQrId, telefonoFinal, telefonoFinal.slice(2)]
+);
+
+if (!cliente.rows[0]) {
+  return res.status(403).json({
+    success: false,
+    error: "Destinatario no autorizado para esta empresa",
+  });
+}
+
+const relacionCanal = await pool.query("SELECT 1 FROM clientes_whatsapp_qr WHERE empresa_id = $1 AND cliente_id = $2 AND whatsapp_qr_id = $3 LIMIT 1", [empresaQrId, cliente.rows[0].id, whatsappQrId]);
+if (relacionCanal.rowCount === 0) return res.status(403).json({ success: false, error: "Cliente no asociado a este canal QR" });
+
+const enviadoAsesor = await sock.sendMessage(
+  `${telefonoFinal}@s.whatsapp.net`,
+  { text: mensaje }
 );
 
 if (cliente.rows.length > 0) {

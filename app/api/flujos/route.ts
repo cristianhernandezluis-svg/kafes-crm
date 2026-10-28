@@ -1,9 +1,30 @@
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
+import { obtenerSesion } from "@/lib/auth";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
+
+
+async function obtenerAdmin() {
+  const sesion = await obtenerSesion();
+
+  if (!sesion) return null;
+
+  const resultado = await pool.query(
+    `SELECT id, empresa_id
+     FROM usuarios
+     WHERE id = $1
+       AND empresa_id = $2
+       AND rol = 'admin'
+     LIMIT 1`,
+    [sesion.id, sesion.empresa_id]
+  );
+
+  return resultado.rows[0] || null;
+}
+
 
 /*
 =========================================================
@@ -19,9 +40,17 @@ GET
 
 export async function GET(request: Request) {
   try {
+const admin = await obtenerAdmin();
+
+if (!admin) {
+  return NextResponse.json(
+    { success: false, error: "Acceso no autorizado" },
+    { status: 403 }
+  );
+}
     const { searchParams } = new URL(request.url);
 
-    const empresaId = Number(searchParams.get("empresa_id"));
+    const empresaId = Number(admin.empresa_id);
     const flujoId = Number(searchParams.get("id"));
 
     if (!empresaId) {
@@ -174,7 +203,16 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const empresaId = Number(body.empresa_id);
+    const admin = await obtenerAdmin();
+
+if (!admin) {
+  return NextResponse.json(
+    { success: false, error: "Acceso no autorizado" },
+    { status: 403 }
+  );
+}
+
+const empresaId = Number(admin.empresa_id);
     const nombre = String(body.nombre || "").trim();
     const productoSlug =
       String(body.producto_slug || "").trim() || null;
@@ -301,7 +339,16 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
 
-    const empresaId = Number(body.empresa_id);
+    const admin = await obtenerAdmin();
+
+if (!admin) {
+  return NextResponse.json(
+    { success: false, error: "Acceso no autorizado" },
+    { status: 403 }
+  );
+}
+
+const empresaId = Number(admin.empresa_id);
     const flujoId = Number(body.flujo_id);
     const nombre = String(body.nombre || "").trim();
 
@@ -375,7 +422,19 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json();
 
-    const empresaId = Number(body.empresa_id);
+        const admin = await obtenerAdmin();
+
+    if (!admin) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Acceso no autorizado",
+        },
+        { status: 403 }
+      );
+    }
+
+    const empresaId = Number(admin.empresa_id);
     const flujoId = Number(body.flujo_id);
 
     const nodos =
@@ -420,6 +479,50 @@ export async function PUT(request: Request) {
         { status: 404 }
       );
     }
+
+
+    // Validar todos los agentes antes de modificar los nodos.
+    for (const nodo of nodos) {
+  const tipo = String(nodo.type || nodo.tipo || "").trim();
+
+  if (tipo !== "agente_ia") continue;
+
+  const agenteId = String(
+    nodo.data?.agenteId ??
+    nodo.config?.agenteId ??
+    ""
+  ).trim();
+
+      if (!/^[1-9]\d*$/.test(agenteId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Selecciona un agente de IA válido.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const agenteResultado = await client.query(
+        `SELECT id
+         FROM agentes_ia
+         WHERE id = $1::bigint
+           AND empresa_id = $2
+         LIMIT 1`,
+        [agenteId, empresaId]
+      );
+
+      if (!agenteResultado.rows.length) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "El agente no pertenece a esta empresa.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
 
     await client.query("BEGIN");
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
-
+import { obtenerSesion } from "@/lib/auth";
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
@@ -12,8 +12,35 @@ function limpiarTelefono(telefono: string) {
 
 export async function POST(req: Request) {
   try {
+const sesion = await obtenerSesion();
+
+if (!sesion) {
+  return NextResponse.json(
+    { success: false, error: "No autorizado" },
+    { status: 401 }
+  );
+}
+
+const usuarioResult = await pool.query(
+  `SELECT id, empresa_id, rol
+   FROM usuarios
+   WHERE id = $1 AND empresa_id = $2
+   LIMIT 1`,
+  [sesion.id, sesion.empresa_id]
+);
+
+if (usuarioResult.rowCount === 0) {
+  return NextResponse.json(
+    { success: false, error: "Usuario no autorizado" },
+    { status: 403 }
+  );
+}
     const { cliente_id, whatsapp_qr_id, telefono, mensaje } = await req.json();
-    const whatsappQrId = Number(whatsapp_qr_id);
+    const qrIdPresente = whatsapp_qr_id !== undefined && whatsapp_qr_id !== null && whatsapp_qr_id !== "";
+    const whatsappQrId = qrIdPresente ? Number(whatsapp_qr_id) : 0;
+    if (qrIdPresente && (!Number.isSafeInteger(whatsappQrId) || whatsappQrId <= 0)) {
+      return NextResponse.json({ success: false, error: "Canal WhatsApp QR invalido" }, { status: 400 });
+    }
 
     if (!cliente_id || !telefono || !mensaje) {
       return NextResponse.json(
@@ -24,12 +51,13 @@ export async function POST(req: Request) {
 
     const clienteResult = await pool.query(
       `
-      SELECT empresa_id, canal
-      FROM clientes
-      WHERE id = $1
-      LIMIT 1
+      SELECT empresa_id, canal, telefono
+FROM clientes
+WHERE id = $1
+  AND empresa_id = $2
+LIMIT 1
       `,
-      [cliente_id]
+      [cliente_id, sesion.empresa_id]
     );
 
     const cliente = clienteResult.rows[0];
@@ -42,6 +70,24 @@ export async function POST(req: Request) {
     }
 
     const empresaId = cliente.empresa_id;
+    // VALIDACION_CANAL_CLIENTE_QR
+    if (cliente.canal === "qr" && !whatsappQrId) {
+      return NextResponse.json(
+        { success: false, error: "Este cliente requiere un canal WhatsApp QR valido" },
+        { status: 400 }
+      );
+    }
+
+
+if (Number(sesion.empresa_id) !== Number(empresaId)) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "No tienes permiso para enviar mensajes de esta empresa",
+    },
+    { status: 403 }
+  );
+}
 
     if (whatsappQrId) {
       const relacionQr = await pool.query(
@@ -67,20 +113,49 @@ export async function POST(req: Request) {
       }
     }
 
+    const rolActual = usuarioResult.rows[0].rol;
+    const usuarioIdActual = usuarioResult.rows[0].id;
+    if (rolActual !== "admin" && rolActual !== "asesor") {
+      return NextResponse.json({ success: false, error: "Acceso denegado" }, { status: 403 });
+    }
+    if (rolActual === "asesor") {
+      const permisoResult = whatsappQrId
+        ? await pool.query(
+            "SELECT 1 FROM clientes_whatsapp_qr WHERE cliente_id=$1 AND empresa_id=$2 AND whatsapp_qr_id=$3 AND asesor_usuario_id=$4 LIMIT 1",
+            [cliente_id, empresaId, whatsappQrId, usuarioIdActual]
+          )
+        : await pool.query(
+            "SELECT 1 FROM clientes WHERE id=$1 AND empresa_id=$2 AND asesor_usuario_id=$3 LIMIT 1",
+            [cliente_id, empresaId, usuarioIdActual]
+          );
+      if (permisoResult.rowCount === 0) {
+        return NextResponse.json({ success: false, error: "Conversacion no autorizada" }, { status: 403 });
+      }
+    }
     const canal = whatsappQrId ? "qr" : cliente.canal || "cloud";
-    const telefonoFinal = limpiarTelefono(telefono);
+    if (!cliente.telefono) {
+  return NextResponse.json(
+    { success: false, error: "Cliente sin telefono registrado" },
+    { status: 400 }
+  );
+}
+
+const telefonoFinal = limpiarTelefono(
+  String(cliente.telefono)
+);
 
     let whatsappMessageId = null;
-    let data: any = null;
+    let data: { success?: boolean; messageId?: string; messages?: { id: string }[]; error?: unknown } | null = null;
 
     if (canal === "qr") {
       const qrUrl = process.env.WHATSAPP_QR_URL || "http://localhost:4001";
 
       const response = await fetch(`${qrUrl}/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-internal-token": process.env.WHATSAPP_QR_INTERNAL_TOKEN || "",
+  },
         body: JSON.stringify({
           telefono: telefonoFinal,
           mensaje,
@@ -90,7 +165,7 @@ export async function POST(req: Request) {
 
       data = await response.json();
 
-      if (!response.ok || data.success === false) {
+      if (!response.ok || data?.success === false) {
         console.error("ERROR WHATSAPP QR:", data);
 
         return NextResponse.json(
@@ -99,7 +174,7 @@ export async function POST(req: Request) {
         );
       }
 
-      whatsappMessageId = data.messageId || null;
+      whatsappMessageId = data?.messageId || null;
     } else {
       const configResult = await pool.query(
         `
@@ -155,7 +230,7 @@ export async function POST(req: Request) {
         );
       }
 
-      whatsappMessageId = data.messages?.[0]?.id || null;
+      whatsappMessageId = data?.messages?.[0]?.id || null;
     }
 
     if (whatsappQrId) {
@@ -163,7 +238,10 @@ export async function POST(req: Request) {
         `
         UPDATE clientes_whatsapp_qr
         SET bot_activo = false,
-            requiere_closer = false,
+            requiere_closer = CASE
+  WHEN handoff_motivo = 'validar_pago' THEN true
+  ELSE false
+END,
             humano_hasta = NOW() + INTERVAL '90 seconds',
             handoff_motivo = CASE
               WHEN handoff_motivo = 'validar_pago' THEN 'validar_pago'
@@ -172,25 +250,30 @@ export async function POST(req: Request) {
             END,
             updated_at = NOW()
         WHERE cliente_id = $1
-          AND whatsapp_qr_id = $2
+  AND whatsapp_qr_id = $2
+  AND empresa_id = $3
         `,
-        [cliente_id, whatsappQrId]
+        [cliente_id, whatsappQrId, empresaId]
       );
     } else {
       await pool.query(
         `
         UPDATE clientes
         SET bot_activo = false,
-            requiere_closer = false,
+            requiere_closer = CASE
+  WHEN handoff_motivo = 'validar_pago' THEN true
+  ELSE false
+END,
             humano_hasta = NOW() + INTERVAL '90 seconds',
             handoff_motivo = CASE
               WHEN handoff_motivo = 'validar_pago' THEN 'validar_pago'
               WHEN handoff_motivo IN ('pide_humano', 'bot_no_puede') THEN handoff_motivo
               ELSE 'intervencion_manual'
             END
-        WHERE id = $1
-        `,
-        [cliente_id]
+       WHERE id = $1
+  AND empresa_id = $2
+`,
+[cliente_id, empresaId]
       );
     }
 

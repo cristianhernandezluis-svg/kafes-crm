@@ -3,6 +3,31 @@ import {
   writeFile,
 } from "fs/promises";
 
+function envioFlujoPermitido(telefono, jidRespuesta) {
+  if (process.env.BOT_TEST_MODE === "false") {
+  return true;
+}
+
+if (process.env.BOT_TEST_MODE !== "true") {
+  console.warn("ENVIO FLUJO BLOQUEADO: modo no configurado");
+  return false;
+}
+
+  const numero = String(telefono || "").replace(/\D/g, "");
+
+  const autorizados = String(process.env.BOT_TEST_PHONES || "")
+    .split(",")
+    .map((n) => n.replace(/\D/g, ""))
+    .filter(Boolean);
+
+  const destinoEsperado = `${numero}@s.whatsapp.net`;
+
+  return (
+    autorizados.includes(numero) &&
+    jidRespuesta === destinoEsperado
+  );
+}
+
 function dormir(ms) {
   return new Promise((resolve) =>
     setTimeout(resolve, ms)
@@ -94,6 +119,13 @@ async function enviarTexto({
   whatsappQrId,
   texto,
 }) {
+
+
+if (!envioFlujoPermitido(telefono, jidRespuesta)) {
+  console.warn("ENVIO TEXTO FLUJO BLOQUEADO:", telefono);
+  return;
+}
+
   const limpio = String(
     texto || ""
   ).trim();
@@ -131,6 +163,11 @@ async function enviarMultimedia({
   url,
   tipo,
 }) {
+
+if (!envioFlujoPermitido(telefono, jidRespuesta)) {
+  console.warn("ENVIO MULTIMEDIA FLUJO BLOQUEADO:", telefono);
+  return;
+}
   const archivo = String(
     url || ""
   ).trim();
@@ -1169,6 +1206,8 @@ async function procesarFlujoClienteInterno({
   tipoMensajeCliente = "text",
   jidRespuesta,
   mediaDir = "./auth/media",
+  flujoPrincipalId = null,
+flujoPruebaId = null,
   _profundidadSubflujo = 0,
 }) {
   const estadoResult =
@@ -1187,6 +1226,7 @@ async function procesarFlujoClienteInterno({
         requiere_closer,
         bot_activo,
         proximo_seguimiento,
+        COALESCE(bot_contexto, '{}'::jsonb) AS bot_contexto,
         distribucion_post_id,
         distribucion_grupo_id,
         distribucion_closer_id,
@@ -1220,6 +1260,8 @@ async function procesarFlujoClienteInterno({
       ? Number(
           estado.distribucion_flujo_id
         )
+      : flujoPrincipalId
+      ? Number(flujoPrincipalId)
       : null;
 
   const flujoEjecucionId =
@@ -1230,8 +1272,9 @@ async function procesarFlujoClienteInterno({
       : null;
 
   const flujoId =
-    flujoEjecucionId ||
-    flujoRaizId;
+  flujoPruebaId
+    ? Number(flujoPruebaId)
+    : flujoEjecucionId || flujoRaizId;
 
   const pilaFlujo =
     normalizarPilaFlujos(
@@ -1247,9 +1290,9 @@ async function procesarFlujoClienteInterno({
   }
 
   if (
-    estado.flujo_estado ===
-    "completado"
-  ) {
+  !flujoPruebaId &&
+  estado.flujo_estado === "completado"
+) {
     return {
       consumido: false,
       botActivado: true,
@@ -1376,6 +1419,18 @@ async function procesarFlujoClienteInterno({
       null;
   }
 
+if (
+  flujoPruebaId &&
+  nodoActual &&
+  !nodosPorId.has(nodoActual)
+) {
+  const inicioPrueba = cargado.nodos.find(
+    (nodo) => nodo.tipo === "inicio"
+  );
+
+  nodoActual = inicioPrueba?.nodo_uid || null;
+}
+
   if (!nodoActual) {
     if (
       pilaFlujo.length > 0
@@ -1401,9 +1456,10 @@ async function procesarFlujoClienteInterno({
           tipoMensajeCliente,
           jidRespuesta,
           mediaDir,
-          _profundidadSubflujo:
-            _profundidadSubflujo +
-            1,
+          flujoPrincipalId,
+flujoPruebaId,
+_profundidadSubflujo:
+  _profundidadSubflujo + 1,
         });
       }
     }
@@ -1614,9 +1670,10 @@ async function procesarFlujoClienteInterno({
         tipoMensajeCliente,
         jidRespuesta,
         mediaDir,
-        _profundidadSubflujo:
-          _profundidadSubflujo +
-          1,
+        flujoPrincipalId,
+flujoPruebaId,
+_profundidadSubflujo:
+  _profundidadSubflujo + 1,
       });
     }
 
@@ -1708,6 +1765,83 @@ async function procesarFlujoClienteInterno({
         nodo.config
           ?.accionFlujo ||
         "activar_bot";
+
+      if (
+        accion ===
+        "establecer_campo"
+      ) {
+        const campo = String(
+          nodo.config?.campoAccion || ""
+        ).trim();
+
+        const operacion = String(
+          nodo.config?.operacionAccion || "asignar"
+        ).trim();
+
+        const valorConfigurado = String(
+          nodo.config?.valorAccion || ""
+        ).trim();
+
+        let valorResuelto = valorConfigurado;
+
+        if (
+          valorConfigurado === "{{last_ad}}"
+        ) {
+          valorResuelto = String(
+            estado?.bot_contexto?.last_ad || ""
+          ).trim();
+        }
+
+        if (
+          campo === "source_id" &&
+          operacion === "asignar" &&
+          valorResuelto
+        ) {
+          await pool.query(
+            `
+            UPDATE clientes_whatsapp_qr
+            SET distribucion_post_id = $3,
+                updated_at = NOW()
+            WHERE cliente_id = $1
+              AND whatsapp_qr_id = $2
+            `,
+            [
+              clienteId,
+              whatsappQrId,
+              valorResuelto,
+            ]
+          );
+
+          estado.distribucion_post_id = valorResuelto;
+
+          console.log(
+            "FLUJO CAMPO ASIGNADO:",
+            {
+              clienteId,
+              campo,
+              valor: valorResuelto,
+            }
+          );
+        } else {
+          console.log(
+            "FLUJO CAMPO SIN ASIGNAR:",
+            {
+              clienteId,
+              campo,
+              operacion,
+              valorConfigurado,
+              valorResuelto,
+            }
+          );
+        }
+
+        nodoActual =
+          siguiente.get(
+            nodo.nodo_uid
+          ) || null;
+
+        continue;
+      }
 
       if (
         accion ===
@@ -1826,6 +1960,61 @@ async function procesarFlujoClienteInterno({
       };
     }
 
+    if (nodo.tipo === "agente_ia") {
+      const agenteId = Number(nodo.config?.agenteId || 0);
+      const agente = await pool.query(
+        `SELECT id FROM agentes_ia WHERE id = $1 AND empresa_id = $2 AND activo = true LIMIT 1`,
+        [agenteId, empresaId]
+      );
+      if (!agente.rowCount) {
+        console.warn("AGENTE IA NO DISPONIBLE:", { clienteId, flujoId, agenteId });
+        return { consumido: true, botActivado: false, motivo: "agente_ia_no_disponible" };
+      }
+
+const productoId = String(
+  nodo.config?.productoId || ""
+).trim();
+
+let productoSlug = null;
+
+if (productoId) {
+  const producto = await pool.query(
+    `SELECT slug
+     FROM productos
+     WHERE empresa_id = $1
+       AND (slug = $2 OR id::text = $2)
+       AND activo = true
+       AND ia_activo = true
+     LIMIT 1`,
+    [empresaId, productoId]
+  );
+
+  if (!producto.rowCount) {
+  console.warn("PRODUCTO IA NO DISPONIBLE:", {
+    clienteId,
+    productoId,
+  });
+
+  return {
+    consumido: true,
+    botActivado: false,
+    motivo: "producto_ia_no_disponible",
+  };
+}
+
+productoSlug = producto.rows[0].slug;
+}
+
+return {
+        consumido: false,
+        botActivado: true,
+        motivo: "agente_ia",
+        agenteId,
+        productoId: productoSlug,
+        flujoId,
+        flujoNombre: cargado.flujo.nombre,
+      };
+    }
     if (
       nodo.tipo ===
       "activar_bot"
@@ -1895,9 +2084,10 @@ async function procesarFlujoClienteInterno({
         tipoMensajeCliente,
         jidRespuesta,
         mediaDir,
-        _profundidadSubflujo:
-          _profundidadSubflujo +
-          1,
+        flujoPrincipalId,
+flujoPruebaId,
+_profundidadSubflujo:
+  _profundidadSubflujo + 1,
       });
     }
   }

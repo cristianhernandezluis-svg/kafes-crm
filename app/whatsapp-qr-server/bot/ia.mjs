@@ -58,7 +58,16 @@ function prepararCatalogo(productos = []) {
   }));
 }
 
+async function obtenerAgenteIA(pool, agenteId, empresaId) {
+  if (!pool || !agenteId || !empresaId) return null;
+  const resultado = await pool.query(
+    `SELECT id, nombre, proveedor, modelo, prompt_maestro FROM agentes_ia WHERE id = $1 AND empresa_id = $2 AND activo = true LIMIT 1`,
+    [agenteId, empresaId]
+  );
+  return resultado.rows[0] || null;
+}
 export async function consultarIA(input) {
+  const pool = typeof input === "object" ? input?.pool || null : null;
   const mensaje =
     typeof input === "string"
       ? input
@@ -78,6 +87,8 @@ export async function consultarIA(input) {
     typeof input === "object"
       ? Number(input?.empresaId || input?.empresa_id || 0) || null
       : null;
+
+  const agenteId = typeof input === "object" ? Number(input?.agenteId || 0) || null : null;
 
   const productoPrincipal =
     typeof input === "object"
@@ -126,6 +137,14 @@ const coincidenciaUbicacionDeclarada =
 
 const ubicacionDeclarada =
   coincidenciaUbicacionDeclarada?.[1]?.trim() || "";
+
+const coincidenciaDestinoEnvio =
+  mensajeUbicacionNormalizado.match(
+    /\b(?:envios?|envian|mandan|despachan|delivery)\s+(?:a|hacia|para)\s+([a-zñ ]+?)(?:\s+(?:por|con|mediante)\s+(?:shalom|olva)|[?.!,]|$)/i
+  );
+
+const destinoEnvioSolicitado =
+  coincidenciaDestinoEnvio?.[1]?.trim() || "";
 
 const ubicacionesGenericas = new Set([
   "domicilio",
@@ -215,16 +234,30 @@ const respuestaAUbicacion =
 
 let envioResuelto = null;
 
+if (destinoEnvioSolicitado) {
+  const envioDestino = resolverTipoEnvioPorUbicacion(
+    destinoEnvioSolicitado
+  );
+
+  if (envioDestino) {
+    envioResuelto = {
+      fuente: "destino_envio_solicitado",
+      ubicacion_original: destinoEnvioSolicitado,
+      ...envioDestino,
+    };
+  }
+}
+
 // Si el cliente declara explicitamente una ubicacion,
 // analizar primero SOLO la ubicacion extraida.
 // Esto evita que frases como:
 // "soy de san juna de lurigancho"
 // se confundan con el distrito "lurigancho".
 if (
+  !envioResuelto &&
   mensajeDeclaraNuevaUbicacion &&
   envioDesdeUbicacionDeclarada
-) {
-  envioResuelto = {
+) {  envioResuelto = {
     fuente: "mensaje_actual_declarado",
     ubicacion_original: ubicacionDeclarada,
     ...envioDesdeUbicacionDeclarada,
@@ -233,7 +266,7 @@ if (
 
 // Si no hubo una declaracion explicita,
 // aceptar una zona de Lima reconocida directamente.
-else if (mensajeResuelveLima) {
+else if (!envioResuelto && mensajeResuelveLima) {
   envioResuelto = {
     fuente: "mensaje_actual",
     ubicacion_original: mensaje,
@@ -244,7 +277,7 @@ else if (mensajeResuelveLima) {
 // Si el bot acaba de preguntar la ubicacion,
 // una respuesta corta como Arequipa, Huaral,
 // Barranca o Huancayo se interpreta como ubicacion.
-else if (respuestaAUbicacion) {
+else if (!envioResuelto && respuestaAUbicacion) {
   envioResuelto = {
     fuente: "respuesta_a_pregunta_ubicacion",
     ubicacion_original: mensaje,
@@ -254,7 +287,7 @@ else if (respuestaAUbicacion) {
 
 // En los demás mensajes seguimos usando
 // la ubicación ya conocida.
-else if (envioDesdeMemoria) {
+else if (!envioResuelto && envioDesdeMemoria) {
   envioResuelto = {
     fuente: "memoria_cliente",
     ubicacion_original: ciudadMemoria,
@@ -280,8 +313,76 @@ else if (envioDesdeMemoria) {
 
   const fechaHoraPeru = obtenerFechaHoraPeru();
 
-const datosPagoPrivados =
-  obtenerDatosPagoPrivados();
+const datosPagoPrivados = {
+  titular: input?.datosPagoEmpresa?.titular || null,
+  yape: input?.datosPagoEmpresa?.yape || null,
+  plin: input?.datosPagoEmpresa?.plin || null,
+  bcp: input?.datosPagoEmpresa?.bcp || null,
+  interbank: input?.datosPagoEmpresa?.interbank || null,
+  bbva: input?.datosPagoEmpresa?.bbva || null,
+  bancoNacion: input?.datosPagoEmpresa?.bancoNacion || null,
+};
+
+const politicasBase = obtenerPoliticasComerciales();
+
+const montoAdelanto = input?.datosPagoEmpresa?.adelantoMonto;
+
+const adelantoEmpresa =
+  montoAdelanto != null &&
+  Number.isFinite(Number(montoAdelanto)) &&
+  Number(montoAdelanto) >= 0
+    ? Number(montoAdelanto)
+    : null;
+
+const politicasEmpresa = {
+  ...politicasBase,
+
+  envios: {
+    ...politicasBase.envios,
+    courierAgencia: {
+      ...politicasBase.envios.courierAgencia,
+      adelantoMinimo: adelantoEmpresa,
+    },
+    interprovincial: {
+      pagoNormal: null,
+      excepcionAceptada: false,
+      adelantoExcepcion: null,
+      condicionExcepcion: null,
+    },
+  },
+
+  adelantos: {
+    ...politicasBase.adelantos,
+    courierAgencia: {
+      ...politicasBase.adelantos.courierAgencia,
+      montoMinimo: adelantoEmpresa,
+      requerido: adelantoEmpresa != null,
+    },
+    interprovincial: {
+      pagoNormal: null,
+      excepcionAceptada: false,
+      montoAdelantoExcepcion: null,
+      moneda: "PEN",
+    },
+  },
+
+  confianza: {
+    ...politicasBase.confianza,
+    mensajesPermitidos: [],
+  },
+};
+
+politicasEmpresa.pagos = {
+  ...politicasEmpresa.pagos,
+  datosCuentaDisponibles: [
+    datosPagoPrivados.yape,
+    datosPagoPrivados.plin,
+    datosPagoPrivados.bcp,
+    datosPagoPrivados.interbank,
+    datosPagoPrivados.bbva,
+    datosPagoPrivados.bancoNacion,
+  ].some(valor => Boolean(String(valor || "").trim())),
+};
 
 const contexto = `
 
@@ -302,7 +403,7 @@ REGLA DE PRODUCTO PRINCIPAL:
 - Usa la memoria e historial como contexto, pero no permitas que un producto antiguo domine una consulta nueva.
 
 POLITICAS COMERCIALES REALES:
-${JSON.stringify(obtenerPoliticasComerciales(), null, 2)}
+${JSON.stringify(politicasEmpresa, null, 2)}
 
 DATOS PRIVADOS DE PAGO DISPONIBLES:
 ${JSON.stringify(datosPagoPrivados, null, 2)}
@@ -327,6 +428,14 @@ ${envioResuelto
 
 REGLA OBLIGATORIA SOBRE ENVIO:
 - ENVIO RESUELTO POR EL SISTEMA tiene prioridad sobre una politica generica de envio.
+
+- Si ENVIO RESUELTO POR EL SISTEMA contiene un destino reconocido, NO vuelvas a preguntar la ciudad ni desde donde se comunica el cliente.
+- Cuando fuente="destino_envio_solicitado", interpreta ubicacion_original como destino del envio, sin asumir que sea la residencia del cliente.
+- Si el cliente consulta precio y envio, responde ambos directamente y termina con UNA pregunta para avanzar la venta.
+- Si existen promociones de cantidad, pregunta cual opcion prefiere comprar.
+- Ejemplo: "¿Prefieres una unidad a S/89 o aprovechas las 2 por S/149?"
+- No preguntes la ubicacion nuevamente salvo que el cliente solicite cambiar el destino o sea necesario precisar una direccion para registrar el pedido.
+
 - Si zona="lima_motorizado", el envio corresponde a motorizado contraentrega. NO digas que requiere adelanto y NO cambies automaticamente a Shalom u Olva.
 - Si zona="lima_agencia", corresponde envio por agencia y puedes aplicar el adelanto confirmado para agencia.
 - Si zona="provincia", corresponde envio por agencia.
@@ -335,8 +444,8 @@ REGLA OBLIGATORIA SOBRE ENVIO:
 - NO cambies una zona="provincia" a motorizado contraentrega.
 - Si zona="lima_distrito_pendiente", NO asumas provincia ni cobres adelanto. Pregunta el distrito de Lima.
 - Si contraEntrega=true, puedes indicar que paga al recibir con motorizado.
-- Si requiereAdelanto=false, NO solicites S/30.
-- Nunca reemplaces una clasificacion concreta del sistema por la politica generica de Shalom u Olva.
+- Si requiereAdelanto=false, NO solicites ningun adelanto.
+- Si requiereAdelanto=true, utiliza exclusivamente el monto de adelanto configurado para esta empresa. Si no existe un monto valido, solicita confirmacion de un asesor antes de indicar una cantidad.
 
 MEMORIA DEL CLIENTE:
 ${JSON.stringify(memoria, null, 2)}
@@ -395,7 +504,7 @@ ORDEN OBLIGATORIO DEL CIERRE DEL PEDIDO:
 - Una vez iniciado el registro, asume que la conversacion continua hasta completar el siguiente dato faltante, salvo que el cliente indique que ya no desea comprar.
 
 - Cuando ya tengas nombre, DNI, ubicacion suficientemente precisa y agencia elegida para un envio que requiere adelanto, el siguiente paso debe ser concreto, por ejemplo:
-  "Para confirmar el pedido corresponde el adelanto de S/30. ¿Te paso los datos de pago?"
+  "Para confirmar el pedido corresponde el adelanto configurado para esta empresa. ¿Te paso los datos de pago?"
 
 - No vuelvas a explicar todas las condiciones de envio si ya fueron explicadas y el cliente no las esta preguntando nuevamente.
 
@@ -454,7 +563,7 @@ REGLA ESPECIAL DE PRIMER CONTACTO GENERAL:
   3) beneficios reales importantes registrados en el catalogo;
   4) precio unitario real;
   5) promocion real si existe.
-- Puedes usar emojis comerciales como 🟡 ⚙️ ✅ 💰 💥 ❗ para hacer la presentacion mas visual, sin exagerar.
+- Puedes usar emojis comerciales como 🔧 ✅ 💰 🎁 ⚡ para hacer la presentacion mas visual, sin exagerar.
 - Usa *negritas* de WhatsApp con un solo asterisco a cada lado para resaltar principalmente nombre, precio y promocion. Nunca uses **doble asterisco**.
 - Si existen varios usos o materiales reales en el catalogo, puedes agruparlos en una linea comercial como "Se trabaja en:" sin inventar ninguno.
 - Si existe promocion activa en el catalogo, incluyela obligatoriamente en la apertura usando el precio exacto registrado.
@@ -491,14 +600,23 @@ const consultaPostventaActual =
     mensajeActualNormalizado
   );
 
+const agenteSeleccionado = agenteId ? await obtenerAgenteIA(pool, agenteId, empresaId) : null;
 const promptActivo =
   consultaPostventaActual
     ? PROMPT_POSTVENTA
     : PROMPT_VENDEDOR;
 
+if (agenteId && !agenteSeleccionado) {
+  throw new Error("Agente IA seleccionado no disponible para esta empresa");
+}
+
+const instruccionesIA = agenteSeleccionado
+  ? promptActivo + "\n\nINSTRUCCIONES DEL AGENTE SELECCIONADO:\n" + agenteSeleccionado.prompt_maestro
+  : promptActivo;
+
   const response = await client.responses.parse({
     model: "gpt-4.1-mini",
-    instructions: promptActivo,
+    instructions: instruccionesIA,
     input: contexto,
     text: {
       format: zodTextFormat(

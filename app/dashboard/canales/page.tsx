@@ -9,6 +9,14 @@ type ProductoOpcion = {
   ia_activo: boolean;
 };
 
+type FlujoOpcion = {
+  id: number;
+  nombre: string;
+  slug: string;
+  producto_slug?: string | null;
+  activo: boolean;
+};
+
 export default function CanalesPage() {
   const [qr, setQr] = useState("");
   const [estado, setEstado] = useState("cargando");
@@ -19,6 +27,9 @@ export default function CanalesPage() {
   const [productoPrincipal, setProductoPrincipal] = useState("");
   const [productos, setProductos] = useState<ProductoOpcion[]>([]);
   const [guardandoProducto, setGuardandoProducto] = useState(false);
+  const [flujoPrincipalId, setFlujoPrincipalId] = useState("");
+  const [flujos, setFlujos] = useState<FlujoOpcion[]>([]);
+  const [guardandoFlujo, setGuardandoFlujo] = useState(false);
 
   async function cargarQR() {
     try {
@@ -33,6 +44,11 @@ export default function CanalesPage() {
       setNumeroWhatsapp(data.numero_whatsapp || "");
       setEmpresaId(data.empresa_id ? Number(data.empresa_id) : null);
       setProductoPrincipal((actual) => actual || data.producto_slug || "");
+      setFlujoPrincipalId(
+        data.flujo_principal_id
+          ? String(data.flujo_principal_id)
+          : ""
+      );
     } catch (error) {
       console.error(error);
       setEstado("error");
@@ -54,6 +70,25 @@ export default function CanalesPage() {
     } catch (error) {
       console.error(error);
       setProductos([]);
+    }
+  }
+
+  async function cargarFlujosDisponibles(id: number) {
+    try {
+      const res = await fetch(`/api/flujos?empresa_id=${id}`, {
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      const disponibles = Array.isArray(data.flujos)
+        ? data.flujos.filter((flujo: FlujoOpcion) => flujo.activo)
+        : [];
+
+      setFlujos(disponibles);
+    } catch (error) {
+      console.error(error);
+      setFlujos([]);
     }
   }
 
@@ -91,6 +126,49 @@ export default function CanalesPage() {
       setMensaje("No se pudo desconectar WhatsApp");
     } finally {
       setDesconectando(false);
+    }
+  }
+
+  async function guardarFlujoPrincipal() {
+    if (!flujoPrincipalId) {
+      setMensaje("Selecciona un flujo principal");
+      return;
+    }
+
+    try {
+      setGuardandoFlujo(true);
+      setMensaje("");
+
+      const res = await fetch("/api/whatsapp-qr", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          flujo_principal_id: Number(flujoPrincipalId),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        setMensaje(
+          data.error ||
+            "No se pudo actualizar el flujo principal"
+        );
+        return;
+      }
+
+      setFlujoPrincipalId(
+        data.flujo_principal_id
+          ? String(data.flujo_principal_id)
+          : flujoPrincipalId
+      );
+      setMensaje("Flujo principal actualizado correctamente");
+      await cargarQR();
+    } catch (error) {
+      console.error(error);
+      setMensaje("No se pudo actualizar el flujo principal");
+    } finally {
+      setGuardandoFlujo(false);
     }
   }
 
@@ -141,10 +219,13 @@ export default function CanalesPage() {
   useEffect(() => {
     if (!empresaId) {
       setProductos([]);
+      setFlujos([]);
+      setFlujoPrincipalId("");
       return;
     }
 
     cargarProductosDisponibles(empresaId);
+    cargarFlujosDisponibles(empresaId);
   }, [empresaId]);
 
   return (
@@ -170,6 +251,40 @@ export default function CanalesPage() {
                 Numero conectado: <strong>+{numeroWhatsapp}</strong>
               </p>
             )}
+
+            <div className="text-left border rounded-xl p-4 mb-5">
+              <label className="block font-bold mb-2">
+                Flujo principal / Router de este WhatsApp
+              </label>
+
+              <select
+                value={flujoPrincipalId}
+                onChange={(e) => setFlujoPrincipalId(e.target.value)}
+                className="w-full border rounded-lg px-3 py-3 mb-3"
+              >
+                <option value="">Selecciona un flujo</option>
+                {flujos.map((flujo) => (
+                  <option key={flujo.id} value={String(flujo.id)}>
+                    {flujo.nombre}
+                    {flujo.producto_slug
+                      ? ` - ${flujo.producto_slug}`
+                      : " - Router general"}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={guardarFlujoPrincipal}
+                disabled={guardandoFlujo || !flujoPrincipalId}
+                className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-5 py-3 rounded-lg font-bold w-full"
+              >
+                {guardandoFlujo ? "Guardando..." : "Guardar flujo principal"}
+              </button>
+
+              <p className="text-xs text-gray-500 mt-3">
+                Este flujo sera el punto de entrada general antes de identificar el producto.
+              </p>
+            </div>
 
             <div className="text-left border rounded-xl p-4 mb-5">
               <label className="block font-bold mb-2">

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
-
+import { obtenerSesion } from "@/lib/auth";
 import { gzip } from "zlib";
 import { promisify } from "util";
 
@@ -12,9 +12,45 @@ const pool = new Pool({
 
 export async function GET(request: Request) {
   try {
+    const sesion = await obtenerSesion();
+
+    if (!sesion) {
+      return NextResponse.json(
+        { success: false, error: "No autorizado" },
+        { status: 401 }
+      );
+    }
+
+const usuarioResult = await pool.query(
+  `SELECT id, empresa_id, rol, nombre
+   FROM usuarios
+   WHERE id = $1 AND empresa_id = $2
+   LIMIT 1`,
+  [sesion.id, sesion.empresa_id]
+);
+
+    if (usuarioResult.rowCount === 0) {
+      return NextResponse.json(
+        { success: false, error: "Usuario no autorizado" },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
-    const empresaId = searchParams.get("empresa_id");
+    const empresaIdSolicitada = searchParams.get("empresa_id");
+
+    if (
+      empresaIdSolicitada !== null &&
+      Number(empresaIdSolicitada) !== sesion.empresa_id
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Acceso denegado a esta empresa" },
+        { status: 403 }
+      );
+    }
+
+    const empresaId = sesion.empresa_id;
     const whatsappQrId = searchParams.get("whatsapp_qr_id");
 
     const limitRaw = Number(
@@ -70,7 +106,8 @@ const filtro = filtrosValidos.includes(filtroRaw)
           cliente_id,
           COUNT(*) AS total
         FROM conversaciones
-        WHERE whatsapp_qr_id = $2
+        WHERE empresa_id = $1
+          AND whatsapp_qr_id = $2
           AND remitente = 'cliente'
           AND COALESCE(leido, false) = false
         GROUP BY cliente_id
@@ -144,6 +181,7 @@ const filtro = filtrosValidos.includes(filtroRaw)
           created_at
         FROM conversaciones
         WHERE cliente_id = c.id
+           AND empresa_id = $1
           AND whatsapp_qr_id = $2
         ORDER BY created_at DESC
         LIMIT 1
@@ -153,6 +191,8 @@ const filtro = filtrosValidos.includes(filtroRaw)
         ON no_leidos.cliente_id = c.id
 
       WHERE c.empresa_id = $1
+
+  AND ($7 = 'admin' OR ($7 = 'asesor' AND rel.asesor_usuario_id = $8))
 
   AND EXISTS (
     SELECT 1
@@ -179,12 +219,12 @@ AND (
 
   OR (
     $6 = 'asignadas'
-    AND rel.asesor IS NOT NULL
+    AND rel.asesor_usuario_id IS NOT NULL
   )
 
   OR (
     $6 = 'sin_asignar'
-    AND rel.asesor IS NULL
+    AND rel.asesor_usuario_id IS NULL
   )
 )
 
@@ -202,20 +242,26 @@ OFFSET $4
   offset,
   buscar,
   filtro,
+  usuarioResult.rows[0].rol,
+  usuarioResult.rows[0].id,
 ]
     );
 
 const totalResult = await pool.query(
   `
   SELECT
-    COUNT(DISTINCT cliente_id)::int AS total
-  FROM conversaciones
-  WHERE empresa_id = $1
-    AND whatsapp_qr_id = $2
+    COUNT(DISTINCT conv.cliente_id)::int AS total
+  FROM conversaciones conv
+  INNER JOIN clientes_whatsapp_qr rel ON rel.cliente_id = conv.cliente_id AND rel.empresa_id = conv.empresa_id AND rel.whatsapp_qr_id = conv.whatsapp_qr_id
+  WHERE conv.empresa_id = $1
+    AND conv.whatsapp_qr_id = $2
+    AND ($3 = 'admin' OR ($3 = 'asesor' AND rel.asesor_usuario_id = $4))
   `,
   [
     empresaId,
     whatsappQrId,
+    usuarioResult.rows[0].rol,
+    usuarioResult.rows[0].id,
   ]
 );
 
@@ -243,12 +289,15 @@ if (buscar || filtro !== "todas") {
         SELECT mensaje
         FROM conversaciones
         WHERE cliente_id = c.id
+           AND empresa_id = $1
           AND whatsapp_qr_id = $2
         ORDER BY created_at DESC
         LIMIT 1
       ) ult_busqueda ON true
 
       WHERE c.empresa_id = $1
+
+        AND ($5 = 'admin' OR ($5 = 'asesor' AND rel.asesor_usuario_id = $6))
 
         AND EXISTS (
           SELECT 1
@@ -282,12 +331,12 @@ if (buscar || filtro !== "todas") {
 
           OR (
             $4 = 'asignadas'
-            AND rel.asesor IS NOT NULL
+            AND rel.asesor_usuario_id IS NOT NULL
           )
 
           OR (
             $4 = 'sin_asignar'
-            AND rel.asesor IS NULL
+            AND rel.asesor_usuario_id IS NULL
           )
         )
     ) resultados
@@ -297,6 +346,8 @@ if (buscar || filtro !== "todas") {
       whatsappQrId,
       buscar,
       filtro,
+      usuarioResult.rows[0].rol,
+      usuarioResult.rows[0].id,
     ]
   );
 
@@ -381,6 +432,29 @@ return NextResponse.json(respuesta);
 
 export async function PATCH(req: Request) {
   try {
+const sesion = await obtenerSesion();
+
+if (!sesion) {
+  return NextResponse.json(
+    { success: false, error: "No autorizado" },
+    { status: 401 }
+  );
+}
+
+const usuarioResult = await pool.query(
+  `SELECT id, empresa_id, rol
+   FROM usuarios
+   WHERE id = $1 AND empresa_id = $2
+   LIMIT 1`,
+  [sesion.id, sesion.empresa_id]
+);
+
+if (usuarioResult.rowCount === 0) {
+  return NextResponse.json(
+    { success: false, error: "Usuario no autorizado" },
+    { status: 403 }
+  );
+}
     const {
       cliente_id,
       whatsapp_qr_id,
@@ -407,6 +481,15 @@ export async function PATCH(req: Request) {
     */
 
     if (accion === "asignar_closer") {
+if (usuarioResult.rows[0].rol !== "admin") {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Solo un administrador puede asignar asesores",
+    },
+    { status: 403 }
+  );
+}
       if (!asesor_id) {
         return NextResponse.json(
           {
@@ -422,19 +505,18 @@ export async function PATCH(req: Request) {
       const relacionResult = await pool.query(
         `
         SELECT
-          empresa_id
-
-        FROM clientes_whatsapp_qr
-
-        WHERE cliente_id = $1
-          AND whatsapp_qr_id = $2
-
-        LIMIT 1
+  empresa_id
+FROM clientes_whatsapp_qr
+WHERE cliente_id = $1
+  AND whatsapp_qr_id = $2
+  AND empresa_id = $3
+LIMIT 1
         `,
         [
-          cliente_id,
-          whatsapp_qr_id,
-        ]
+  cliente_id,
+  whatsapp_qr_id,
+  sesion.empresa_id,
+]
       );
 
       if (relacionResult.rowCount === 0) {
@@ -526,14 +608,16 @@ export async function PATCH(req: Request) {
           updated_at = NOW()
 
         WHERE cliente_id = $1
-          AND whatsapp_qr_id = $2
+  AND whatsapp_qr_id = $2
+  AND empresa_id = $5
         `,
         [
-          cliente_id,
-          whatsapp_qr_id,
-          asesor.nombre,
-          asesor.id,
-        ]
+  cliente_id,
+  whatsapp_qr_id,
+  asesor.nombre,
+  asesor.id,
+  sesion.empresa_id,
+]
       );
 
       return NextResponse.json({
@@ -552,8 +636,21 @@ export async function PATCH(req: Request) {
     =========================================================
     */
 
+    // Verificar permisos antes de modificar el chat.
+    const usuarioActual = usuarioResult.rows[0];
+    if (usuarioActual.rol !== "admin" && usuarioActual.rol !== "asesor") {
+      return NextResponse.json({ success: false, error: "Acceso denegado" }, { status: 403 });
+    }
+    const permisoChat = await pool.query(
+      "SELECT 1 FROM clientes_whatsapp_qr WHERE cliente_id = $1 AND whatsapp_qr_id = $2 AND empresa_id = $3 AND ($4 = 'admin' OR asesor_usuario_id = $5) LIMIT 1",
+      [cliente_id, whatsapp_qr_id, sesion.empresa_id, usuarioActual.rol, usuarioActual.id]
+    );
+    if (permisoChat.rowCount !== 1) {
+      return NextResponse.json({ success: false, error: "Conversacion no autorizada" }, { status: 403 });
+    }
+
     if (accion === "liberar") {
-      await pool.query(
+      const resultadoLiberacion = await pool.query(
         `
         UPDATE clientes_whatsapp_qr
 
@@ -563,23 +660,30 @@ export async function PATCH(req: Request) {
           updated_at = NOW()
 
         WHERE cliente_id = $1
-          AND whatsapp_qr_id = $2
-          AND COALESCE(
-            modo_humano_permanente,
-            false
-          ) = false
-          AND humano_hasta IS NOT NULL
+  AND whatsapp_qr_id = $2
+  AND empresa_id = $3
+  AND COALESCE(
+    modo_humano_permanente,
+    false
+  ) = false
+  AND humano_hasta IS NOT NULL
+AND COALESCE(handoff_motivo, '') <> 'validar_pago'
         `,
         [
-          cliente_id,
-          whatsapp_qr_id,
-        ]
+  cliente_id,
+  whatsapp_qr_id,
+  sesion.empresa_id,
+]
       );
 
       return NextResponse.json({
-        success: true,
-        liberado: true,
-      });
+  success: true,
+  liberado: (resultadoLiberacion.rowCount ?? 0) > 0,
+  motivo:
+    (resultadoLiberacion.rowCount ?? 0) > 0
+      ? null
+      : "No se liberó la conversación. Puede existir un pago pendiente o una restricción de atención humana.",
+});
     }
 
     /*
@@ -596,13 +700,15 @@ SET leido = true
 
 WHERE cliente_id = $1
   AND whatsapp_qr_id = $2
+  AND empresa_id = $3
   AND remitente = 'cliente'
   AND COALESCE(leido, false) = false
       `,
       [
-        cliente_id,
-        whatsapp_qr_id,
-      ]
+  cliente_id,
+  whatsapp_qr_id,
+  sesion.empresa_id,
+]
     );
 
     /*
@@ -626,13 +732,10 @@ WHERE cliente_id = $1
         bot_activo = false,
 
         requiere_closer = CASE
-          WHEN COALESCE(
-            BTRIM(asesor),
-            ''
-          ) = ''
-          THEN requiere_closer
-          ELSE false
-        END,
+  WHEN handoff_motivo = 'validar_pago' THEN true
+  WHEN COALESCE(BTRIM(asesor), '') = '' THEN requiere_closer
+  ELSE false
+END,
 
         humano_hasta =
           NOW() + INTERVAL '90 seconds',
@@ -640,12 +743,14 @@ WHERE cliente_id = $1
         updated_at = NOW()
 
       WHERE cliente_id = $1
-        AND whatsapp_qr_id = $2
+  AND whatsapp_qr_id = $2
+  AND empresa_id = $3
       `,
       [
-        cliente_id,
-        whatsapp_qr_id,
-      ]
+  cliente_id,
+  whatsapp_qr_id,
+  sesion.empresa_id,
+]
     );
 
     return NextResponse.json({

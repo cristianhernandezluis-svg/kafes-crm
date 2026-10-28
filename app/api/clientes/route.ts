@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
+import { obtenerSesion } from "@/lib/auth";
 
 import { gzip } from "zlib";
 import { promisify } from "util";
@@ -12,9 +13,44 @@ const pool = new Pool({
 
 export async function GET(request: Request) {
   try {
+    const sesion = await obtenerSesion();
+
+    if (!sesion) {
+      return NextResponse.json(
+        { success: false, error: "No autorizado" },
+        { status: 401 }
+      );
+    }
+
+    const usuarioResult = await pool.query(
+      `SELECT id FROM usuarios
+       WHERE id = $1 AND empresa_id = $2
+       LIMIT 1`,
+      [sesion.id, sesion.empresa_id]
+    );
+
+    if (usuarioResult.rowCount === 0) {
+      return NextResponse.json(
+        { success: false, error: "Usuario no autorizado" },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
-    const empresaId = searchParams.get("empresa_id");
+    const empresaIdSolicitada = searchParams.get("empresa_id");
+
+    if (
+      empresaIdSolicitada !== null &&
+      Number(empresaIdSolicitada) !== sesion.empresa_id
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Acceso denegado a esta empresa" },
+        { status: 403 }
+      );
+    }
+
+    const empresaId = sesion.empresa_id;
     const whatsappQrId = searchParams.get("whatsapp_qr_id");
     const incluirContactos = searchParams.get("incluir_contactos") === "1";
 const modoDashboard =
@@ -135,7 +171,8 @@ END AS score,
               SELECT 1
               FROM integraciones_whatsapp_qr iq
               WHERE iq.id = $2::integer
-                AND conv.created_at >= iq.created_at
+  AND iq.empresa_id = $1
+  AND conv.created_at >= iq.created_at
             )
           )
 
@@ -170,7 +207,8 @@ END AS score,
               SELECT 1
               FROM conversaciones conv2
               JOIN integraciones_whatsapp_qr iq2
-                ON iq2.id = $2::integer
+  ON iq2.id = $2::integer
+ AND iq2.empresa_id = $1
               WHERE conv2.cliente_id = clientes.id
                 AND conv2.empresa_id = $1
                 AND conv2.whatsapp_qr_id = $2::integer
@@ -262,10 +300,33 @@ return NextResponse.json(respuesta);
 
 export async function POST(request: Request) {
   try {
+    const sesion = await obtenerSesion();
+
+    if (!sesion) {
+      return NextResponse.json(
+        { success: false, error: "No autorizado" },
+        { status: 401 }
+      );
+    }
+
+    const usuarioResult = await pool.query(
+      `SELECT id, empresa_id, rol
+       FROM usuarios
+       WHERE id = $1 AND empresa_id = $2
+       LIMIT 1`,
+      [sesion.id, sesion.empresa_id]
+    );
+
+    if (usuarioResult.rowCount === 0) {
+      return NextResponse.json(
+        { success: false, error: "Usuario no autorizado" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
     const {
-      empresa_id,
       nombre,
       telefono,
       ciudad,
@@ -275,12 +336,27 @@ export async function POST(request: Request) {
       proximo_seguimiento = null,
     } = body;
 
-    if (!empresa_id) {
+    if (
+      body.empresa_id != null &&
+      Number(body.empresa_id) !== sesion.empresa_id
+    ) {
       return NextResponse.json(
-        { success: false, error: "empresa_id es obligatorio" },
+        { success: false, error: "Acceso denegado a esta empresa" },
+        { status: 403 }
+      );
+    }
+
+    if (
+      typeof telefono !== "string" ||
+      !telefono.replace(/\D/g, "")
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Teléfono inválido" },
         { status: 400 }
       );
     }
+
+    const empresa_id = sesion.empresa_id;
 
     let telefonoLimpio = telefono.replace(/\D/g, "");
 

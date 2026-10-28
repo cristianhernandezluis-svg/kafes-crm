@@ -39,6 +39,25 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-auth/
 auth-backup-*/
 storage/
+
+# Respaldos y archivos temporales
+*.backup-*
+*.bak
+*.bak-*
+*.antes-*.bak
+*.respaldo-*.bak
+*.pre-prueba-*.bak
+
+# Scripts temporales de mantenimiento
+/patch_*.cjs
+/patch_*.py
+
+# Pruebas locales de agentes
+/prueba-*.mjs
+*.backup.*
+/auth/
+/app/whatsapp-qr-server/auth/
+/app - copia/whatsapp-qr-server/auth/
+/app - copia/
